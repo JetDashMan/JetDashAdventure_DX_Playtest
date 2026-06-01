@@ -148,7 +148,7 @@ body.touch-enabled #game {
 
 .graphics-toggle,
 .debug-toggle,
-.help-toggle {
+.pause-toggle {
   position: fixed;
   top: 18px;
   z-index: 2;
@@ -170,20 +170,20 @@ body.touch-enabled #game {
   min-width: 88px;
 }
 
-.help-toggle {
+.pause-toggle {
   right: 372px;
   min-width: 42px;
   width: 42px;
   padding: 0;
-  font-size: 1.2rem;
+  font-size: 0.94rem;
 }
 
 .graphics-toggle[aria-expanded="true"],
 .debug-toggle[aria-expanded="true"],
-.help-toggle[aria-expanded="true"],
+.pause-toggle[aria-expanded="true"],
 .graphics-toggle:hover,
 .debug-toggle:hover,
-.help-toggle:hover {
+.pause-toggle:hover {
   background: #ffd344;
   color: #181100;
 }
@@ -329,6 +329,59 @@ body.touch-enabled #game {
 .settings-action button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+.pause-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 8, 16, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.pause-menu.hidden {
+  display: none;
+}
+
+.pause-panel {
+  display: grid;
+  gap: 14px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(7, 18, 31, 0.9);
+  box-shadow: 0 24px 76px rgba(0, 0, 0, 0.34);
+}
+
+.pause-panel .panel-title {
+  margin-bottom: 0;
+}
+
+.pause-help-toggle {
+  min-width: 38px;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1rem;
+}
+
+.pause-help-toggle[aria-expanded="true"] {
+  background: #ffd344;
+  color: #181100;
+}
+
+.resume-game {
+  width: 100%;
+  min-height: 50px;
+}
+
+body.game-paused .help-panel {
+  z-index: 9;
 }
 
 .debug-block {
@@ -792,7 +845,8 @@ body.touch-enabled:not(.portrait-touch) .boost-track {
 
 body.touch-enabled:not(.portrait-touch) .music-toggle,
 body.touch-enabled:not(.portrait-touch) .graphics-toggle,
-body.touch-enabled:not(.portrait-touch) .debug-toggle {
+body.touch-enabled:not(.portrait-touch) .debug-toggle,
+body.touch-enabled:not(.portrait-touch) .pause-toggle {
   right: 8px;
   min-width: 84px;
   min-height: 32px;
@@ -811,13 +865,28 @@ body.touch-enabled:not(.portrait-touch) .debug-toggle {
   top: 80px;
 }
 
-body.touch-enabled:not(.portrait-touch) .help-toggle {
+body.touch-enabled:not(.portrait-touch) .pause-toggle {
   top: 116px;
   right: 8px;
   min-width: 32px;
   width: 32px;
   min-height: 32px;
   font-size: 0.9rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .pause-menu {
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+
+body.touch-enabled:not(.portrait-touch) .pause-panel {
+  width: min(280px, calc(100vw - 32px));
+  padding: 14px;
+  gap: 10px;
+}
+
+body.touch-enabled:not(.portrait-touch) .resume-game {
+  min-height: 38px;
+  font-size: 0.78rem;
 }
 
 body.touch-enabled:not(.portrait-touch) .stage-select {
@@ -957,7 +1026,7 @@ body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
     font-size: 0.7rem;
   }
 
-  .help-toggle {
+  .pause-toggle {
     top: auto;
     right: 118px;
     bottom: 58px;

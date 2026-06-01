@@ -22,6 +22,9 @@ const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
+const pauseButton = document.querySelector("#pause-toggle");
+const pauseMenu = document.querySelector("#pause-menu");
+const resumeButton = document.querySelector("#resume-game");
 const stageMenuToggle = document.querySelector("#stage-menu-toggle");
 const stageMenu = document.querySelector("#stage-menu");
 const stageSelectButtons = document.querySelectorAll("[data-stage-select]");
@@ -34,6 +37,7 @@ const debugProgressButtons = document.querySelectorAll("[data-debug-progress]");
 const graphicsControls = {
   preset: document.querySelector("#graphics-preset"),
   renderScale: document.querySelector("#graphics-render-scale"),
+  mobileRenderScale: document.querySelector("#graphics-mobile-render-scale"),
   shadowQuality: document.querySelector("#graphics-shadow-quality"),
   shadowSoftness: document.querySelector("#graphics-shadow-softness"),
   shadowDistance: document.querySelector("#graphics-shadow-distance"),
@@ -63,6 +67,7 @@ const graphicsStorageKey = "jetdash-graphics-settings";
 const graphicsPresets = {
   low: {
     renderScale: "0.75",
+    mobileRenderScale: "0.75",
     shadowQuality: "off",
     shadowSoftness: "hard",
     shadowDistance: "near",
@@ -74,6 +79,7 @@ const graphicsPresets = {
   },
   medium: {
     renderScale: "1",
+    mobileRenderScale: "1",
     shadowQuality: "medium",
     shadowSoftness: "hard",
     shadowDistance: "medium",
@@ -85,6 +91,7 @@ const graphicsPresets = {
   },
   high: {
     renderScale: "1.25",
+    mobileRenderScale: "1.5",
     shadowQuality: "high",
     shadowSoftness: "soft",
     shadowDistance: "far",
@@ -96,6 +103,7 @@ const graphicsPresets = {
   },
   ultra: {
     renderScale: "1.5",
+    mobileRenderScale: "2",
     shadowQuality: "ultra",
     shadowSoftness: "soft",
     shadowDistance: "ultra",
@@ -287,7 +295,7 @@ const speedDisplayScale = 3.2;
 const debugSuperBoostSpeed = 2000 / speedDisplayScale;
 const seaLevelY = -8.2;
 const runTopSpeed = 46;
-const reverseTopSpeed = 15;
+const reverseTopSpeed = 147 / speedDisplayScale;
 const boostTopSpeed = 300 / speedDisplayScale;
 const maxHorizontalSpeed = 400 / speedDisplayScale;
 const boostGaugeMax = 100;
@@ -352,6 +360,9 @@ const stageMusicVolume = 0.62;
 let musicWanted = true;
 let musicStarted = false;
 let musicAudio;
+let isPaused = false;
+let pauseStartedAt = 0;
+let musicWasPlayingBeforePause = false;
 let hemiLight;
 let sunLight;
 let sunTarget;
@@ -3663,7 +3674,7 @@ function getGoalProgressForZ(z) {
 
 function isGwangalliBuildingRemovalZone(z) {
   const progress = getGoalProgressForZ(z);
-  return progress >= 0.35 && progress <= 0.48;
+  return progress >= 0.35 && progress <= 0.56;
 }
 
 function addGwangalliIsland({ x, z, radius, height }) {
@@ -3748,7 +3759,7 @@ function addGwangalliDenseUrbanCorridor() {
   if (!Number.isFinite(tunnelStartZ)) return;
 
   const startZ = getStageZAtGoalProgress(0.6);
-  const endZ = tunnelStartZ + 30;
+  const endZ = getStageZAtGoalProgress(0.8);
   const rowSpacing = 132;
   let rowIndex = 0;
 
@@ -3763,14 +3774,17 @@ function addGwangalliDenseUrbanCorridor() {
     setStageSceneryTransform(group, new THREE.Vector3(0, ground.y - 1.05, z), 0, 0, true);
 
     for (const side of [-1, 1]) {
-      addGwangalliUrbanBlockBase(group, side, rowIndex);
+      const closeToRoad = z > tunnelStartZ + 20;
+      if (closeToRoad) {
+        addGwangalliUrbanBlockBase(group, side, rowIndex);
+      }
 
       for (let column = 0; column < 3; column += 1) {
         const seed = rowIndex * 17 + column * 5 + (side > 0 ? 3 : 11);
-        const height = 34 + (seed % 9) * 7 + (column === 2 ? 24 : column * 9);
+        const height = 34 + (seed % 9) * 7 + (column === 2 ? 24 : column * 9) + (closeToRoad ? 0 : 18);
         const width = 13 + (seed % 4) * 2.2;
         const depth = 18 + ((seed + column) % 5) * 2.6;
-        const x = side * (43 + column * 24 + ((seed % 3) - 1) * 2.4);
+        const x = side * ((closeToRoad ? 25 : 54) + column * (closeToRoad ? 18 : 24) + ((seed % 3) - 1) * 2.4);
         const towerZ = -42 + column * 42 + ((seed % 5) - 2) * 3.2;
 
         addGwangalliUrbanTower(group, {
@@ -3792,27 +3806,27 @@ function addGwangalliDenseUrbanCorridor() {
 
 function addGwangalliUrbanBlockBase(group, side, rowIndex) {
   const base = new THREE.Mesh(
-    new THREE.BoxGeometry(82, 1.1, 144),
+    new THREE.BoxGeometry(50, 1.1, 144),
     materials.coastalRock,
   );
-  base.position.set(side * 72, 0.55, 0);
+  base.position.set(side * 36.5, 0.55, 0);
   base.receiveShadow = true;
   group.add(base);
 
   const sidewalk = new THREE.Mesh(
-    new THREE.BoxGeometry(7.5, 0.2, 134),
+    new THREE.BoxGeometry(5.8, 0.2, 134),
     materials.gwangalliBoardwalk,
   );
-  sidewalk.position.set(side * 28.5, 1.22, 0);
+  sidewalk.position.set(side * 13.2, 1.22, 0);
   sidewalk.receiveShadow = true;
   group.add(sidewalk);
 
   if (rowIndex % 3 === 1) {
     const serviceRoad = new THREE.Mesh(
-      new THREE.BoxGeometry(13.5, 0.16, 126),
+      new THREE.BoxGeometry(10.5, 0.16, 126),
       materials.gwangalliRoad,
     );
-    serviceRoad.position.set(side * 37.5, 1.25, 0);
+    serviceRoad.position.set(side * 22.2, 1.25, 0);
     serviceRoad.receiveShadow = true;
     group.add(serviceRoad);
   }
@@ -3924,6 +3938,8 @@ function addShinseondaeTunnelApproach() {
   const tunnelStartZ = getGwangalliTunnelStartZ();
   if (!Number.isFinite(tunnelStartZ)) return;
 
+  addShinseondaeApproachSideRoads(tunnelStartZ);
+
   for (let z = tunnelStartZ + 360; z > tunnelStartZ + 30; z -= 78) {
     const sample = getStageDefinitionGroundSample(0, z);
     if (!sample) continue;
@@ -3951,7 +3967,44 @@ function addShinseondaeTunnelApproach() {
   }
 
   addShinseondaeTunnelEntrance(tunnelStartZ);
-  addShinseondaeOverheadGuide(tunnelStartZ + 260, "SHINSEONDAE UNDERPASS");
+  addShinseondaeVariableMessageSign(tunnelStartZ + 260);
+}
+
+function addShinseondaeApproachSideRoads(tunnelStartZ) {
+  const sideRoadStartZ = getStageZAtGoalProgress(0.6);
+  const sideRoadEndZ = tunnelStartZ - 18;
+
+  for (const side of [-1, 1]) {
+    const sideRoad = new THREE.Mesh(
+      makeContinuousScenerySideBoxGeometry(side * 15.1, sideRoadStartZ, sideRoadEndZ, 0.12, 8.2, 0.42, 14),
+      materials.gwangalliRoadAlt,
+    );
+    sideRoad.receiveShadow = true;
+    scene.add(sideRoad);
+
+    const sidewalk = new THREE.Mesh(
+      makeContinuousScenerySideBoxGeometry(side * 21.2, sideRoadStartZ, sideRoadEndZ, 0.18, 3.2, 0.38, 14),
+      materials.gwangalliBoardwalk,
+    );
+    sidewalk.receiveShadow = true;
+    scene.add(sidewalk);
+
+    const innerCurb = new THREE.Mesh(
+      makeContinuousSceneryVerticalBoxGeometry(side * 10.7, sideRoadStartZ, sideRoadEndZ, 0.16, 0.98, 0.34, 16),
+      materials.gwangalliRail,
+    );
+    innerCurb.castShadow = false;
+    innerCurb.receiveShadow = true;
+    scene.add(innerCurb);
+
+    const outerRail = new THREE.Mesh(
+      makeContinuousSceneryVerticalBoxGeometry(side * 22.9, sideRoadStartZ, sideRoadEndZ, 0.28, 1.42, 0.32, 16),
+      materials.gwangalliRailStripe,
+    );
+    outerRail.castShadow = false;
+    outerRail.receiveShadow = true;
+    scene.add(outerRail);
+  }
 }
 
 function addShinseondaeTunnelEntrance(z) {
@@ -3976,41 +4029,169 @@ function addShinseondaeTunnelEntrance(z) {
   header.castShadow = true;
   group.add(header);
 
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(15.6, 1.25, 0.16),
-    createCanvasLabelMaterial("신선대지하차도", 512, 96, "#f1f7e9", "#244034"),
-  );
-  sign.position.set(0, 9.05, 0.48);
-  group.add(sign);
+  addTunnelEntranceBrickLines(group);
+  addTunnelEntranceLetterSigns(group);
+  addTunnelEntranceLimitSigns(group);
 
   scene.add(group);
 }
 
-function addShinseondaeOverheadGuide(z, label) {
+function addShinseondaeVariableMessageSign(z) {
   const sample = getStageDefinitionGroundSample(0, z);
   if (!sample) return;
 
   const group = new THREE.Group();
   setStageSceneryTransform(group, new THREE.Vector3(0, sample.y, z), 0, 0);
 
-  const leftPost = new THREE.Mesh(new THREE.BoxGeometry(0.34, 7.2, 0.34), materials.gwangalliBridgeCable);
-  leftPost.position.set(-9.8, 3.6, 0);
+  const leftPost = new THREE.Mesh(new THREE.BoxGeometry(0.34, 8.2, 0.34), materials.gwangalliBridgeCable);
+  leftPost.position.set(-12.5, 4.1, 0);
   const rightPost = leftPost.clone();
-  rightPost.position.x = 9.8;
+  rightPost.position.x = 12.5;
   group.add(leftPost, rightPost);
 
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(21, 0.35, 0.35), materials.gwangalliBridgeCable);
-  beam.position.y = 7.1;
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(27.5, 0.34, 0.34), materials.gwangalliBridgeCable);
+  beam.position.y = 8.15;
   group.add(beam);
 
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(14.5, 1.4, 0.16),
-    createCanvasLabelMaterial(label, 512, 96, "#b9f7b9", "#24312d"),
+  const board = new THREE.Mesh(new THREE.BoxGeometry(18.8, 2.7, 0.42), materials.roadSign);
+  board.position.set(0, 6.78, 0.08);
+  board.castShadow = true;
+  group.add(board);
+
+  const message = new THREE.Mesh(
+    new THREE.PlaneGeometry(17.8, 2.05),
+    createCanvasMultilineLabelMaterial(["전조등을 켜시오"], 1024, 220, "#b8ff7a", "rgba(0, 0, 0, 0)"),
   );
-  sign.position.set(0, 6.3, -0.1);
-  group.add(sign);
+  message.position.set(0, 6.8, 0.32);
+  group.add(message);
+
+  addOverheadSmallSign(group, -5.5, 8.92, "구간단속지점");
+  addOverheadSmallSign(group, 5.5, 8.92, "지점고속단속중");
+
+  for (const x of [-2.2, 2.2]) {
+    const cameraBox = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.38, 0.52), materials.gwangalliBridgeCable);
+    cameraBox.position.set(x, 8.42, 0.18);
+    cameraBox.castShadow = true;
+    group.add(cameraBox);
+
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.13, 16), materials.roadSign);
+    lens.position.set(x, 8.42, 0.46);
+    group.add(lens);
+  }
+
+  addShinseondaeWarningSignStack(group, -1);
+  addShinseondaeWarningSignStack(group, 1);
+  addCrashCushion(group, -1);
+  addCrashCushion(group, 1);
 
   scene.add(group);
+}
+
+function addTunnelEntranceBrickLines(group) {
+  for (let row = 0; row < 7; row += 1) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(27.8, 0.035, 0.08), materials.gwangalliRailStripe);
+    line.position.set(0, 6.72 + row * 0.38, 0.46);
+    group.add(line);
+  }
+
+  for (let column = 0; column < 18; column += 1) {
+    const stagger = column % 2 === 0 ? 0 : 0.19;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(0.035, 2.56, 0.08), materials.gwangalliRailStripe);
+    line.position.set(-13.2 + column * 1.55, 7.82 + stagger, 0.47);
+    group.add(line);
+  }
+}
+
+function addTunnelEntranceLetterSigns(group) {
+  const letters = ["지", "하", "차", "도"];
+  letters.forEach((letter, index) => {
+    const panel = new THREE.Mesh(
+      new THREE.BoxGeometry(3.25, 1.78, 0.12),
+      createCanvasLabelMaterial(letter, 160, 120, "#111820", "#f6f7f2"),
+    );
+    panel.position.set(-7.35 + index * 4.9, 9.55, 0.58);
+    group.add(panel);
+  });
+}
+
+function addTunnelEntranceLimitSigns(group) {
+  const signs = [
+    { x: -4.7, label: "NO", radius: 0.64 },
+    { x: 0, label: "4.5m", radius: 0.68 },
+    { x: 4.7, label: "60", radius: 0.68 },
+  ];
+
+  signs.forEach((sign) => {
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(sign.radius, 40),
+      createCircleRoadSignMaterial(sign.label),
+    );
+    disc.position.set(sign.x, 8.45, 0.62);
+    group.add(disc);
+  });
+}
+
+function addOverheadSmallSign(group, x, y, label) {
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(4.7, 0.82, 0.16),
+    createCanvasLabelMaterial(label, 320, 96, "#1d1a12", "#c9862d"),
+  );
+  sign.position.set(x, y, 0.34);
+  sign.castShadow = true;
+  group.add(sign);
+}
+
+function addShinseondaeWarningSignStack(group, side) {
+  const x = side * 12.95;
+  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.24, 6.0, 0.24), materials.gwangalliBridgeCable);
+  pole.position.set(x, 3.0, 0.16);
+  pole.castShadow = true;
+  group.add(pole);
+
+  addTriangleRoadSign(group, x, 5.92, 0.46);
+  addCircleRoadSign(group, x, 4.9, 0.46, "4.5m", 0.44);
+  addCircleRoadSign(group, x, 3.98, 0.46, "NO", 0.42);
+  addCircleRoadSign(group, x, 3.08, 0.46, "60", 0.42);
+
+  const sideNotice = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 1.02, 0.12),
+    createCanvasMultilineLabelMaterial(["진입", "금지"], 180, 160, "#183043", "#f5f7fb"),
+  );
+  sideNotice.position.set(x, 6.86, 0.46);
+  group.add(sideNotice);
+}
+
+function addCircleRoadSign(group, x, y, z, label, radius) {
+  const sign = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 36),
+    createCircleRoadSignMaterial(label),
+  );
+  sign.position.set(x, y, z);
+  group.add(sign);
+}
+
+function addTriangleRoadSign(group, x, y, z) {
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.98, 0.9),
+    createTriangleRoadSignMaterial(),
+  );
+  sign.position.set(x, y, z);
+  group.add(sign);
+}
+
+function addCrashCushion(group, side) {
+  for (let i = 0; i < 3; i += 1) {
+    const block = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.48, 1.25), materials.obstacleStripe);
+    block.position.set(side * (13.35 + i * 0.62), 0.42, 4.9 - i * 0.38);
+    block.rotation.y = side * 0.12;
+    block.castShadow = true;
+    group.add(block);
+
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 1.32), materials.obstacleDark);
+    stripe.position.set(block.position.x - side * 0.22, 0.47, block.position.z);
+    stripe.rotation.set(0, block.rotation.y, side * 0.42);
+    group.add(stripe);
+  }
 }
 
 function addShinseondaeTunnel() {
@@ -4143,6 +4324,83 @@ function createCanvasLabelMaterial(label, width, height, textColor, backgroundCo
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshBasicMaterial({ map: texture });
+}
+
+function createCanvasMultilineLabelMaterial(lines, width, height, textColor, backgroundColor) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.fillStyle = backgroundColor;
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = textColor;
+  const fontSize = Math.round(height / (lines.length + 1.25));
+  context.font = `bold ${fontSize}px Arial, sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  const lineHeight = fontSize * 1.12;
+  const firstY = height * 0.5 - (lines.length - 1) * lineHeight * 0.5;
+
+  lines.forEach((line, index) => {
+    context.fillText(line, width * 0.5, firstY + index * lineHeight);
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: texture, transparent: backgroundColor.includes("rgba") });
+}
+
+function createCircleRoadSignMaterial(label) {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, size, size);
+  context.beginPath();
+  context.arc(size * 0.5, size * 0.5, size * 0.43, 0, Math.PI * 2);
+  context.fillStyle = "#f7f8f4";
+  context.fill();
+  context.lineWidth = size * 0.075;
+  context.strokeStyle = "#b51f36";
+  context.stroke();
+  context.fillStyle = "#132030";
+  context.font = `bold ${label.length > 3 ? 52 : 72}px Arial, sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, size * 0.5, size * 0.52);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+}
+
+function createTriangleRoadSignMaterial() {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, size, size);
+  context.beginPath();
+  context.moveTo(size * 0.5, size * 0.12);
+  context.lineTo(size * 0.88, size * 0.82);
+  context.lineTo(size * 0.12, size * 0.82);
+  context.closePath();
+  context.fillStyle = "#f9c74f";
+  context.fill();
+  context.lineWidth = size * 0.055;
+  context.strokeStyle = "#9d2735";
+  context.stroke();
+  context.fillStyle = "#151923";
+  context.font = "bold 82px Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("!", size * 0.5, size * 0.58);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: texture, transparent: true });
 }
 
 function getStageSceneryFrame(z, useCache = false) {
@@ -5332,9 +5590,14 @@ function addTrail() {
 
 function bindInput() {
   window.addEventListener("keydown", (event) => {
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyQ", "KeyE", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyO", "KeyU"].includes(event.code)) {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyQ", "KeyE", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyO", "KeyU", "KeyP", "Escape"].includes(event.code)) {
       event.preventDefault();
     }
+    if ((event.code === "KeyP" || event.code === "Escape") && !event.repeat) {
+      setPaused(!isPaused, "manual");
+      return;
+    }
+    if (isPaused) return;
     if (event.code === "KeyM" && !keys.has("KeyM")) {
       toggleMusic();
     } else if (musicWanted && isGameplayKey(event.code)) {
@@ -5380,18 +5643,35 @@ function bindInput() {
   musicButton.addEventListener("click", toggleMusic);
   graphicsButton?.addEventListener("click", () => setGraphicsPanelOpen(graphicsPanel?.classList.contains("hidden")));
   debugButton?.addEventListener("click", () => setDebugPanelOpen(debugPanel?.classList.contains("hidden")));
+  pauseButton?.addEventListener("click", () => setPaused(true, "manual"));
+  resumeButton?.addEventListener("click", () => setPaused(false, "manual"));
   helpButton?.addEventListener("click", () => setHelpPanelOpen(helpPanel?.classList.contains("hidden")));
   document.querySelector("[data-close-panel='graphics']")?.addEventListener("click", () => setGraphicsPanelOpen(false));
   document.querySelector("[data-close-panel='debug']")?.addEventListener("click", () => setDebugPanelOpen(false));
   document.querySelector("[data-close-panel='help']")?.addEventListener("click", () => setHelpPanelOpen(false));
   fullscreenButton?.addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", updateFullscreenButton);
+  document.addEventListener("visibilitychange", handleVisibilityPause);
+  window.addEventListener("pagehide", handleVisibilityPause);
+  window.addEventListener("blur", handleWindowBlurPause);
   bindGraphicsControls();
   bindDebugControls();
   window.addEventListener("resize", resize);
   updateMusicButton();
   updateStageSelector();
   updateFullscreenButton();
+}
+
+function handleVisibilityPause(event) {
+  if ((document.hidden || event?.type === "pagehide") && !finished) {
+    setPaused(true, "system");
+  }
+}
+
+function handleWindowBlurPause() {
+  if (touchControlsEnabled && !finished) {
+    setPaused(true, "system");
+  }
 }
 
 function bindTouchControls() {
@@ -5422,6 +5702,8 @@ function updateTouchOrientationState() {
 }
 
 function handleTouchControlDown(event) {
+  if (isPaused) return;
+
   const button = event.currentTarget;
   const control = button.dataset.touchControl;
   if (!control) return;
@@ -5466,7 +5748,7 @@ function handleTouchControlUp(event) {
 }
 
 function handleTouchQuickStepTap(event) {
-  if (!touchControlsEnabled || document.body.classList.contains("portrait-touch") || finished) return;
+  if (!touchControlsEnabled || document.body.classList.contains("portrait-touch") || finished || isPaused) return;
   if (event.pointerType === "mouse") return;
   if (event.target !== canvas) return;
 
@@ -5527,6 +5809,13 @@ function tick(now = performance.now()) {
     return;
   }
   lastFrameTime = now;
+
+  if (isPaused) {
+    clock.getDelta();
+    renderGame(0);
+    requestAnimationFrame(tick);
+    return;
+  }
 
   const dt = Math.min(clock.getDelta(), 0.033);
   updateGame(dt);
@@ -6038,6 +6327,7 @@ function dropCollectedRings() {
 
 function checkGoal() {
   if (player.position.z < goalZ + 6 && Math.abs(player.position.x) < 9.2) {
+    setPaused(false, "finish");
     finished = true;
     finishEl.classList.remove("hidden");
     finishKickerEl.textContent = `${currentStage.label} CLEAR`;
@@ -6311,8 +6601,63 @@ function spawnTrailBurst() {
   }
 }
 
+function setPaused(paused, reason = "manual") {
+  if (finished && paused) return;
+  if (isPaused === paused) return;
+
+  isPaused = paused;
+  document.body.classList.toggle("game-paused", isPaused);
+  pauseMenu?.classList.toggle("hidden", !isPaused);
+  pauseButton?.setAttribute("aria-expanded", isPaused ? "true" : "false");
+
+  if (isPaused) {
+    pauseStartedAt = performance.now();
+    keys.clear();
+    quickStepQueued = 0;
+    jumpQueued = false;
+    if (touchControlsEnabled) {
+      touchInput.activePointers.clear();
+      touchInput.brake = false;
+      touchInput.jump = false;
+      syncTouchControls();
+    }
+    setStageMenuOpen(false);
+    setGraphicsPanelOpen(false);
+    setDebugPanelOpen(false);
+    pauseMusicForGame();
+  } else {
+    if (pauseStartedAt > 0) {
+      startedAt += performance.now() - pauseStartedAt;
+      pauseStartedAt = 0;
+    }
+    setHelpPanelOpen(false);
+    clock.getDelta();
+    resumeMusicForGame(reason);
+  }
+}
+
+function pauseMusicForGame() {
+  musicWasPlayingBeforePause = Boolean(musicAudio && musicStarted && !musicAudio.paused);
+  if (musicAudio) {
+    musicAudio.pause();
+  }
+  musicStarted = false;
+  updateMusicButton();
+}
+
+function resumeMusicForGame(reason) {
+  const shouldResume = reason !== "reset" && musicWanted && musicWasPlayingBeforePause;
+  musicWasPlayingBeforePause = false;
+  if (shouldResume) {
+    startMusic();
+  } else {
+    updateMusicButton();
+  }
+}
+
 function startMusic() {
   if (!musicWanted) return;
+  if (isPaused) return;
 
   if (!musicAudio) {
     setupMusic();
@@ -6404,6 +6749,7 @@ function normalizeGraphicsSettings(source = {}) {
   return {
     preset: source.preset === "custom" ? "custom" : preset,
     renderScale: isValidGraphicsValue(settings.renderScale, ["0.75", "1", "1.25", "1.5"]) ? settings.renderScale : graphicsDefaults.renderScale,
+    mobileRenderScale: isValidGraphicsValue(settings.mobileRenderScale, ["0.75", "1", "1.25", "1.5", "1.75", "2"]) ? settings.mobileRenderScale : graphicsDefaults.mobileRenderScale,
     shadowQuality: isValidGraphicsValue(settings.shadowQuality, Object.keys(shadowQualityConfig)) ? settings.shadowQuality : graphicsDefaults.shadowQuality,
     shadowSoftness: isValidGraphicsValue(settings.shadowSoftness, ["hard", "soft"]) ? settings.shadowSoftness : graphicsDefaults.shadowSoftness,
     shadowDistance: isValidGraphicsValue(settings.shadowDistance, Object.keys(shadowDistanceConfig)) ? settings.shadowDistance : graphicsDefaults.shadowDistance,
@@ -6513,7 +6859,12 @@ function applyGraphicsSettings(save = true) {
 }
 
 function applyRenderScale() {
-  renderer.setPixelRatio(Number(graphicsSettings.renderScale));
+  renderer.setPixelRatio(getEffectiveRenderScale());
+}
+
+function getEffectiveRenderScale() {
+  const scale = Number(touchControlsEnabled ? graphicsSettings.mobileRenderScale : graphicsSettings.renderScale);
+  return Number.isFinite(scale) && scale > 0 ? scale : Number(graphicsDefaults.renderScale);
 }
 
 function applyShadowSettings() {
@@ -6621,6 +6972,9 @@ function setDebugPanelOpen(open) {
 
 function setHelpPanelOpen(open) {
   if (!helpPanel || !helpButton) return;
+  if (open && !isPaused) {
+    setPaused(true, "manual");
+  }
   helpPanel.classList.toggle("hidden", !open);
   helpButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
@@ -6744,6 +7098,7 @@ function getGoalProgressPercent() {
 }
 
 function resetGame(options = {}) {
+  setPaused(false, "reset");
   const scoreOverride = Number.isFinite(options.scoreOverride) ? options.scoreOverride : 0;
 
   finished = false;

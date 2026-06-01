@@ -62,8 +62,8 @@
     <button id="debug-toggle" class="debug-toggle" type="button" aria-expanded="false">
       DEBUG
     </button>
-    <button id="help-toggle" class="help-toggle" type="button" aria-label="Key guide" aria-expanded="false">
-      ?
+    <button id="pause-toggle" class="pause-toggle" type="button" aria-label="Pause game" aria-expanded="false">
+      II
     </button>
 
     <nav class="stage-select" aria-label="Stage select">
@@ -77,7 +77,7 @@
     <section id="graphics-panel" class="settings-panel hidden" aria-label="Graphics settings">
       <div class="panel-title">
         <strong>GRAPHICS</strong>
-        <button type="button" data-close-panel="graphics" aria-label="Close graphics settings">×</button>
+        <button type="button" data-close-panel="graphics" aria-label="Close graphics settings">x</button>
       </div>
       <label>
         <span>Preset</span>
@@ -96,6 +96,17 @@
           <option value="1">100%</option>
           <option value="1.25">125%</option>
           <option value="1.5">150%</option>
+        </select>
+      </label>
+      <label>
+        <span>Mobile Resolution Scale</span>
+        <select id="graphics-mobile-render-scale">
+          <option value="0.75">75%</option>
+          <option value="1">100%</option>
+          <option value="1.25">125%</option>
+          <option value="1.5">150%</option>
+          <option value="1.75">175%</option>
+          <option value="2">200%</option>
         </select>
       </label>
       <label>
@@ -178,7 +189,7 @@
     <section id="debug-panel" class="settings-panel debug-panel hidden" aria-label="Debug settings">
       <div class="panel-title">
         <strong>DEBUG</strong>
-        <button type="button" data-close-panel="debug" aria-label="Close debug settings">×</button>
+        <button type="button" data-close-panel="debug" aria-label="Close debug settings">x</button>
       </div>
       <div class="debug-block">
         <span>Progress Warp</span>
@@ -199,18 +210,29 @@
       </label>
     </section>
 
+    <section id="pause-menu" class="pause-menu hidden" aria-label="Pause menu" aria-modal="true" role="dialog">
+      <div class="pause-panel">
+        <div class="panel-title">
+          <strong>PAUSED</strong>
+          <button id="help-toggle" class="pause-help-toggle" type="button" aria-label="Key guide" aria-expanded="false">?</button>
+        </div>
+        <button id="resume-game" class="resume-game" type="button">Resume Game</button>
+      </div>
+    </section>
+
     <section id="help-panel" class="help-panel hidden" aria-label="Key guide">
       <div class="panel-title">
         <strong>KEY GUIDE</strong>
-        <button type="button" data-close-panel="help" aria-label="Close key guide">×</button>
+        <button type="button" data-close-panel="help" aria-label="Close key guide">x</button>
       </div>
       <dl>
-        <dt>W / ↑</dt><dd>Forward</dd>
-        <dt>S / ↓</dt><dd>Brake / Reverse</dd>
-        <dt>A,D / ←,→</dt><dd>Move</dd>
+        <dt>W / Up</dt><dd>Forward</dd>
+        <dt>S / Down</dt><dd>Brake / Reverse</dd>
+        <dt>A,D / Left,Right</dt><dd>Move</dd>
         <dt>Q / E</dt><dd>Quick Step</dd>
         <dt>Space</dt><dd>Jump</dd>
         <dt>Shift</dt><dd>Boost</dd>
+        <dt>P / Esc</dt><dd>Pause</dd>
         <dt>U</dt><dd>Debug Super Boost</dd>
         <dt>J / L</dt><dd>Camera Left / Right</dd>
         <dt>I / K</dt><dd>Camera Up / Down</dd>
