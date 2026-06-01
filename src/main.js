@@ -1896,6 +1896,7 @@ function addGwangalliBeachEnvironment() {
   addGwangalliSuspensionStructure();
   addGwangalliTourBoats();
   addGwangalliCoastalLandmarks();
+  addGwangalliDenseUrbanCorridor();
   addShinseondaeTunnelApproach();
   addShinseondaeTunnel();
 }
@@ -3647,9 +3648,22 @@ function addGwangalliCoastalLandmarks() {
     { x: 180, z: -6200, count: 6, seed: 33 },
     { x: 146, z: -7040, count: 5, seed: 41 },
   ];
-  clusters.forEach(addGwangalliApartmentCluster);
+  clusters
+    .filter((cluster) => !isGwangalliBuildingRemovalZone(cluster.z))
+    .forEach(addGwangalliApartmentCluster);
 
   addGwangalliCoastalRoadDetails();
+}
+
+function getGoalProgressForZ(z) {
+  const goalDistance = stageStartZ - goalZ;
+  if (goalDistance <= 0) return 0;
+  return THREE.MathUtils.clamp((stageStartZ - z) / goalDistance, 0, 1);
+}
+
+function isGwangalliBuildingRemovalZone(z) {
+  const progress = getGoalProgressForZ(z);
+  return progress >= 0.35 && progress <= 0.48;
 }
 
 function addGwangalliIsland({ x, z, radius, height }) {
@@ -3725,6 +3739,142 @@ function addGwangalliApartmentCluster({ x, z, count, seed }) {
   }
 
   scene.add(group);
+}
+
+function addGwangalliDenseUrbanCorridor() {
+  if (!currentStage.gwangalliTheme) return;
+
+  const tunnelStartZ = getGwangalliTunnelStartZ();
+  if (!Number.isFinite(tunnelStartZ)) return;
+
+  const startZ = getStageZAtGoalProgress(0.6);
+  const endZ = tunnelStartZ + 30;
+  const rowSpacing = 132;
+  let rowIndex = 0;
+
+  for (let z = startZ; z > endZ; z -= rowSpacing) {
+    const ground = getStageDefinitionGroundSample(0, z);
+    if (!ground) {
+      rowIndex += 1;
+      continue;
+    }
+
+    const group = new THREE.Group();
+    setStageSceneryTransform(group, new THREE.Vector3(0, ground.y - 1.05, z), 0, 0, true);
+
+    for (const side of [-1, 1]) {
+      addGwangalliUrbanBlockBase(group, side, rowIndex);
+
+      for (let column = 0; column < 3; column += 1) {
+        const seed = rowIndex * 17 + column * 5 + (side > 0 ? 3 : 11);
+        const height = 34 + (seed % 9) * 7 + (column === 2 ? 24 : column * 9);
+        const width = 13 + (seed % 4) * 2.2;
+        const depth = 18 + ((seed + column) % 5) * 2.6;
+        const x = side * (43 + column * 24 + ((seed % 3) - 1) * 2.4);
+        const towerZ = -42 + column * 42 + ((seed % 5) - 2) * 3.2;
+
+        addGwangalliUrbanTower(group, {
+          x,
+          z: towerZ,
+          width,
+          depth,
+          height,
+          side,
+          seed,
+        });
+      }
+    }
+
+    scene.add(group);
+    rowIndex += 1;
+  }
+}
+
+function addGwangalliUrbanBlockBase(group, side, rowIndex) {
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(82, 1.1, 144),
+    materials.coastalRock,
+  );
+  base.position.set(side * 72, 0.55, 0);
+  base.receiveShadow = true;
+  group.add(base);
+
+  const sidewalk = new THREE.Mesh(
+    new THREE.BoxGeometry(7.5, 0.2, 134),
+    materials.gwangalliBoardwalk,
+  );
+  sidewalk.position.set(side * 28.5, 1.22, 0);
+  sidewalk.receiveShadow = true;
+  group.add(sidewalk);
+
+  if (rowIndex % 3 === 1) {
+    const serviceRoad = new THREE.Mesh(
+      new THREE.BoxGeometry(13.5, 0.16, 126),
+      materials.gwangalliRoad,
+    );
+    serviceRoad.position.set(side * 37.5, 1.25, 0);
+    serviceRoad.receiveShadow = true;
+    group.add(serviceRoad);
+  }
+}
+
+function addGwangalliUrbanTower(group, {
+  x,
+  z,
+  width,
+  depth,
+  height,
+  side,
+  seed,
+}) {
+  const material = seed % 3 === 0
+    ? materials.rightCityDarkGlass
+    : seed % 3 === 1
+      ? materials.gwangalliBuilding
+      : materials.rightCityGlass;
+
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  tower.position.set(x, height * 0.5 + 1.2, z);
+  tower.castShadow = height > 48;
+  tower.receiveShadow = true;
+  group.add(tower);
+
+  const cap = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 1.2, 1.25, depth + 1.0),
+    materials.rightCityFacade,
+  );
+  cap.position.set(x, height + 1.85, z);
+  cap.castShadow = false;
+  cap.receiveShadow = true;
+  group.add(cap);
+
+  const innerFaceX = x - side * (width * 0.5 + 0.08);
+  const glassPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, height * 0.68, depth * 0.72),
+    material === materials.gwangalliBuilding ? materials.gwangalliWindow : materials.rightCityGlass,
+  );
+  glassPanel.position.set(innerFaceX, height * 0.5 + 1.4, z);
+  group.add(glassPanel);
+
+  const floorCount = Math.min(7, Math.max(3, Math.floor(height / 13)));
+  for (let floor = 1; floor <= floorCount; floor += 1) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.44, depth * 0.78),
+      floor % 2 === 0 ? materials.gwangalliBuildingLight : materials.gwangalliWindow,
+    );
+    strip.position.set(innerFaceX - side * 0.04, 3.2 + floor * (height - 6) / (floorCount + 1), z);
+    group.add(strip);
+  }
+
+  if (seed % 4 === 0) {
+    const rooftop = new THREE.Mesh(
+      new THREE.BoxGeometry(width * 0.58, 3.8, depth * 0.5),
+      materials.rightCityFacade,
+    );
+    rooftop.position.set(x, height + 4.3, z);
+    rooftop.castShadow = false;
+    group.add(rooftop);
+  }
 }
 
 function addGwangalliCoastalRoadDetails() {
