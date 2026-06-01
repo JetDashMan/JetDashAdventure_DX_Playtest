@@ -333,6 +333,7 @@ let quickStepFlash = 0;
 let boostGauge = boostGaugeMax;
 let boostMotionBlurTarget = 0;
 let boostMotionBlurStrength = 0;
+let playerBoostEffectActive = false;
 let cameraYawOffset = 0;
 let cameraPitchOffset = 0;
 let dashPadBoostStartSpeed = 0;
@@ -496,6 +497,68 @@ const materials = {
   shoeSole: new THREE.MeshStandardMaterial({
     color: 0xf7f7ef,
     roughness: 0.42,
+  }),
+  jetHoodie: new THREE.MeshStandardMaterial({
+    color: 0xf1f3f4,
+    roughness: 0.54,
+    metalness: 0.02,
+  }),
+  jetHoodieShadow: new THREE.MeshStandardMaterial({
+    color: 0xc9cdd0,
+    roughness: 0.6,
+    metalness: 0.02,
+  }),
+  jetPants: new THREE.MeshStandardMaterial({
+    color: 0xbb2024,
+    roughness: 0.48,
+    metalness: 0.02,
+  }),
+  jetPantsTrim: new THREE.MeshStandardMaterial({
+    color: 0xf4f6f8,
+    roughness: 0.45,
+  }),
+  jetHarness: new THREE.MeshStandardMaterial({
+    color: 0x15191f,
+    roughness: 0.42,
+    metalness: 0.08,
+  }),
+  jetHarnessPlate: new THREE.MeshStandardMaterial({
+    color: 0x4a525b,
+    roughness: 0.34,
+    metalness: 0.28,
+  }),
+  jetHair: new THREE.MeshStandardMaterial({
+    color: 0x2b1f1a,
+    roughness: 0.58,
+  }),
+  jetSkin: new THREE.MeshStandardMaterial({
+    color: 0xf1b98f,
+    roughness: 0.5,
+  }),
+  jetEyeBlue: new THREE.MeshStandardMaterial({
+    color: 0x1163d8,
+    emissive: 0x07245a,
+    emissiveIntensity: 0.15,
+    roughness: 0.28,
+  }),
+  jetShoeWhite: new THREE.MeshStandardMaterial({
+    color: 0xf7f8f6,
+    roughness: 0.38,
+  }),
+  jetShoeSole: new THREE.MeshStandardMaterial({
+    color: 0x20252b,
+    roughness: 0.5,
+  }),
+  jetAccentRed: new THREE.MeshStandardMaterial({
+    color: 0xd0262c,
+    roughness: 0.4,
+  }),
+  jetEnergy: new THREE.MeshBasicMaterial({
+    color: 0x24d9ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   }),
   harborRoad: new THREE.MeshStandardMaterial({
     color: 0xe2ecef,
@@ -4913,74 +4976,76 @@ function addGoal() {
 function addPlayer() {
   const group = new THREE.Group();
   const model = new THREE.Group();
-  model.position.y = -0.06;
+  model.position.y = 0.1;
   group.add(model);
+  const energyLines = [];
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 24), materials.speedsterBlue);
-  body.scale.set(0.82, 1.08, 0.66);
-  body.position.set(0, -0.04, 0.02);
-  model.add(body);
+  addBox(model, 0.68, 0.78, 0.42, materials.jetHoodie, 0, 0.13, 0);
+  addBox(model, 0.74, 0.12, 0.48, materials.jetHoodieShadow, 0, -0.31, 0);
+  addBox(model, 0.03, 0.68, 0.024, materials.jetHarness, 0, 0.15, -0.226);
+  addBox(model, 0.04, 0.52, 0.028, materials.jetAccentRed, -0.36, -0.02, -0.16);
+  addBox(model, 0.04, 0.52, 0.028, materials.jetAccentRed, 0.36, -0.02, -0.16);
 
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.26, 24, 16), materials.speedsterSkin);
-  belly.scale.set(1.0, 1.18, 0.36);
-  belly.position.set(0, -0.04, -0.38);
-  model.add(belly);
+  const hoodBack = new THREE.Mesh(new THREE.SphereGeometry(0.36, 24, 16), materials.jetHoodie);
+  hoodBack.scale.set(1.08, 0.56, 0.72);
+  hoodBack.position.set(0, 0.56, 0.2);
+  model.add(hoodBack);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.56, 36, 24), materials.speedsterBlue);
-  head.scale.set(1.02, 1.06, 0.96);
-  head.position.set(0, 0.7, -0.16);
+  const hoodCollar = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.055, 10, 32), materials.jetHoodieShadow);
+  hoodCollar.position.set(0, 0.55, -0.02);
+  hoodCollar.rotation.x = Math.PI / 2;
+  hoodCollar.scale.set(1.12, 0.76, 1);
+  model.add(hoodCollar);
+
+  const innerCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.18, 16), materials.jetHarness);
+  innerCollar.position.set(0, 0.51, -0.04);
+  model.add(innerCollar);
+
+  addJetHarness(model, energyLines);
+
+  const head = new THREE.Group();
+  head.position.set(0, 0.89, -0.12);
   model.add(head);
 
-  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.25, 24, 16), materials.speedsterSkin);
-  muzzle.scale.set(1.18, 0.78, 0.72);
-  muzzle.position.set(0, 0.58, -0.62);
-  model.add(muzzle);
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.26, 32, 20), materials.jetSkin);
+  face.scale.set(0.84, 1.06, 0.78);
+  head.add(face);
 
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 10), materials.pupil);
-  nose.scale.set(1.0, 0.82, 1.3);
-  nose.position.set(0, 0.62, -0.84);
-  model.add(nose);
+  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.28, 28, 16), materials.jetHair);
+  hairCap.scale.set(0.96, 0.66, 0.9);
+  hairCap.position.set(0, 0.12, 0.01);
+  head.add(hairCap);
 
-  const eyeGeometry = new THREE.SphereGeometry(0.14, 20, 12);
-  const pupilGeometry = new THREE.SphereGeometry(0.042, 12, 8);
+  addJetHair(head);
+
   for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(eyeGeometry, materials.eyeWhite);
-    eye.scale.set(0.82, 1.36, 0.2);
-    eye.position.set(side * 0.15, 0.87, -0.61);
-    model.add(eye);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 10), materials.eyeWhite);
+    eye.scale.set(1.45, 0.72, 0.22);
+    eye.position.set(side * 0.085, 0.03, -0.205);
+    head.add(eye);
 
-    const pupil = new THREE.Mesh(pupilGeometry, materials.pupil);
-    pupil.scale.set(0.8, 1.25, 0.32);
-    pupil.position.set(side * 0.15, 0.84, -0.645);
-    model.add(pupil);
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 8), materials.jetEyeBlue);
+    iris.scale.set(0.9, 1.05, 0.28);
+    iris.position.set(side * 0.085, 0.025, -0.224);
+    head.add(iris);
   }
 
-  const earGeometry = new THREE.ConeGeometry(0.16, 0.38, 3);
-  for (const side of [-1, 1]) {
-    const ear = new THREE.Mesh(earGeometry, materials.speedsterBlue);
-    ear.position.set(side * 0.29, 1.17, -0.16);
-    ear.rotation.z = side * -0.28;
-    ear.rotation.y = side * 0.18;
-    model.add(ear);
-  }
+  const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.18, 6, 10), materials.jetSkin);
+  neck.position.set(0, 0.52, -0.06);
+  model.add(neck);
 
-  addSpine(model, 0, 0.82, 0.45, 0.28, 1.18, 0);
-  addSpine(model, -0.28, 0.57, 0.42, 0.22, 0.96, 0.34);
-  addSpine(model, 0.28, 0.57, 0.42, 0.22, 0.96, -0.34);
-  addSpine(model, 0, 0.16, 0.39, 0.22, 0.92, 0);
-  addSpine(model, -0.2, -0.08, 0.35, 0.18, 0.76, 0.24);
-  addSpine(model, 0.2, -0.08, 0.35, 0.18, 0.76, -0.24);
-
-  const armLeft = createArm(-1);
-  const armRight = createArm(1);
-  const legLeft = createLeg(-1);
-  const legRight = createLeg(1);
+  const armLeft = createArm(-1, energyLines);
+  const armRight = createArm(1, energyLines);
+  const legLeft = createLeg(-1, energyLines);
+  const legRight = createLeg(1, energyLines);
   model.add(armLeft, armRight, legLeft, legRight);
+
+  addJetEnergyLine(energyLines, model, 0.56, 0.024, 0.02, 0, 0.61, -0.285);
 
   model.traverse((child) => {
     if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
+      child.castShadow = !child.userData.energyLine;
+      child.receiveShadow = !child.userData.energyLine;
     }
   });
 
@@ -4991,57 +5056,109 @@ function addPlayer() {
     arms: [armLeft, armRight],
     legs: [legLeft, legRight],
     head,
+    energyLines,
   };
 }
 
-function addSpine(parent, x, y, z, radius, length, roll) {
-  const spine = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 18), materials.speedsterBlue);
-  spine.position.set(x, y, z);
-  spine.rotation.x = Math.PI / 2;
-  spine.rotation.z = roll;
-  parent.add(spine);
+function addBox(parent, width, height, depth, material, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  parent.add(mesh);
+  return mesh;
 }
 
-function createArm(side) {
+function addJetHarness(parent, energyLines) {
+  addBox(parent, 0.075, 0.78, 0.052, materials.jetHarness, -0.24, 0.18, -0.254, 0, 0, -0.08);
+  addBox(parent, 0.075, 0.78, 0.052, materials.jetHarness, 0.24, 0.18, -0.254, 0, 0, 0.08);
+  addBox(parent, 0.66, 0.085, 0.062, materials.jetHarness, 0, 0.16, -0.286);
+  addBox(parent, 0.18, 0.12, 0.075, materials.jetHarnessPlate, 0, 0.16, -0.325);
+
+  addBox(parent, 0.08, 0.76, 0.056, materials.jetHarness, -0.22, 0.2, 0.248, 0, 0, 0.36);
+  addBox(parent, 0.08, 0.76, 0.056, materials.jetHarness, 0.22, 0.2, 0.248, 0, 0, -0.36);
+  addBox(parent, 0.26, 0.34, 0.08, materials.jetHarnessPlate, 0, 0.24, 0.31);
+  addJetEnergyLine(energyLines, parent, 0.05, 0.24, 0.014, 0, 0.24, 0.36);
+}
+
+function addJetHair(head) {
+  addHairSpike(head, -0.18, 0.18, -0.04, 0.075, 0.28, -0.55, 0.08, -0.55);
+  addHairSpike(head, -0.08, 0.22, -0.09, 0.08, 0.34, -0.78, -0.1, -0.22);
+  addHairSpike(head, 0.06, 0.23, -0.1, 0.085, 0.36, -0.84, 0.08, 0.18);
+  addHairSpike(head, 0.18, 0.17, -0.04, 0.075, 0.28, -0.58, -0.08, 0.48);
+  addHairSpike(head, -0.24, 0.08, 0.02, 0.07, 0.24, -0.15, 0.1, -0.82);
+  addHairSpike(head, 0.24, 0.08, 0.02, 0.07, 0.24, -0.15, -0.1, 0.82);
+  addHairSpike(head, 0, 0.23, 0.08, 0.075, 0.26, 0.3, 0, 0);
+}
+
+function addHairSpike(parent, x, y, z, radius, length, rx, ry, rz) {
+  const spike = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 8), materials.jetHair);
+  spike.position.set(x, y, z);
+  spike.rotation.set(rx, ry, rz);
+  parent.add(spike);
+}
+
+function addJetEnergyLine(lines, parent, width, height, depth, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const line = addBox(parent, width, height, depth, materials.jetEnergy, x, y, z, rx, ry, rz);
+  line.visible = false;
+  line.userData.energyLine = true;
+  line.userData.phase = lines.length * 0.73;
+  lines.push(line);
+  return line;
+}
+
+function createArm(side, energyLines) {
   const arm = new THREE.Group();
-  arm.position.set(side * 0.44, 0.2, -0.04);
-  arm.rotation.z = side * 0.28;
+  arm.position.set(side * 0.45, 0.36, -0.02);
+  arm.rotation.z = side * 0.2;
 
-  const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.46, 6, 12), materials.speedsterSkin);
-  limb.position.y = -0.24;
-  limb.rotation.z = side * 0.08;
-  arm.add(limb);
+  const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, 0.46, 6, 12), materials.jetHoodie);
+  sleeve.position.y = -0.23;
+  sleeve.rotation.z = side * 0.06;
+  arm.add(sleeve);
 
-  const glove = new THREE.Mesh(new THREE.SphereGeometry(0.14, 18, 12), materials.glove);
-  glove.scale.set(1.1, 0.9, 1.0);
-  glove.position.set(0, -0.54, -0.03);
+  addBox(arm, 0.18, 0.1, 0.16, materials.jetHarness, 0, -0.48, -0.01);
+  addJetEnergyLine(energyLines, arm, 0.024, 0.24, 0.018, side * 0.062, -0.28, -0.095, 0, 0, side * 0.16);
+
+  const glove = new THREE.Mesh(new THREE.SphereGeometry(0.13, 18, 12), materials.jetHarness);
+  glove.scale.set(1.08, 0.88, 0.9);
+  glove.position.set(0, -0.61, -0.035);
   arm.add(glove);
+
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 8), materials.jetSkin);
+  palm.scale.set(1.05, 0.72, 0.5);
+  palm.position.set(0, -0.62, -0.09);
+  arm.add(palm);
 
   return arm;
 }
 
-function createLeg(side) {
+function createLeg(side, energyLines) {
   const leg = new THREE.Group();
-  leg.position.set(side * 0.2, -0.45, 0.0);
+  leg.position.set(side * 0.2, -0.34, 0.01);
 
-  const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.38, 6, 12), materials.speedsterSkin);
-  limb.position.y = -0.18;
-  leg.add(limb);
+  const pants = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, 0.52, 6, 12), materials.jetPants);
+  pants.position.y = -0.25;
+  pants.rotation.z = side * 0.04;
+  leg.add(pants);
+
+  addBox(leg, 0.04, 0.42, 0.018, materials.jetPantsTrim, side * 0.086, -0.25, -0.03, 0, 0, side * -0.08);
+  addBox(leg, 0.16, 0.08, 0.16, materials.jetHarness, 0, -0.55, -0.02);
 
   const shoe = new THREE.Group();
-  shoe.position.set(0, -0.43, -0.12);
+  shoe.position.set(0, -0.46, -0.12);
 
-  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.13, 0.62), materials.shoeSole);
-  sole.position.set(0, -0.06, 0.02);
+  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.11, 0.66), materials.jetShoeSole);
+  sole.position.set(0, -0.07, 0.03);
   shoe.add(sole);
 
-  const top = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.56), materials.shoe);
-  top.position.set(0, 0.03, -0.02);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.2, 0.58), materials.jetShoeWhite);
+  top.position.set(0, 0.02, -0.03);
   shoe.add(top);
 
-  const strap = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.12), materials.shoeSole);
-  strap.position.set(0, 0.17, -0.12);
-  shoe.add(strap);
+  addBox(shoe, 0.34, 0.07, 0.12, materials.jetHoodieShadow, 0, 0.16, -0.12);
+  addBox(shoe, 0.07, 0.1, 0.24, materials.jetAccentRed, side * 0.17, 0.02, -0.02, 0, 0.16 * side, 0);
+  addBox(shoe, 0.24, 0.04, 0.34, materials.jetHarnessPlate, 0, 0.03, -0.13, 0, 0, side * 0.12);
+  addJetEnergyLine(energyLines, shoe, 0.028, 0.042, 0.38, side * 0.21, 0.06, -0.04, 0, 0.08 * side, 0);
 
   leg.add(shoe);
   leg.shoe = shoe;
@@ -5265,6 +5382,7 @@ function updateGame(dt) {
   quickStepCooldown = Math.max(0, quickStepCooldown - dt);
   quickStepFlash = Math.max(0, quickStepFlash - dt * 5.5);
   boostMotionBlurTarget = 0;
+  playerBoostEffectActive = false;
 
   if (!finished) {
     updatePlayer(dt);
@@ -5294,6 +5412,7 @@ function updatePlayer(dt) {
   const keyboardBoost = isDown("ShiftLeft", "ShiftRight");
   const touchBoost = touchControlsEnabled && touchInput.boost && touchInput.autoForward;
   const boosting = !stunned && !brakingInput && (keyboardBoost || touchBoost) && boostGauge > 0;
+  playerBoostEffectActive = boosting || debugSuperBoostActive;
   const strafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
   const speedLimit = debugSuperBoostActive ? debugSuperBoostSpeed : maxHorizontalSpeed;
 
@@ -5877,7 +5996,7 @@ function animatePlayerModel(dt) {
   const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.12;
   const airborne = !player.grounded;
 
-  player.parts.model.position.y = -0.06
+  player.parts.model.position.y = 0.1
     + (moving && player.grounded ? Math.abs(Math.sin(runPhase * 2)) * 0.035 : 0)
     + (airborne ? 0.04 : 0);
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
@@ -5917,6 +6036,18 @@ function animatePlayerModel(dt) {
     THREE.MathUtils.clamp(player.velocity.x * 0.018, -0.2, 0.2),
     1 - Math.exp(-8 * dt),
   );
+
+  const energyAmount = playerBoostEffectActive
+    ? THREE.MathUtils.clamp(0.35 + speed / boostTopSpeed, 0.35, 1)
+    : 0;
+  materials.jetEnergy.opacity = energyAmount > 0 ? 0.3 + energyAmount * 0.55 : 0;
+  for (const line of player.parts.energyLines ?? []) {
+    line.visible = energyAmount > 0;
+    const pulse = energyAmount > 0
+      ? 1 + Math.sin(runPhase * 3 + line.userData.phase) * 0.08 * energyAmount
+      : 1;
+    line.scale.setScalar(pulse);
+  }
 }
 
 function updateCamera(dt) {
@@ -6380,6 +6511,8 @@ function warpToGoalProgress(progress) {
   dashPadBoostRemaining = 0;
   boostMotionBlurTarget = 0;
   boostMotionBlurStrength = 0;
+  playerBoostEffectActive = false;
+  materials.jetEnergy.opacity = 0;
   boostMotionBlurMaterial.uniforms.uStrength.value = 0;
   if (touchControlsEnabled) resetTouchRunState();
   player.position.set(0, sample.y + player.radius, targetZ);
@@ -6419,6 +6552,8 @@ function resetGame(options = {}) {
   boostGauge = boostGaugeMax;
   boostMotionBlurTarget = 0;
   boostMotionBlurStrength = 0;
+  playerBoostEffectActive = false;
+  materials.jetEnergy.opacity = 0;
   boostMotionBlurMaterial.uniforms.uStrength.value = 0;
   resetCameraView();
   dashPadBoostStartSpeed = 0;
@@ -6453,7 +6588,7 @@ function resetGame(options = {}) {
     setStageObjectTransform(player.mesh, player.position);
   }
   if (player.parts) {
-    player.parts.model.position.y = -0.06;
+    player.parts.model.position.y = 0.1;
     player.parts.model.rotation.set(0, 0, 0);
     for (const arm of player.parts.arms) arm.rotation.set(0, 0, 0);
     for (const leg of player.parts.legs) {
@@ -6462,6 +6597,10 @@ function resetGame(options = {}) {
       leg.shoe.scale.set(1, 1, 1);
     }
     player.parts.head.rotation.set(0, 0, 0);
+    for (const line of player.parts.energyLines ?? []) {
+      line.visible = false;
+      line.scale.setScalar(1);
+    }
   }
 
   for (const ring of rings) {
