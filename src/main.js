@@ -4122,10 +4122,7 @@ function addTunnelEntranceLimitSigns(group) {
   ];
 
   signs.forEach((sign) => {
-    const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(sign.radius, 40),
-      createCircleRoadSignMaterial(sign.label),
-    );
+    const disc = createRoundRoadSignMesh(sign.label, sign.radius, 0.14);
     disc.position.set(sign.x, 8.45, 0.62);
     group.add(disc);
   });
@@ -4162,10 +4159,7 @@ function addShinseondaeWarningSignStack(group, side) {
 }
 
 function addCircleRoadSign(group, x, y, z, label, radius) {
-  const sign = new THREE.Mesh(
-    new THREE.CircleGeometry(radius, 36),
-    createCircleRoadSignMaterial(label),
-  );
+  const sign = createRoundRoadSignMesh(label, radius, 0.1);
   sign.position.set(x, y, z);
   group.add(sign);
 }
@@ -4199,7 +4193,7 @@ function addShinseondaeTunnel() {
   const tunnelEndZ = currentStage.gwangalliTunnelEndZ ?? currentStage.goalZ;
   if (!Number.isFinite(tunnelStartZ)) return;
 
-  const shellStartZ = tunnelStartZ - 82;
+  const shellStartZ = tunnelStartZ + 24;
   const shellEndZ = tunnelEndZ + 36;
   const ceiling = new THREE.Mesh(
     makeContinuousScenerySideBoxGeometry(0, shellStartZ, shellEndZ, 7.25, 22.8, 0.82, 7),
@@ -4252,7 +4246,7 @@ function addShinseondaeTunnel() {
     scene.add(blueStripe);
   }
 
-  for (let z = tunnelStartZ - 72; z > tunnelEndZ + 40; z -= 34) {
+  for (let z = tunnelStartZ + 10; z > tunnelEndZ + 40; z -= 34) {
     const sample = getStageDefinitionGroundSample(0, z);
     if (!sample) continue;
 
@@ -4373,6 +4367,18 @@ function createCircleRoadSignMaterial(label) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+}
+
+function createRoundRoadSignMesh(label, radius, depth = 0.12) {
+  const faceMaterial = createCircleRoadSignMaterial(label);
+  const sign = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, depth, 56),
+    [materials.gwangalliBridgeCable, faceMaterial, faceMaterial],
+  );
+  sign.rotation.x = Math.PI * 0.5;
+  sign.castShadow = true;
+  sign.receiveShadow = true;
+  return sign;
 }
 
 function createTriangleRoadSignMaterial() {
