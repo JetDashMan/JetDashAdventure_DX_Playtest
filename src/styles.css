@@ -193,14 +193,14 @@ body.touch-enabled #game {
   top: 72px;
   right: 18px;
   z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  justify-items: end;
   gap: 8px;
-  max-width: min(392px, calc(100vw - 36px));
+  max-width: min(220px, calc(100vw - 36px));
 }
 
-.stage-select button {
+.stage-select button,
+.stage-menu-toggle {
   min-width: 86px;
   min-height: 38px;
   border: 1px solid rgba(255, 255, 255, 0.26);
@@ -208,6 +208,21 @@ body.touch-enabled #game {
   color: #f8fbff;
   font-size: 0.8rem;
   box-shadow: 0 10px 28px rgba(4, 20, 40, 0.16);
+}
+
+.stage-menu {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(7, 18, 31, 0.76);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.stage-menu.hidden {
+  display: none;
 }
 
 .stage-select button[aria-pressed="true"] {
@@ -288,6 +303,32 @@ body.touch-enabled #game {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.settings-action {
+  display: grid;
+  grid-template-columns: 1fr minmax(132px, 48%);
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgba(241, 249, 255, 0.78);
+}
+
+.settings-action button {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+}
+
+.settings-action button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .debug-block {
@@ -465,10 +506,9 @@ body.touch-enabled:not(.portrait-touch) .touch-controls {
 }
 
 .touch-cluster-center {
-  left: 50%;
+  left: max(18px, env(safe-area-inset-left));
   bottom: max(18px, env(safe-area-inset-bottom));
   gap: 10px;
-  transform: translateX(-50%);
 }
 
 .touch-cluster-right {
@@ -580,23 +620,14 @@ body.touch-enabled:not(.portrait-touch) .touch-controls {
   border-left: 8px solid transparent;
 }
 
-.touch-icon-brake::before,
-.touch-icon-brake::after {
+.touch-icon-brake::before {
   content: "";
   position: absolute;
-  top: 5px;
-  width: 8px;
-  height: 21px;
-  border-radius: 4px;
-  background: currentColor;
-}
-
-.touch-icon-brake::before {
-  left: 6px;
-}
-
-.touch-icon-brake::after {
-  right: 6px;
+  left: 7px;
+  top: 6px;
+  border-top: 20px solid currentColor;
+  border-right: 8px solid transparent;
+  border-left: 8px solid transparent;
 }
 
 .touch-icon-jump::before {
@@ -631,7 +662,7 @@ body.touch-enabled:not(.portrait-touch) .touch-controls {
 .finish {
   position: fixed;
   inset: 0;
-  z-index: 3;
+  z-index: 8;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -793,14 +824,19 @@ body.touch-enabled:not(.portrait-touch) .stage-select {
   top: 8px;
   right: 100px;
   gap: 5px;
-  max-width: min(260px, calc(100vw - 460px));
+  max-width: min(120px, calc(100vw - 460px));
 }
 
 body.touch-enabled:not(.portrait-touch) .stage-select button {
-  min-width: 58px;
+  min-width: 72px;
   min-height: 30px;
   padding: 0 6px;
   font-size: 0.56rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .stage-menu {
+  gap: 5px;
+  padding: 5px;
 }
 
 body.touch-enabled:not(.portrait-touch) .settings-panel,
@@ -809,6 +845,43 @@ body.touch-enabled:not(.portrait-touch) .help-panel {
   right: 100px;
   width: min(300px, calc(100vw - 120px));
   max-height: calc(100vh - 24px);
+}
+
+body.touch-enabled:not(.portrait-touch) .finish {
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+
+body.touch-enabled:not(.portrait-touch) .finish-panel {
+  width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 28px);
+  padding: 16px;
+  overflow: auto;
+}
+
+body.touch-enabled:not(.portrait-touch) .finish-kicker {
+  font-size: 0.68rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .finish h1 {
+  margin: 5px 0 8px;
+  font-size: clamp(1.7rem, 9vh, 2.8rem);
+}
+
+body.touch-enabled:not(.portrait-touch) .finish-score {
+  margin-bottom: 12px;
+  font-size: clamp(0.86rem, 4.5vh, 1.1rem);
+}
+
+body.touch-enabled:not(.portrait-touch) .finish-actions {
+  gap: 7px;
+}
+
+body.touch-enabled:not(.portrait-touch) .finish-actions button,
+body.touch-enabled:not(.portrait-touch) #next-stage,
+body.touch-enabled:not(.portrait-touch) #restart {
+  width: min(220px, 100%);
+  min-height: 34px;
+  font-size: 0.76rem;
 }
 
 body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
@@ -923,6 +996,11 @@ body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
   }
 
   .settings-panel label {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .settings-action {
     grid-template-columns: 1fr;
     gap: 6px;
   }

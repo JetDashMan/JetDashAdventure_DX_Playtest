@@ -22,11 +22,14 @@ const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
+const stageMenuToggle = document.querySelector("#stage-menu-toggle");
+const stageMenu = document.querySelector("#stage-menu");
 const stageSelectButtons = document.querySelectorAll("[data-stage-select]");
 const tutorialPromptEl = document.querySelector("#tutorial-prompt");
 const rotatePromptEl = document.querySelector("#rotate-prompt");
 const touchControlsEl = document.querySelector("#touch-controls");
 const touchControlButtons = document.querySelectorAll("[data-touch-control]");
+const fullscreenButton = document.querySelector("#fullscreen-toggle");
 const debugProgressButtons = document.querySelectorAll("[data-debug-progress]");
 const graphicsControls = {
   preset: document.querySelector("#graphics-preset"),
@@ -258,7 +261,7 @@ const worldUp = new THREE.Vector3(0, 1, 0);
 const sunFollowOffset = new THREE.Vector3(-28, 46, 24);
 const playerStart = new THREE.Vector3(0, 2.2, 20);
 const lanes = [-4.2, 0, 4.2];
-const stageRoutes = ["tutorial", "1", "2", "3"];
+const stageRoutes = ["1", "2"];
 const defaultStageRoute = "1";
 const stageCount = stageRoutes.length;
 const urlParams = new URLSearchParams(window.location.search);
@@ -299,7 +302,7 @@ const groundSnapDistance = 1.35;
 const dashPadPlacements = currentStage.dashPads;
 const obstaclePlacements = currentStage.obstacles;
 const storedStageScore = Number(window.sessionStorage.getItem("dx-speed-stage-score"));
-const carriedStageScore = currentStageIndex > 1 && Number.isFinite(storedStageScore) ? storedStageScore : 0;
+const carriedStageScore = currentStageIndex > 0 && Number.isFinite(storedStageScore) ? storedStageScore : 0;
 window.sessionStorage.removeItem("dx-speed-stage-score");
 
 const trackSegments = [];
@@ -341,8 +344,6 @@ let dashPadBoostRemaining = 0;
 let debugSuperBoostActive = false;
 const defaultStageMusicUrl = "./assets/audio/The_Final_Straightaway.mp3";
 const stageMusicUrls = [
-  defaultStageMusicUrl,
-  defaultStageMusicUrl,
   "./assets/audio/Salt_and_Steel.mp3",
   defaultStageMusicUrl,
 ];
@@ -1025,10 +1026,9 @@ function addLights() {
 
 function getStageIndex(stageRoute) {
   const normalizedRoute = String(stageRoute || defaultStageRoute).trim().toLowerCase();
-  if (normalizedRoute === "tutorial" || normalizedRoute === "0") return 0;
-  if (normalizedRoute === "1" || normalizedRoute === "stage1") return 1;
-  if (normalizedRoute === "2" || normalizedRoute === "stage2") return 2;
-  if (normalizedRoute === "3" || normalizedRoute === "stage3") return 3;
+  if (normalizedRoute === "1" || normalizedRoute === "stage1") return 0;
+  if (normalizedRoute === "2" || normalizedRoute === "stage2") return 1;
+  if (normalizedRoute === "3" || normalizedRoute === "stage3") return 1;
   return stageRoutes.indexOf(defaultStageRoute);
 }
 
@@ -1038,10 +1038,8 @@ function getStageRoute(stageIndex) {
 }
 
 function createStageDefinition(stageIndex) {
-  if (stageIndex === 0) return createTutorialStageDefinition();
-  if (stageIndex === 1) return createStageOneDefinition();
-  if (stageIndex === 2) return createStageTwoDefinition();
-  return createStageThreeDefinition();
+  if (stageIndex === 0) return createStageTwoDefinition("STAGE 1");
+  return createStageThreeDefinition("STAGE 2");
 }
 
 function createTutorialStageDefinition() {
@@ -1231,7 +1229,7 @@ function createStageOneDefinition() {
     };
 }
 
-function createStageTwoDefinition() {
+function createStageTwoDefinition(label = "STAGE 2") {
   const goalZ = -10900;
   const startZ = playerStart.z + Math.round((playerStart.z - goalZ) * 0.1);
   const trackNodes = [
@@ -1305,7 +1303,7 @@ function createStageTwoDefinition() {
   ]);
 
   return {
-      label: "STAGE 2",
+      label,
       startZ,
       goalZ,
       rollClearStartZ: -1840,
@@ -1313,6 +1311,7 @@ function createStageTwoDefinition() {
       rollLiftHeight: 30,
       rollEnabled: false,
       gwangalliTheme: true,
+      hideWaterAfterProgress: 0.6,
       gwangalliBridgeEndZ: -4400,
       gwangalliTunnelStartZ: -7900,
       gwangalliTunnelEndZ: goalZ,
@@ -1457,7 +1456,7 @@ function getGwangalliBridgeRoadY(z, baseY, startZ, rampEndZ, fenceEndZ, raisedY)
   return baseY;
 }
 
-function createStageThreeDefinition() {
+function createStageThreeDefinition(label = "STAGE 3") {
   const trackNodes = [
     [28, 0, 22],
     [-260, 0, 22],
@@ -1474,7 +1473,7 @@ function createStageThreeDefinition() {
   ];
 
   return {
-      label: "STAGE 3",
+      label,
       goalZ: -3000,
       rollClearStartZ: -9999,
       rollClearEndZ: -10000,
@@ -5222,6 +5221,12 @@ function bindInput() {
   stageSelectButtons.forEach((button) => {
     button.addEventListener("click", () => selectStage(button.dataset.stageSelect));
   });
+  stageMenuToggle?.addEventListener("click", () => setStageMenuOpen(stageMenu?.classList.contains("hidden")));
+  document.addEventListener("pointerdown", (event) => {
+    if (!stageMenu || !stageMenuToggle || stageMenu.classList.contains("hidden")) return;
+    if (stageMenu.contains(event.target) || stageMenuToggle.contains(event.target)) return;
+    setStageMenuOpen(false);
+  });
   musicButton.addEventListener("click", toggleMusic);
   graphicsButton?.addEventListener("click", () => setGraphicsPanelOpen(graphicsPanel?.classList.contains("hidden")));
   debugButton?.addEventListener("click", () => setDebugPanelOpen(debugPanel?.classList.contains("hidden")));
@@ -5229,11 +5234,14 @@ function bindInput() {
   document.querySelector("[data-close-panel='graphics']")?.addEventListener("click", () => setGraphicsPanelOpen(false));
   document.querySelector("[data-close-panel='debug']")?.addEventListener("click", () => setDebugPanelOpen(false));
   document.querySelector("[data-close-panel='help']")?.addEventListener("click", () => setHelpPanelOpen(false));
+  fullscreenButton?.addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", updateFullscreenButton);
   bindGraphicsControls();
   bindDebugControls();
   window.addEventListener("resize", resize);
   updateMusicButton();
   updateStageSelector();
+  updateFullscreenButton();
 }
 
 function bindTouchControls() {
@@ -5245,6 +5253,7 @@ function bindTouchControls() {
   window.addEventListener("resize", updateTouchOrientationState);
   window.addEventListener("orientationchange", updateTouchOrientationState);
   touchControlsEl.addEventListener("contextmenu", (event) => event.preventDefault());
+  canvas.addEventListener("pointerdown", handleTouchQuickStepTap);
 
   touchControlButtons.forEach((button) => {
     button.addEventListener("pointerdown", handleTouchControlDown);
@@ -5274,19 +5283,15 @@ function handleTouchControlDown(event) {
   tryLockLandscape();
   if (musicWanted) startMusic();
 
-  if (control === "quick-left") {
-    quickStepQueued = -1;
-  } else if (control === "quick-right") {
-    quickStepQueued = 1;
-  } else if (control === "jump") {
+  if (control === "jump") {
     if (!touchInput.jump) jumpQueued = true;
     touchInput.jump = true;
   } else if (control === "boost") {
-    touchInput.boost = true;
+    touchInput.boost = !touchInput.boost;
   } else if (control === "brake") {
     touchInput.brake = true;
   } else if (control === "forward") {
-    startTouchAutoForward();
+    toggleTouchAutoForward();
   }
 
   syncTouchControls();
@@ -5303,8 +5308,6 @@ function handleTouchControlUp(event) {
 
   if (control === "jump") {
     touchInput.jump = false;
-  } else if (control === "boost") {
-    touchInput.boost = false;
   } else if (control === "brake") {
     touchInput.brake = false;
   }
@@ -5312,11 +5315,23 @@ function handleTouchControlUp(event) {
   syncTouchControls();
 }
 
-function startTouchAutoForward() {
+function handleTouchQuickStepTap(event) {
+  if (!touchControlsEnabled || document.body.classList.contains("portrait-touch") || finished) return;
+  if (event.pointerType === "mouse") return;
+  if (event.target !== canvas) return;
+
+  event.preventDefault();
+  tryLockLandscape();
+  if (musicWanted) startMusic();
+  quickStepQueued = event.clientX < window.innerWidth * 0.5 ? -1 : 1;
+}
+
+function toggleTouchAutoForward() {
+  touchInput.autoForward = !touchInput.autoForward;
   if (!touchInput.autoForward) {
-    touchInput.autoForward = true;
+    touchInput.boost = false;
   }
-  if (!touchInput.runStarted) {
+  if (touchInput.autoForward && !touchInput.runStarted) {
     touchInput.runStarted = true;
     startedAt = performance.now();
   }
@@ -5337,9 +5352,11 @@ function syncTouchControls() {
 
   touchControlButtons.forEach((button) => {
     const isForward = button.dataset.touchControl === "forward";
-    button.classList.toggle("is-latched", isForward && touchInput.autoForward);
-    if (isForward) {
-      button.setAttribute("aria-pressed", touchInput.autoForward ? "true" : "false");
+    const isBoost = button.dataset.touchControl === "boost";
+    const isLatched = (isForward && touchInput.autoForward) || (isBoost && touchInput.boost);
+    button.classList.toggle("is-latched", isLatched);
+    if (isForward || isBoost) {
+      button.setAttribute("aria-pressed", isLatched ? "true" : "false");
     }
   });
 }
@@ -5883,7 +5900,7 @@ function checkGoal() {
 function goToNextStage() {
   if (currentStageIndex >= stageCount - 1) return;
 
-  if (currentStageIndex > 0) {
+  if (currentStageIndex >= 0) {
     window.sessionStorage.setItem("dx-speed-stage-score", `${score}`);
   } else {
     window.sessionStorage.removeItem("dx-speed-stage-score");
@@ -5897,6 +5914,7 @@ function selectStage(stageRoute) {
   const stageIndex = getStageIndex(stageRoute);
 
   window.sessionStorage.removeItem("dx-speed-stage-score");
+  setStageMenuOpen(false);
   if (stageIndex === currentStageIndex) {
     resetGame();
     return;
@@ -5912,6 +5930,12 @@ function updateStageSelector() {
     const stageIndex = getStageIndex(button.dataset.stageSelect);
     button.setAttribute("aria-pressed", stageIndex === currentStageIndex ? "true" : "false");
   });
+}
+
+function setStageMenuOpen(open) {
+  if (!stageMenu || !stageMenuToggle) return;
+  stageMenu.classList.toggle("hidden", !open);
+  stageMenuToggle.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 function updateTutorialPrompt() {
@@ -6198,6 +6222,10 @@ function updateMusicState() {
 function updateWater(dt) {
   if (!waterMaterial) return;
 
+  if (waterMesh && Number.isFinite(currentStage.hideWaterAfterProgress)) {
+    waterMesh.visible = getStageProgress(player.position.z) < currentStage.hideWaterAfterProgress;
+  }
+
   waterTime += dt;
   waterMaterial.uniforms.uTime.value = waterTime;
 }
@@ -6424,6 +6452,7 @@ function setGraphicsPanelOpen(open) {
   graphicsPanel.classList.toggle("hidden", !open);
   graphicsButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    setStageMenuOpen(false);
     setDebugPanelOpen(false);
     setHelpPanelOpen(false);
   }
@@ -6434,6 +6463,7 @@ function setDebugPanelOpen(open) {
   debugPanel.classList.toggle("hidden", !open);
   debugButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setHelpPanelOpen(false);
   }
@@ -6444,9 +6474,40 @@ function setHelpPanelOpen(open) {
   helpPanel.classList.toggle("hidden", !open);
   helpButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
   }
+}
+
+async function toggleFullscreen() {
+  if (!fullscreenButton || !document.fullscreenEnabled) {
+    updateFullscreenButton();
+    return;
+  }
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      tryLockLandscape();
+    }
+  } catch (error) {
+    console.warn("Fullscreen request failed", error);
+  } finally {
+    updateFullscreenButton();
+  }
+}
+
+function updateFullscreenButton() {
+  if (!fullscreenButton) return;
+
+  const available = Boolean(document.fullscreenEnabled);
+  fullscreenButton.disabled = !available;
+  fullscreenButton.textContent = !available
+    ? "Unavailable"
+    : document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
 }
 
 function isGameplayKey(code) {

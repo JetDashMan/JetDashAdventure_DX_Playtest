@@ -67,10 +67,11 @@
     </button>
 
     <nav class="stage-select" aria-label="Stage select">
-      <button type="button" data-stage-select="tutorial">TUTORIAL</button>
-      <button type="button" data-stage-select="1">STAGE 1</button>
-      <button type="button" data-stage-select="2">STAGE 2</button>
-      <button type="button" data-stage-select="3">STAGE 3</button>
+      <button id="stage-menu-toggle" class="stage-menu-toggle" type="button" aria-expanded="false">STAGE</button>
+      <div id="stage-menu" class="stage-menu hidden">
+        <button type="button" data-stage-select="1">STAGE 1</button>
+        <button type="button" data-stage-select="2">STAGE 2</button>
+      </div>
     </nav>
 
     <section id="graphics-panel" class="settings-panel hidden" aria-label="Graphics settings">
@@ -168,6 +169,10 @@
           <option value="unlimited">Unlimited</option>
         </select>
       </label>
+      <div class="settings-action">
+        <span>Display</span>
+        <button id="fullscreen-toggle" type="button">Fullscreen</button>
+      </div>
     </section>
 
     <section id="debug-panel" class="settings-panel debug-panel hidden" aria-label="Debug settings">
@@ -226,19 +231,11 @@
     </div>
 
     <section id="touch-controls" class="touch-controls" aria-label="Touch controls">
-      <div class="touch-cluster touch-cluster-left">
-        <button class="touch-btn touch-btn-large" type="button" data-touch-control="quick-left" aria-label="Quick step left">
-          <span class="touch-icon touch-icon-left" aria-hidden="true"></span>
-        </button>
-        <button class="touch-btn touch-btn-large" type="button" data-touch-control="quick-right" aria-label="Quick step right">
-          <span class="touch-icon touch-icon-right" aria-hidden="true"></span>
-        </button>
-      </div>
       <div class="touch-cluster touch-cluster-center">
-        <button class="touch-btn touch-btn-small touch-btn-forward" type="button" data-touch-control="forward" aria-label="Start auto forward" aria-pressed="false">
+        <button class="touch-btn touch-btn-small touch-btn-forward" type="button" data-touch-control="forward" aria-label="Toggle auto forward" aria-pressed="false">
           <span class="touch-icon touch-icon-forward" aria-hidden="true"></span>
         </button>
-        <button class="touch-btn touch-btn-small" type="button" data-touch-control="brake" aria-label="Brake">
+        <button class="touch-btn touch-btn-small" type="button" data-touch-control="brake" aria-label="Brake or reverse">
           <span class="touch-icon touch-icon-brake" aria-hidden="true"></span>
         </button>
       </div>
@@ -246,7 +243,7 @@
         <button class="touch-btn touch-btn-large" type="button" data-touch-control="jump" aria-label="Jump">
           <span class="touch-icon touch-icon-jump" aria-hidden="true"></span>
         </button>
-        <button class="touch-btn touch-btn-large touch-btn-boost" type="button" data-touch-control="boost" aria-label="Boost">
+        <button class="touch-btn touch-btn-large touch-btn-boost" type="button" data-touch-control="boost" aria-label="Toggle boost" aria-pressed="false">
           <span class="touch-icon touch-icon-boost" aria-hidden="true"></span>
         </button>
       </div>
