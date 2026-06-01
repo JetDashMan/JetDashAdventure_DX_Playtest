@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JetDashAdventure_DX</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <main class="hud" aria-label="Game status">
+      <section class="stat">
+        <span class="stat-label">RINGS</span>
+        <strong id="rings">0/0</strong>
+      </section>
+      <section class="stat">
+        <span class="stat-label">SPEED</span>
+        <strong id="speed">0</strong>
+      </section>
+      <section class="stat">
+        <span class="stat-label">TIME</span>
+        <strong id="time">0.00</strong>
+      </section>
+      <section class="stat">
+        <span class="stat-label">SCORE</span>
+        <strong id="score">0</strong>
+      </section>
+      <section class="stat">
+        <span class="stat-label">PROGRESS</span>
+        <strong id="progress">0%</strong>
+      </section>
+      <section class="stat">
+        <span class="stat-label">HEIGHT</span>
+        <strong id="height">0m</strong>
+      </section>
+      <section class="boost-stat">
+        <div class="boost-stat-header">
+          <span class="stat-label">BOOST</span>
+          <strong id="boost-gauge">100%</strong>
+        </div>
+        <div class="boost-track" role="meter" aria-label="Boost gauge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+          <span id="boost-fill"></span>
+        </div>
+      </section>
+    </main>
+
+    <button id="music-toggle" class="music-toggle" type="button" aria-pressed="true">
+      MUSIC ON
+    </button>
+    <button id="graphics-toggle" class="graphics-toggle" type="button" aria-expanded="false">
+      GRAPHICS
+    </button>
+    <button id="debug-toggle" class="debug-toggle" type="button" aria-expanded="false">
+      DEBUG
+    </button>
+    <button id="help-toggle" class="help-toggle" type="button" aria-label="Key guide" aria-expanded="false">
+      ?
+    </button>
+
+    <nav class="stage-select" aria-label="Stage select">
+      <button type="button" data-stage-select="tutorial">TUTORIAL</button>
+      <button type="button" data-stage-select="1">STAGE 1</button>
+      <button type="button" data-stage-select="2">STAGE 2</button>
+      <button type="button" data-stage-select="3">STAGE 3</button>
+    </nav>
+
+    <section id="graphics-panel" class="settings-panel hidden" aria-label="Graphics settings">
+      <div class="panel-title">
+        <strong>GRAPHICS</strong>
+        <button type="button" data-close-panel="graphics" aria-label="Close graphics settings">×</button>
+      </div>
+      <label>
+        <span>Preset</span>
+        <select id="graphics-preset">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="ultra">Ultra</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label>
+        <span>Render Scale</span>
+        <select id="graphics-render-scale">
+          <option value="0.75">75%</option>
+          <option value="1">100%</option>
+          <option value="1.25">125%</option>
+          <option value="1.5">150%</option>
+        </select>
+      </label>
+      <label>
+        <span>Shadows</span>
+        <select id="graphics-shadow-quality">
+          <option value="off">Off</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </label>
+      <label>
+        <span>Shadow Softness</span>
+        <select id="graphics-shadow-softness">
+          <option value="hard">Hard</option>
+          <option value="soft">Soft</option>
+        </select>
+      </label>
+      <label>
+        <span>Shadow Distance</span>
+        <select id="graphics-shadow-distance">
+          <option value="near">Near</option>
+          <option value="medium">Medium</option>
+          <option value="far">Far</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </label>
+      <label>
+        <span>Motion Blur</span>
+        <select id="graphics-motion-blur">
+          <option value="off">Off</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </label>
+      <label>
+        <span>Water</span>
+        <select id="graphics-water-quality">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </label>
+      <label>
+        <span>View Distance</span>
+        <select id="graphics-view-distance">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </label>
+      <label>
+        <span>Lighting</span>
+        <select id="graphics-lighting">
+          <option value="standard">Standard</option>
+          <option value="enhanced">Enhanced</option>
+          <option value="cinematic">Cinematic</option>
+        </select>
+      </label>
+      <label>
+        <span>Frame Limit</span>
+        <select id="graphics-frame-cap">
+          <option value="30">30 FPS</option>
+          <option value="60">60 FPS</option>
+          <option value="120">120 FPS</option>
+          <option value="unlimited">Unlimited</option>
+        </select>
+      </label>
+    </section>
+
+    <section id="debug-panel" class="settings-panel debug-panel hidden" aria-label="Debug settings">
+      <div class="panel-title">
+        <strong>DEBUG</strong>
+        <button type="button" data-close-panel="debug" aria-label="Close debug settings">×</button>
+      </div>
+      <div class="debug-block">
+        <span>Progress Warp</span>
+        <div class="debug-progress-grid">
+          <button type="button" data-debug-progress="20">20%</button>
+          <button type="button" data-debug-progress="40">40%</button>
+          <button type="button" data-debug-progress="60">60%</button>
+          <button type="button" data-debug-progress="80">80%</button>
+        </div>
+      </div>
+      <label class="debug-check">
+        <span>U Super Boost</span>
+        <input id="debug-super-boost" type="checkbox" />
+      </label>
+      <label class="debug-check">
+        <span>Infinite Jump</span>
+        <input id="debug-infinite-jump" type="checkbox" />
+      </label>
+    </section>
+
+    <section id="help-panel" class="help-panel hidden" aria-label="Key guide">
+      <div class="panel-title">
+        <strong>KEY GUIDE</strong>
+        <button type="button" data-close-panel="help" aria-label="Close key guide">×</button>
+      </div>
+      <dl>
+        <dt>W / ↑</dt><dd>Forward</dd>
+        <dt>S / ↓</dt><dd>Brake / Reverse</dd>
+        <dt>A,D / ←,→</dt><dd>Move</dd>
+        <dt>Q / E</dt><dd>Quick Step</dd>
+        <dt>Space</dt><dd>Jump</dd>
+        <dt>Shift</dt><dd>Boost</dd>
+        <dt>U</dt><dd>Debug Super Boost</dd>
+        <dt>J / L</dt><dd>Camera Left / Right</dd>
+        <dt>I / K</dt><dd>Camera Up / Down</dd>
+        <dt>O</dt><dd>Reset Camera</dd>
+        <dt>1</dt><dd>Fill Boost Gauge</dd>
+        <dt>R</dt><dd>Restart</dd>
+      </dl>
+    </section>
+
+    <div id="tutorial-prompt" class="tutorial-prompt hidden" aria-live="polite"></div>
+
+    <div id="rotate-prompt" class="rotate-prompt" aria-hidden="true">
+      <div class="rotate-prompt-panel">
+        <span class="rotate-device-icon" aria-hidden="true"></span>
+        <strong>LANDSCAPE</strong>
+        <p>Rotate your phone to play</p>
+      </div>
+    </div>
+
+    <section id="touch-controls" class="touch-controls" aria-label="Touch controls">
+      <div class="touch-cluster touch-cluster-left">
+        <button class="touch-btn touch-btn-large" type="button" data-touch-control="quick-left" aria-label="Quick step left">
+          <span class="touch-icon touch-icon-left" aria-hidden="true"></span>
+        </button>
+        <button class="touch-btn touch-btn-large" type="button" data-touch-control="quick-right" aria-label="Quick step right">
+          <span class="touch-icon touch-icon-right" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div class="touch-cluster touch-cluster-center">
+        <button class="touch-btn touch-btn-small touch-btn-forward" type="button" data-touch-control="forward" aria-label="Start auto forward" aria-pressed="false">
+          <span class="touch-icon touch-icon-forward" aria-hidden="true"></span>
+        </button>
+        <button class="touch-btn touch-btn-small" type="button" data-touch-control="brake" aria-label="Brake">
+          <span class="touch-icon touch-icon-brake" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div class="touch-cluster touch-cluster-right">
+        <button class="touch-btn touch-btn-large" type="button" data-touch-control="jump" aria-label="Jump">
+          <span class="touch-icon touch-icon-jump" aria-hidden="true"></span>
+        </button>
+        <button class="touch-btn touch-btn-large touch-btn-boost" type="button" data-touch-control="boost" aria-label="Boost">
+          <span class="touch-icon touch-icon-boost" aria-hidden="true"></span>
+        </button>
+      </div>
+    </section>
+
+    <section id="finish" class="finish hidden" aria-live="polite">
+      <div class="finish-panel">
+        <p id="finish-kicker" class="finish-kicker">STAGE CLEAR</p>
+        <h1 id="finish-time">0.00s</h1>
+        <p class="finish-score">SCORE <strong id="finish-score">0</strong></p>
+        <div class="finish-actions">
+          <button id="next-stage" type="button">Next Stage</button>
+          <button id="restart" type="button">Restart</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
