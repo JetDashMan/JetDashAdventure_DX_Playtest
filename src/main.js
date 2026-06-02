@@ -42,6 +42,7 @@ const graphicsControls = {
   shadowSoftness: document.querySelector("#graphics-shadow-softness"),
   shadowDistance: document.querySelector("#graphics-shadow-distance"),
   motionBlur: document.querySelector("#graphics-motion-blur"),
+  textureQuality: document.querySelector("#graphics-texture-quality"),
   waterQuality: document.querySelector("#graphics-water-quality"),
   viewDistance: document.querySelector("#graphics-view-distance"),
   lighting: document.querySelector("#graphics-lighting"),
@@ -72,6 +73,7 @@ const graphicsPresets = {
     shadowSoftness: "hard",
     shadowDistance: "near",
     motionBlur: "off",
+    textureQuality: "low",
     waterQuality: "low",
     viewDistance: "low",
     lighting: "standard",
@@ -84,6 +86,7 @@ const graphicsPresets = {
     shadowSoftness: "hard",
     shadowDistance: "medium",
     motionBlur: "medium",
+    textureQuality: "medium",
     waterQuality: "medium",
     viewDistance: "medium",
     lighting: "enhanced",
@@ -96,6 +99,7 @@ const graphicsPresets = {
     shadowSoftness: "soft",
     shadowDistance: "far",
     motionBlur: "high",
+    textureQuality: "high",
     waterQuality: "high",
     viewDistance: "high",
     lighting: "cinematic",
@@ -108,6 +112,7 @@ const graphicsPresets = {
     shadowSoftness: "soft",
     shadowDistance: "ultra",
     motionBlur: "ultra",
+    textureQuality: "ultra",
     waterQuality: "ultra",
     viewDistance: "ultra",
     lighting: "cinematic",
@@ -115,6 +120,32 @@ const graphicsPresets = {
   },
 };
 const graphicsDefaults = { preset: "high", ...graphicsPresets.high };
+const asphaltTextureQualityConfig = {
+  low: {
+    baseColor: "./assets/textures/asphalt/busan_coastal_asphalt_basecolor_256.jpg",
+    normal: "./assets/textures/asphalt/busan_coastal_asphalt_normal_256.png",
+    roughness: "./assets/textures/asphalt/busan_coastal_asphalt_roughness_256.jpg",
+    ao: "./assets/textures/asphalt/busan_coastal_asphalt_ao_256.jpg",
+  },
+  medium: {
+    baseColor: "./assets/textures/asphalt/busan_coastal_asphalt_basecolor_512.jpg",
+    normal: "./assets/textures/asphalt/busan_coastal_asphalt_normal_512.png",
+    roughness: "./assets/textures/asphalt/busan_coastal_asphalt_roughness_512.jpg",
+    ao: "./assets/textures/asphalt/busan_coastal_asphalt_ao_512.jpg",
+  },
+  high: {
+    baseColor: "./assets/textures/asphalt/busan_coastal_asphalt_basecolor_1024.jpg",
+    normal: "./assets/textures/asphalt/busan_coastal_asphalt_normal_1024.png",
+    roughness: "./assets/textures/asphalt/busan_coastal_asphalt_roughness_1024.jpg",
+    ao: "./assets/textures/asphalt/busan_coastal_asphalt_ao_1024.jpg",
+  },
+  ultra: {
+    baseColor: "./assets/textures/asphalt/busan_coastal_asphalt_basecolor.png",
+    normal: "./assets/textures/asphalt/busan_coastal_asphalt_normal.png",
+    roughness: "./assets/textures/asphalt/busan_coastal_asphalt_roughness.png",
+    ao: "./assets/textures/asphalt/busan_coastal_asphalt_ao.png",
+  },
+};
 const shadowQualityConfig = {
   off: { enabled: false, size: 256 },
   low: { enabled: true, size: 512 },
@@ -394,7 +425,8 @@ const player = {
 const textureLoader = new THREE.TextureLoader();
 const textureAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const roadTextureTileMeters = 10;
-const asphaltRoadTextures = createAsphaltTextureSet();
+let activeAsphaltTextureQuality = graphicsSettings.textureQuality;
+let asphaltRoadTextures = createAsphaltTextureSet(activeAsphaltTextureQuality);
 
 const materials = {
   track: new THREE.MeshStandardMaterial({
@@ -954,14 +986,24 @@ const materials = {
   }),
 };
 
-function createAsphaltTextureSet() {
+const asphaltRoadMaterials = [
+  materials.harborRoad,
+  materials.harborRoadAlt,
+  materials.gwangalliRoad,
+  materials.gwangalliRoadAlt,
+  materials.gwangalliTunnelRoad,
+  materials.gwangalliTunnelRoadAlt,
+];
+
+function createAsphaltTextureSet(quality = graphicsSettings.textureQuality) {
+  const config = asphaltTextureQualityConfig[quality] ?? asphaltTextureQualityConfig.high;
   return {
-    baseColor: loadPbrTexture("./assets/textures/asphalt/busan_coastal_asphalt_basecolor.png", {
+    baseColor: loadPbrTexture(config.baseColor, {
       colorSpace: THREE.SRGBColorSpace,
     }),
-    normal: loadPbrTexture("./assets/textures/asphalt/busan_coastal_asphalt_normal.png"),
-    roughness: loadPbrTexture("./assets/textures/asphalt/busan_coastal_asphalt_roughness.png"),
-    ao: loadPbrTexture("./assets/textures/asphalt/busan_coastal_asphalt_ao.png"),
+    normal: loadPbrTexture(config.normal),
+    roughness: loadPbrTexture(config.roughness),
+    ao: loadPbrTexture(config.ao),
   };
 }
 
@@ -972,6 +1014,31 @@ function loadPbrTexture(path, options = {}) {
   texture.anisotropy = textureAnisotropy;
   texture.colorSpace = options.colorSpace ?? THREE.NoColorSpace;
   return texture;
+}
+
+function applyAsphaltTextureSettings() {
+  const quality = graphicsSettings.textureQuality;
+  if (quality === activeAsphaltTextureQuality) return;
+
+  const previousTextures = asphaltRoadTextures;
+  asphaltRoadTextures = createAsphaltTextureSet(quality);
+  activeAsphaltTextureQuality = quality;
+
+  for (const material of asphaltRoadMaterials) {
+    material.map = asphaltRoadTextures.baseColor;
+    material.normalMap = asphaltRoadTextures.normal;
+    material.roughnessMap = asphaltRoadTextures.roughness;
+    material.aoMap = asphaltRoadTextures.ao;
+    material.needsUpdate = true;
+  }
+
+  disposeAsphaltTextureSet(previousTextures);
+}
+
+function disposeAsphaltTextureSet(textureSet) {
+  for (const texture of Object.values(textureSet)) {
+    texture.dispose();
+  }
 }
 
 const pickupClusterColors = [
@@ -3645,12 +3712,6 @@ function updateGwangalliTourBoats(dt) {
 function addGwangalliCoastalLandmarks() {
   if (!currentStage.gwangalliTheme) return;
 
-  [
-    { x: -118, z: -3780, radius: 52, height: 15 },
-    { x: -142, z: -4050, radius: 74, height: 22 },
-    { x: -118, z: -4350, radius: 58, height: 18 },
-  ].forEach(addGwangalliIsland);
-
   const clusters = [
     { x: 138, z: -3700, count: 5, seed: 1 },
     { x: 176, z: -3920, count: 7, seed: 6 },
@@ -3762,10 +3823,15 @@ function addYonghoBayLandmarkScenery() {
   group.scale.setScalar(0.9);
 
   addYonghoBayIslandAndCruiseTerminal(group);
-  addYonghoBayReclaimedPier(group);
-  addYonghoBayPark(group);
-  addYonghoBaySmallApartments(group);
-  addYonghoBayWTowers(group);
+
+  const rotatedDistrict = new THREE.Group();
+  rotatedDistrict.rotation.y = Math.PI * 0.5;
+  group.add(rotatedDistrict);
+
+  addYonghoBayReclaimedPier(rotatedDistrict);
+  addYonghoBayPark(rotatedDistrict);
+  addYonghoBaySmallApartments(rotatedDistrict);
+  addYonghoBayWTowers(rotatedDistrict);
 
   scene.add(group);
 }
@@ -3965,7 +4031,7 @@ function addYonghoBayReclaimedPier(group) {
 
 function addYonghoBayIslandAndCruiseTerminal(group) {
   const island = new THREE.Group();
-  island.position.set(-228, -0.15, -72);
+  island.position.set(-300, -0.15, -72);
 
   const base = new THREE.Mesh(new THREE.CylinderGeometry(76, 92, 15, 32), materials.coastalRock);
   base.position.y = 7.4;
@@ -3991,18 +4057,18 @@ function addYonghoBayIslandAndCruiseTerminal(group) {
   group.add(island);
 
   const breakwater = new THREE.Mesh(new THREE.BoxGeometry(148, 0.58, 4.2), materials.coastalRock);
-  breakwater.position.set(-222, 0.34, -126);
+  breakwater.position.set(-294, 0.34, -126);
   breakwater.rotation.y = -0.08;
   breakwater.receiveShadow = true;
   group.add(breakwater);
 
   const lighthouse = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.45, 10, 16), materials.gwangalliBridge);
-  lighthouse.position.set(-294, 5.6, -128);
+  lighthouse.position.set(-366, 5.6, -128);
   lighthouse.castShadow = true;
   group.add(lighthouse);
 
   const terminal = new THREE.Group();
-  terminal.position.set(-137, 0.65, -62);
+  terminal.position.set(-209, 0.65, -62);
   const hall = new THREE.Mesh(new THREE.BoxGeometry(44, 8.5, 18), materials.rightCityFacade);
   hall.position.y = 4.2;
   hall.castShadow = true;
@@ -4027,7 +4093,7 @@ function addYonghoBayIslandAndCruiseTerminal(group) {
   group.add(terminal);
 
   const terminalDock = new THREE.Mesh(new THREE.BoxGeometry(66, 0.3, 5.2), materials.marinaDock);
-  terminalDock.position.set(-137, 0.5, -77);
+  terminalDock.position.set(-209, 0.5, -77);
   terminalDock.receiveShadow = true;
   group.add(terminalDock);
 }
@@ -7075,6 +7141,7 @@ function normalizeGraphicsSettings(source = {}) {
     shadowSoftness: isValidGraphicsValue(settings.shadowSoftness, ["hard", "soft"]) ? settings.shadowSoftness : graphicsDefaults.shadowSoftness,
     shadowDistance: isValidGraphicsValue(settings.shadowDistance, Object.keys(shadowDistanceConfig)) ? settings.shadowDistance : graphicsDefaults.shadowDistance,
     motionBlur: isValidGraphicsValue(settings.motionBlur, Object.keys(motionBlurStrengthConfig)) ? settings.motionBlur : graphicsDefaults.motionBlur,
+    textureQuality: isValidGraphicsValue(settings.textureQuality, Object.keys(asphaltTextureQualityConfig)) ? settings.textureQuality : graphicsDefaults.textureQuality,
     waterQuality: isValidGraphicsValue(settings.waterQuality, Object.keys(waterQualityConfig)) ? settings.waterQuality : graphicsDefaults.waterQuality,
     viewDistance: isValidGraphicsValue(settings.viewDistance, Object.keys(viewDistanceConfig)) ? settings.viewDistance : graphicsDefaults.viewDistance,
     lighting: isValidGraphicsValue(settings.lighting, Object.keys(lightingConfig)) ? settings.lighting : graphicsDefaults.lighting,
@@ -7167,6 +7234,7 @@ function syncDebugControls() {
 
 function applyGraphicsSettings(save = true) {
   applyRenderScale();
+  applyAsphaltTextureSettings();
   applyShadowSettings();
   applyViewDistanceSettings();
   applyLightingSettings();
