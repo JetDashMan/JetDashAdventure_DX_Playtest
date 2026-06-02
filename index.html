@@ -17,10 +17,21 @@
   <body>
     <canvas id="game"></canvas>
 
+    <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
+      <div class="loading-panel">
+        <p class="loading-kicker">JETDASH ADVENTURE</p>
+        <strong>LOADING</strong>
+        <div class="loading-track" aria-hidden="true">
+          <span id="loading-progress"></span>
+        </div>
+        <p id="loading-status">Preparing road textures</p>
+      </div>
+    </section>
+
     <main class="hud" aria-label="Game status">
       <section class="stat">
-        <span class="stat-label">RINGS</span>
-        <strong id="rings">0/0</strong>
+        <span class="stat-label">DNA</span>
+        <strong id="dna">0/0</strong>
       </section>
       <section class="stat">
         <span class="stat-label">SPEED</span>
@@ -53,26 +64,30 @@
       </section>
     </main>
 
-    <button id="music-toggle" class="music-toggle" type="button" aria-pressed="true">
-      MUSIC ON
-    </button>
-    <button id="graphics-toggle" class="graphics-toggle" type="button" aria-expanded="false">
-      GRAPHICS
-    </button>
-    <button id="debug-toggle" class="debug-toggle" type="button" aria-expanded="false">
-      DEBUG
-    </button>
-    <button id="pause-toggle" class="pause-toggle" type="button" aria-label="Pause game" aria-expanded="false">
-      II
-    </button>
-
-    <nav class="stage-select" aria-label="Stage select">
-      <button id="stage-menu-toggle" class="stage-menu-toggle" type="button" aria-expanded="false">STAGE</button>
-      <div id="stage-menu" class="stage-menu hidden">
-        <button type="button" data-stage-select="1">STAGE 1</button>
-        <button type="button" data-stage-select="2">STAGE 2</button>
+    <div class="main-menu" id="main-menu">
+      <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false">MENU</button>
+      <div id="menu-panel" class="menu-panel hidden">
+        <button id="pause-toggle" class="pause-toggle" type="button" aria-label="Pause game" aria-expanded="false">
+          PAUSE
+        </button>
+        <button id="music-toggle" class="music-toggle" type="button" aria-pressed="true">
+          MUSIC ON
+        </button>
+        <button id="graphics-toggle" class="graphics-toggle" type="button" aria-expanded="false">
+          GRAPHICS
+        </button>
+        <nav class="stage-select" aria-label="Stage select">
+          <button id="stage-menu-toggle" class="stage-menu-toggle" type="button" aria-expanded="false">STAGE</button>
+          <div id="stage-menu" class="stage-menu hidden">
+            <button type="button" data-stage-select="1">STAGE 1</button>
+            <button type="button" data-stage-select="2">STAGE 2</button>
+          </div>
+        </nav>
+        <button id="debug-toggle" class="debug-toggle" type="button" aria-expanded="false">
+          DEBUG
+        </button>
       </div>
-    </nav>
+    </div>
 
     <section id="graphics-panel" class="settings-panel hidden" aria-label="Graphics settings">
       <div class="panel-title">

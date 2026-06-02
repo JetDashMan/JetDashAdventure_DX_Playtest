@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 const canvas = document.querySelector("#game");
-const ringsEl = document.querySelector("#rings");
+const dnaEl = document.querySelector("#dna");
 const speedEl = document.querySelector("#speed");
 const timeEl = document.querySelector("#time");
 const scoreEl = document.querySelector("#score");
@@ -22,6 +22,8 @@ const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
+const menuButton = document.querySelector("#menu-toggle");
+const menuPanel = document.querySelector("#menu-panel");
 const pauseButton = document.querySelector("#pause-toggle");
 const pauseMenu = document.querySelector("#pause-menu");
 const resumeButton = document.querySelector("#resume-game");
@@ -33,6 +35,9 @@ const rotatePromptEl = document.querySelector("#rotate-prompt");
 const touchControlsEl = document.querySelector("#touch-controls");
 const touchControlButtons = document.querySelectorAll("[data-touch-control]");
 const fullscreenButton = document.querySelector("#fullscreen-toggle");
+const loadingScreenEl = document.querySelector("#loading-screen");
+const loadingProgressEl = document.querySelector("#loading-progress");
+const loadingStatusEl = document.querySelector("#loading-status");
 const debugProgressButtons = document.querySelectorAll("[data-debug-progress]");
 const graphicsControls = {
   preset: document.querySelector("#graphics-preset"),
@@ -119,7 +124,7 @@ const graphicsPresets = {
     frameCap: "unlimited",
   },
 };
-const graphicsDefaults = { preset: "high", ...graphicsPresets.high };
+const graphicsDefaults = { preset: "medium", ...graphicsPresets.medium };
 const asphaltTextureQualityConfig = {
   low: {
     baseColor: "./assets/textures/asphalt/busan_coastal_asphalt_basecolor_256.jpg",
@@ -331,8 +336,8 @@ const boostTopSpeed = 300 / speedDisplayScale;
 const maxHorizontalSpeed = 400 / speedDisplayScale;
 const boostGaugeMax = 100;
 const boostDrainPerSecond = 10;
-const ringBoostGaugeGain = 5;
-const ringScoreValue = 100;
+const dnaBoostGaugeGain = 5;
+const dnaScoreValue = 100;
 const obstacleScorePenalty = 1000;
 const dashPadSpeedGain = 100 / speedDisplayScale;
 const dashPadFadeDuration = 3;
@@ -345,17 +350,17 @@ const carriedStageScore = currentStageIndex > 0 && Number.isFinite(storedStageSc
 window.sessionStorage.removeItem("dx-speed-stage-score");
 
 const trackSegments = [];
-const rings = [];
+const dnaItems = [];
 const dashPads = [];
 const obstacles = [];
-const looseRings = [];
+const looseDnaItems = [];
 const trail = [];
 const staticStageFrameCache = new Map();
 const staticStageSceneryFrameCache = new Map();
 let waterMesh;
 let waterMaterial;
 let waterTime = 0;
-let collectedRings = 0;
+let collectedDna = 0;
 let score = 0;
 let startedAt = performance.now();
 let finished = false;
@@ -422,7 +427,31 @@ const player = {
   velocity: new THREE.Vector3(),
 };
 
-const textureLoader = new THREE.TextureLoader();
+let loadingScreenHideScheduled = false;
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onProgress = (_url, loaded, total) => {
+  const progress = total > 0 ? THREE.MathUtils.clamp(loaded / total, 0.08, 1) : 0.08;
+  if (loadingProgressEl) loadingProgressEl.style.width = `${Math.round(progress * 100)}%`;
+  if (loadingStatusEl) loadingStatusEl.textContent = `Loading road textures ${loaded}/${Math.max(total, loaded)}`;
+  if (progress >= 1) {
+    scheduleHideLoadingScreen();
+  }
+};
+loadingManager.onError = () => {
+  if (loadingStatusEl) loadingStatusEl.textContent = "Loading issue detected, continuing";
+};
+loadingManager.onLoad = scheduleHideLoadingScreen;
+window.setTimeout(() => scheduleHideLoadingScreen(), 12000);
+
+function scheduleHideLoadingScreen() {
+  if (loadingScreenHideScheduled) return;
+  loadingScreenHideScheduled = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => hideLoadingScreen());
+  });
+}
+
+const textureLoader = new THREE.TextureLoader(loadingManager);
 const textureAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const roadTextureTileMeters = 10;
 let activeAsphaltTextureQuality = graphicsSettings.textureQuality;
@@ -471,7 +500,7 @@ const materials = {
     roughness: 0.42,
     metalness: 0.04,
   }),
-  ring: new THREE.MeshBasicMaterial({
+  dna: new THREE.MeshBasicMaterial({
     vertexColors: true,
   }),
   dashPad: new THREE.MeshStandardMaterial({
@@ -1046,10 +1075,10 @@ const pickupClusterColors = [
   new THREE.Color(0x3e86ff),
   new THREE.Color(0xffffff),
 ];
-const ringGeometry = createPickupClusterGeometry();
-let ringInstances;
-const ringInstanceObject = new THREE.Object3D();
-const hiddenRingMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+const dnaGeometry = createPickupClusterGeometry();
+let dnaInstances;
+const dnaInstanceObject = new THREE.Object3D();
+const hiddenDnaMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
 const harborContainerGeometry = new THREE.BoxGeometry(3.4, 1.12, 6.2);
 const harborContainerRibGeometry = new THREE.BoxGeometry(0.08, 1.18, 6.34);
 const harborContainerDoorGeometry = new THREE.BoxGeometry(3.46, 1.0, 0.08);
@@ -1069,7 +1098,7 @@ function init() {
   addEnvironment();
   addTrack();
   addStageThreeHarbor();
-  addRings();
+  addDnaItems();
   addDashPads();
   addObstacles();
   addGoal();
@@ -1165,7 +1194,7 @@ function createTutorialStageDefinition() {
         { lanes: [1], z: -485, height: 1.35 },
         { lanes: [0], z: -680, height: 1.9 },
       ],
-      ringPlan: [
+      dnaPlan: [
         { type: "trail", lane: 1, zStart: 8, count: 5, spacing: 7.0 },
         { type: "rows", zStart: -86, rowCount: 2, spacing: 14.0 },
         { type: "switch", pattern: [0, 1, 2, 1], zStart: -170, count: 8, spacing: 7.5 },
@@ -1281,7 +1310,7 @@ function createStageOneDefinition() {
         { lanes: [1, 2], z: -2325, height: 2.2 },
         { lanes: [2], z: -2478, height: 2.0 },
       ],
-      ringPlan: [
+      dnaPlan: [
         { type: "trail", lane: 1, zStart: 10, count: 8, spacing: 6.2 },
         { type: "rows", zStart: -72, rowCount: 3, spacing: 12.0 },
         { type: "switch", pattern: [0, 1, 2, 1], zStart: -152, count: 10, spacing: 6.5 },
@@ -1479,7 +1508,7 @@ function createStageTwoDefinition(label = "STAGE 2") {
         { lanes: [0, 1], z: -10120, height: 2.15 },
         { lanes: [2], z: -10660, height: 2.0 },
       ],
-      ringPlan: [
+      dnaPlan: [
         { type: "trail", lane: 1, zStart: startZ - 32, count: 8, spacing: 9.0 },
         { type: "switch", pattern: [1, 0, 1, 2], zStart: startZ - 260, count: 10, spacing: 9.5 },
         { type: "trail", lane: 2, zStart: startZ - 545, count: 7, spacing: 10.0 },
@@ -1590,7 +1619,7 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { lanes: [0, 2], z: -2180, height: 2.05 },
         { lanes: [1], z: -2600, height: 1.9 },
       ],
-      ringPlan: [
+      dnaPlan: [
         { type: "trail", lane: 1, zStart: -48, count: 6, spacing: 9.0 },
         { type: "rows", zStart: -170, rowCount: 2, spacing: 16.0 },
         { type: "switch", pattern: [0, 1, 0, 1], zStart: -262, count: 6, spacing: 10.0 },
@@ -1975,6 +2004,7 @@ function addGwangalliBeachEnvironment() {
   addGwangalliTourBoats();
   addGwangalliCoastalLandmarks();
   addYonghoBayLandmarkScenery();
+  addGwangalliMidwayResidentialCorridor();
   addGwangalliDenseUrbanCorridor();
   addShinseondaeTunnelApproach();
   addShinseondaeTunnel();
@@ -4133,13 +4163,156 @@ function addYonghoBayCruiseBoat(group, x, z, scale, label) {
   group.add(boat);
 }
 
+function addGwangalliMidwayResidentialCorridor() {
+  if (!currentStage.gwangalliTheme) return;
+
+  const startZ = getStageZAtGoalProgress(0.5);
+  const endZ = getStageZAtGoalProgress(0.6);
+  addGwangalliMidwayRoadsideTrees(startZ, endZ);
+
+  let rowIndex = 0;
+  for (let z = startZ; z > endZ; z -= 118) {
+    const ground = getStageDefinitionGroundSample(0, z);
+    if (!ground) {
+      rowIndex += 1;
+      continue;
+    }
+
+    const group = new THREE.Group();
+    setStageSceneryTransform(group, new THREE.Vector3(0, ground.y - 0.8, z), 0, 0, true);
+    addGwangalliMidwayApartmentRow(group, rowIndex);
+    addGwangalliMidwayTreeVerge(group, rowIndex);
+    scene.add(group);
+    rowIndex += 1;
+  }
+}
+
+function addGwangalliMidwayApartmentRow(group, rowIndex) {
+  const base = new THREE.Mesh(new THREE.BoxGeometry(112, 0.9, 126), materials.coastalRock);
+  base.position.set(-50, 0.48, 0);
+  base.receiveShadow = true;
+  group.add(base);
+
+  const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(8, 0.18, 118), materials.gwangalliBoardwalk);
+  sidewalk.position.set(-13, 1.0, 0);
+  sidewalk.receiveShadow = true;
+  group.add(sidewalk);
+
+  const podium = new THREE.Mesh(new THREE.BoxGeometry(74, 4.6, 21), materials.rightCityFacade);
+  podium.position.set(-55, 3.2, -36 + (rowIndex % 2) * 12);
+  podium.castShadow = false;
+  podium.receiveShadow = true;
+  group.add(podium);
+
+  for (let i = 0; i < 5; i += 1) {
+    const seed = rowIndex * 13 + i * 7;
+    const x = -27 - i * 13.5 + ((seed % 3) - 1) * 1.8;
+    const z = -42 + i * 20 + ((seed % 5) - 2) * 2.2;
+    const width = 9.5 + (seed % 3) * 1.2;
+    const depth = 17 + (seed % 4) * 2.4;
+    const height = 32 + (seed % 6) * 5.2 + (i % 2) * 10;
+    addGwangalliMidwayApartmentTower(group, { x, z, width, depth, height, seed });
+  }
+}
+
+function addGwangalliMidwayApartmentTower(group, { x, z, width, depth, height, seed }) {
+  const material = seed % 2 === 0 ? materials.gwangalliBuilding : materials.rightCityFacade;
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  tower.position.set(x, height * 0.5 + 1.1, z);
+  tower.castShadow = height > 46;
+  tower.receiveShadow = true;
+  group.add(tower);
+
+  const innerFace = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, height * 0.74, depth * 0.82),
+    seed % 2 === 0 ? materials.gwangalliWindow : materials.rightCityGlass,
+  );
+  innerFace.position.set(x + width * 0.5 + 0.1, height * 0.5 + 1.2, z);
+  group.add(innerFace);
+
+  const floorCount = Math.min(7, Math.max(4, Math.floor(height / 9)));
+  for (let floor = 1; floor <= floorCount; floor += 1) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.34, depth * 0.78),
+      floor % 2 === 0 ? materials.gwangalliBuildingLight : materials.gwangalliWindow,
+    );
+    strip.position.set(x + width * 0.5 + 0.18, 3 + floor * (height - 5) / (floorCount + 1), z);
+    group.add(strip);
+  }
+}
+
+function addGwangalliMidwayTreeVerge(group, rowIndex) {
+  const grass = new THREE.Mesh(new THREE.BoxGeometry(58, 0.18, 128), materials.coastalForest);
+  grass.position.set(39, 0.98, 0);
+  grass.receiveShadow = true;
+  group.add(grass);
+
+  const walkway = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 122), materials.gwangalliBoardwalk);
+  walkway.position.set(15, 1.1, 0);
+  walkway.receiveShadow = true;
+  group.add(walkway);
+
+  if (rowIndex % 2 === 0) {
+    const lowWall = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 120), materials.noiseWallConcrete);
+    lowWall.position.set(18.8, 1.55, 0);
+    lowWall.receiveShadow = true;
+    group.add(lowWall);
+  }
+}
+
+function addGwangalliMidwayRoadsideTrees(startZ, endZ) {
+  const placements = [];
+  for (let z = startZ - 18; z > endZ + 14; z -= 34) {
+    const ground = getStageDefinitionGroundSample(0, z);
+    if (!ground) continue;
+
+    for (let column = 0; column < 3; column += 1) {
+      const seed = Math.abs(Math.round(z)) + column * 19;
+      placements.push({
+        x: 25 + column * 9.6 + ((seed % 5) - 2) * 0.9,
+        y: ground.y,
+        z: z + ((seed % 7) - 3) * 1.1,
+        scale: 0.82 + (seed % 5) * 0.07,
+      });
+    }
+  }
+
+  if (placements.length === 0) return;
+
+  const trunkGeometry = new THREE.CylinderGeometry(0.32, 0.42, 1, 7);
+  const crownGeometry = new THREE.ConeGeometry(3.6, 1, 9);
+  const trunkMesh = new THREE.InstancedMesh(trunkGeometry, materials.coastalRock, placements.length);
+  const crownMesh = new THREE.InstancedMesh(crownGeometry, materials.coastalForest, placements.length);
+  const dummy = new THREE.Object3D();
+
+  placements.forEach((placement, index) => {
+    const base = toSceneryWorldPosition(new THREE.Vector3(placement.x, placement.y, placement.z), true);
+    dummy.position.copy(base).addScaledVector(worldUp, 2.0 * placement.scale);
+    dummy.scale.set(placement.scale, 4.0 * placement.scale, placement.scale);
+    dummy.updateMatrix();
+    trunkMesh.setMatrixAt(index, dummy.matrix);
+
+    dummy.position.copy(base).addScaledVector(worldUp, 7.6 * placement.scale);
+    dummy.scale.set(placement.scale, 8.6 * placement.scale, placement.scale);
+    dummy.updateMatrix();
+    crownMesh.setMatrixAt(index, dummy.matrix);
+  });
+
+  trunkMesh.castShadow = true;
+  trunkMesh.receiveShadow = true;
+  crownMesh.castShadow = true;
+  crownMesh.receiveShadow = true;
+  scene.add(trunkMesh);
+  scene.add(crownMesh);
+}
+
 function addGwangalliDenseUrbanCorridor() {
   if (!currentStage.gwangalliTheme) return;
 
   const tunnelStartZ = getGwangalliTunnelStartZ();
   if (!Number.isFinite(tunnelStartZ)) return;
 
-  const startZ = getStageZAtGoalProgress(0.6);
+  const startZ = getStageZAtGoalProgress(0.62);
   const endZ = getStageZAtGoalProgress(0.8);
   const rowSpacing = 132;
   let rowIndex = 0;
@@ -4574,7 +4747,8 @@ function addShinseondaeTunnel() {
   const tunnelEndZ = currentStage.gwangalliTunnelEndZ ?? currentStage.goalZ;
   if (!Number.isFinite(tunnelStartZ)) return;
 
-  const shellStartZ = tunnelStartZ + 24;
+  const tunnelInteriorStartZ = tunnelStartZ - 10;
+  const shellStartZ = tunnelInteriorStartZ;
   const shellEndZ = tunnelEndZ + 36;
   const ceiling = new THREE.Mesh(
     makeContinuousScenerySideBoxGeometry(0, shellStartZ, shellEndZ, 7.25, 22.8, 0.82, 7),
@@ -4627,13 +4801,13 @@ function addShinseondaeTunnel() {
     scene.add(blueStripe);
   }
 
-  for (let z = tunnelStartZ + 10; z > tunnelEndZ + 40; z -= 34) {
+  for (let z = tunnelInteriorStartZ; z > tunnelEndZ + 40; z -= 34) {
     const sample = getStageDefinitionGroundSample(0, z);
     if (!sample) continue;
 
     const group = new THREE.Group();
     setStageSceneryTransform(group, new THREE.Vector3(0, sample.y, z), 0, 0);
-    const blockIndex = Math.round((tunnelStartZ - z) / 34);
+    const blockIndex = Math.round((tunnelInteriorStartZ - z) / 34);
 
     for (const side of [-1, 1]) {
       const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.18, 1.35), materials.tunnelLight);
@@ -5553,9 +5727,9 @@ function mergeColoredGeometries(parts) {
   return merged;
 }
 
-function addRings() {
-  const addRing = (x, z, lift = 1.42) => {
-    if (!isRingPlacementClear(x, z)) return;
+function addDnaItems() {
+  const addDnaItem = (x, z, lift = 1.42) => {
+    if (!isDnaPlacementClear(x, z)) return;
 
     const sample = getGroundSample(x, z);
     if (!sample) return;
@@ -5565,8 +5739,8 @@ function addRings() {
     const basePosition = frame.center.clone()
       .addScaledVector(frame.right, localPosition.x)
       .addScaledVector(frame.up, localPosition.y);
-    rings.push({
-      index: rings.length,
+    dnaItems.push({
+      index: dnaItems.length,
       localPosition,
       basePosition,
       baseQuaternion: getStageQuaternion(frame),
@@ -5580,7 +5754,7 @@ function addRings() {
 
   const addLaneTrail = (lane, zStart, count, spacing = 5.0) => {
     for (let i = 0; i < count; i += 1) {
-      addRing(lanes[lane], zStart - i * spacing);
+      addDnaItem(lanes[lane], zStart - i * spacing);
     }
   };
 
@@ -5588,18 +5762,18 @@ function addRings() {
     for (let i = 0; i < rowCount; i += 1) {
       const z = zStart - i * spacing;
       for (const x of lanes) {
-        addRing(x, z);
+        addDnaItem(x, z);
       }
     }
   };
 
   const addLaneSwitch = (pattern, zStart, count, spacing = 5.0) => {
     for (let i = 0; i < count; i += 1) {
-      addRing(lanes[pattern[i % pattern.length]], zStart - i * spacing);
+      addDnaItem(lanes[pattern[i % pattern.length]], zStart - i * spacing);
     }
   };
 
-  for (const plan of currentStage.ringPlan) {
+  for (const plan of currentStage.dnaPlan) {
     if (plan.type === "trail") {
       addLaneTrail(plan.lane, plan.zStart, plan.count, plan.spacing);
     } else if (plan.type === "rows") {
@@ -5609,16 +5783,16 @@ function addRings() {
     }
   }
 
-  ringInstances = new THREE.InstancedMesh(ringGeometry, materials.ring, rings.length);
-  ringInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  ringInstances.castShadow = false;
-  ringInstances.receiveShadow = false;
-  scene.add(ringInstances);
+  dnaInstances = new THREE.InstancedMesh(dnaGeometry, materials.dna, dnaItems.length);
+  dnaInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  dnaInstances.castShadow = false;
+  dnaInstances.receiveShadow = false;
+  scene.add(dnaInstances);
 
-  refreshRingInstances();
+  refreshDnaInstances();
 }
 
-function isRingPlacementClear(x, z) {
+function isDnaPlacementClear(x, z) {
   const clearOfDashPads = !dashPadPlacements.some((placement) => (
     Math.abs(x - lanes[placement.lane]) < 0.01 && Math.abs(z - placement.z) <= 3.7
   ));
@@ -6018,6 +6192,12 @@ function bindInput() {
   bindTouchControls();
   restartButton.addEventListener("click", resetGame);
   nextStageButton.addEventListener("click", goToNextStage);
+  menuButton?.addEventListener("click", () => setMainMenuOpen(menuPanel?.classList.contains("hidden")));
+  document.addEventListener("pointerdown", (event) => {
+    if (!menuPanel || !menuButton || menuPanel.classList.contains("hidden")) return;
+    if (menuPanel.contains(event.target) || menuButton.contains(event.target)) return;
+    setMainMenuOpen(false);
+  });
   stageSelectButtons.forEach((button) => {
     button.addEventListener("click", () => selectStage(button.dataset.stageSelect));
   });
@@ -6211,8 +6391,8 @@ function tick(now = performance.now()) {
 }
 
 function updateGame(dt) {
-  updateRings(dt);
-  updateLooseRings(dt);
+  updateDnaItems(dt);
+  updateLooseDnaItems(dt);
   updateObstacles(dt);
   updateDashPads(dt);
   updateStageThreeHarbor(dt);
@@ -6350,7 +6530,7 @@ function updatePlayer(dt) {
     checkDashPads();
   }
   clampHorizontalSpeed(speedLimit);
-  checkRingCollection();
+  checkDnaCollection();
   checkObstacleCollision();
 
   player.yaw = THREE.MathUtils.lerp(player.yaw, THREE.MathUtils.clamp(player.velocity.x * 0.035, -0.48, 0.48), 1 - Math.exp(-8 * dt));
@@ -6534,53 +6714,53 @@ function updateObstacles(dt) {
   }
 }
 
-function updateRings(dt) {
-  for (const ring of rings) {
-    if (ring.collected) continue;
-    ring.spinAngle += dt * ring.spin * 2.8;
-    const bob = Math.sin(performance.now() * 0.004 + ring.bobPhase) * 0.035;
-    setRingInstanceMatrix(ring, bob);
+function updateDnaItems(dt) {
+  for (const dna of dnaItems) {
+    if (dna.collected) continue;
+    dna.spinAngle += dt * dna.spin * 2.8;
+    const bob = Math.sin(performance.now() * 0.004 + dna.bobPhase) * 0.035;
+    setDnaInstanceMatrix(dna, bob);
   }
-  if (ringInstances) {
-    ringInstances.instanceMatrix.needsUpdate = true;
+  if (dnaInstances) {
+    dnaInstances.instanceMatrix.needsUpdate = true;
   }
 }
 
-function setRingInstanceMatrix(ring, bob = 0) {
-  if (!ringInstances) return;
+function setDnaInstanceMatrix(dna, bob = 0) {
+  if (!dnaInstances) return;
 
-  ringInstanceObject.position.copy(ring.basePosition).addScaledVector(ring.up, bob);
-  ringInstanceObject.quaternion.copy(ring.baseQuaternion);
-  ringInstanceObject.scale.setScalar(1);
-  ringInstanceObject.rotateY(ring.spinAngle * 0.85);
-  ringInstanceObject.rotateZ(ring.spinAngle * 0.42);
-  ringInstanceObject.updateMatrix();
-  ringInstances.setMatrixAt(ring.index, ringInstanceObject.matrix);
+  dnaInstanceObject.position.copy(dna.basePosition).addScaledVector(dna.up, bob);
+  dnaInstanceObject.quaternion.copy(dna.baseQuaternion);
+  dnaInstanceObject.scale.setScalar(1);
+  dnaInstanceObject.rotateY(dna.spinAngle * 0.85);
+  dnaInstanceObject.rotateZ(dna.spinAngle * 0.42);
+  dnaInstanceObject.updateMatrix();
+  dnaInstances.setMatrixAt(dna.index, dnaInstanceObject.matrix);
 }
 
-function hideRingInstance(ring) {
-  if (!ringInstances) return;
+function hideDnaInstance(dna) {
+  if (!dnaInstances) return;
 
-  ringInstances.setMatrixAt(ring.index, hiddenRingMatrix);
-  ringInstances.instanceMatrix.needsUpdate = true;
+  dnaInstances.setMatrixAt(dna.index, hiddenDnaMatrix);
+  dnaInstances.instanceMatrix.needsUpdate = true;
 }
 
-function refreshRingInstances() {
-  for (const ring of rings) {
-    if (ring.collected) {
-      hideRingInstance(ring);
+function refreshDnaInstances() {
+  for (const dna of dnaItems) {
+    if (dna.collected) {
+      hideDnaInstance(dna);
     } else {
-      setRingInstanceMatrix(ring);
+      setDnaInstanceMatrix(dna);
     }
   }
-  if (ringInstances) {
-    ringInstances.instanceMatrix.needsUpdate = true;
+  if (dnaInstances) {
+    dnaInstances.instanceMatrix.needsUpdate = true;
   }
 }
 
-function updateLooseRings(dt) {
-  for (let i = looseRings.length - 1; i >= 0; i -= 1) {
-    const loose = looseRings[i];
+function updateLooseDnaItems(dt) {
+  for (let i = looseDnaItems.length - 1; i >= 0; i -= 1) {
+    const loose = looseDnaItems[i];
     loose.age += dt;
     loose.velocity.y -= 30 * dt;
     loose.localPosition.addScaledVector(loose.velocity, dt);
@@ -6599,30 +6779,30 @@ function updateLooseRings(dt) {
     setStageObjectTransform(loose.mesh, loose.localPosition, loose.spinAngle);
 
     if (loose.age > loose.collectDelay && loose.localPosition.distanceTo(player.position) < 1.45) {
-      collectedRings += 1;
-      addScore(ringScoreValue);
-      restoreBoostGauge(ringBoostGaugeGain);
+      collectedDna += 1;
+      addScore(dnaScoreValue);
+      restoreBoostGauge(dnaBoostGaugeGain);
       scene.remove(loose.mesh);
-      looseRings.splice(i, 1);
+      looseDnaItems.splice(i, 1);
       continue;
     }
 
     if (loose.age > 8 || loose.localPosition.y < -14) {
       scene.remove(loose.mesh);
-      looseRings.splice(i, 1);
+      looseDnaItems.splice(i, 1);
     }
   }
 }
 
-function checkRingCollection() {
-  for (const ring of rings) {
-    if (ring.collected) continue;
-    if (ring.localPosition.distanceTo(player.position) < 1.42) {
-      ring.collected = true;
-      hideRingInstance(ring);
-      collectedRings += 1;
-      addScore(ringScoreValue);
-      restoreBoostGauge(ringBoostGaugeGain);
+function checkDnaCollection() {
+  for (const dna of dnaItems) {
+    if (dna.collected) continue;
+    if (dna.localPosition.distanceTo(player.position) < 1.42) {
+      dna.collected = true;
+      hideDnaInstance(dna);
+      collectedDna += 1;
+      addScore(dnaScoreValue);
+      restoreBoostGauge(dnaBoostGaugeGain);
     }
   }
 }
@@ -6670,18 +6850,18 @@ function handleObstacleHit(obstacle) {
   jumpImpact = 1;
   obstacle.mesh.scale.set(1.2, 1.08, 1.2);
   setTimeout(() => obstacle.mesh.scale.set(1, 1, 1), 120);
-  dropCollectedRings();
+  dropCollectedDna();
 }
 
-function dropCollectedRings() {
-  const count = collectedRings;
+function dropCollectedDna() {
+  const count = collectedDna;
   if (count <= 0) return;
 
-  collectedRings = 0;
+  collectedDna = 0;
   const origin = player.position.clone();
 
   for (let i = 0; i < count; i += 1) {
-    const meteor = new THREE.Mesh(ringGeometry, materials.ring);
+    const meteor = new THREE.Mesh(dnaGeometry, materials.dna);
     meteor.castShadow = false;
     meteor.receiveShadow = false;
 
@@ -6696,7 +6876,7 @@ function dropCollectedRings() {
     scene.add(meteor);
 
     const burstSpeed = 8 + Math.random() * 13;
-    looseRings.push({
+    looseDnaItems.push({
       mesh: meteor,
       localPosition,
       velocity: new THREE.Vector3(
@@ -6741,6 +6921,7 @@ function selectStage(stageRoute) {
   const stageIndex = getStageIndex(stageRoute);
 
   window.sessionStorage.removeItem("dx-speed-stage-score");
+  setMainMenuOpen(false);
   setStageMenuOpen(false);
   if (stageIndex === currentStageIndex) {
     resetGame();
@@ -6757,6 +6938,25 @@ function updateStageSelector() {
     const stageIndex = getStageIndex(button.dataset.stageSelect);
     button.setAttribute("aria-pressed", stageIndex === currentStageIndex ? "true" : "false");
   });
+}
+
+function hideLoadingScreen() {
+  if (!loadingScreenEl) return;
+  if (loadingProgressEl) loadingProgressEl.style.width = "100%";
+  if (loadingStatusEl) loadingStatusEl.textContent = "Ready";
+  loadingScreenEl.classList.add("is-complete");
+  window.setTimeout(() => {
+    loadingScreenEl.classList.add("hidden");
+  }, 260);
+}
+
+function setMainMenuOpen(open) {
+  if (!menuPanel || !menuButton) return;
+  menuPanel.classList.toggle("hidden", !open);
+  menuButton.setAttribute("aria-expanded", open ? "true" : "false");
+  if (!open) {
+    setStageMenuOpen(false);
+  }
 }
 
 function setStageMenuOpen(open) {
@@ -7008,6 +7208,7 @@ function setPaused(paused, reason = "manual") {
       touchInput.jump = false;
       syncTouchControls();
     }
+    setMainMenuOpen(false);
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
@@ -7342,6 +7543,7 @@ function setGraphicsPanelOpen(open) {
   graphicsPanel.classList.toggle("hidden", !open);
   graphicsButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    setMainMenuOpen(false);
     setStageMenuOpen(false);
     setDebugPanelOpen(false);
     setHelpPanelOpen(false);
@@ -7353,6 +7555,7 @@ function setDebugPanelOpen(open) {
   debugPanel.classList.toggle("hidden", !open);
   debugButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    setMainMenuOpen(false);
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setHelpPanelOpen(false);
@@ -7367,6 +7570,7 @@ function setHelpPanelOpen(open) {
   helpPanel.classList.toggle("hidden", !open);
   helpButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    setMainMenuOpen(false);
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
@@ -7429,7 +7633,7 @@ function isGameplayKey(code) {
 
 function updateHud() {
   const speedCap = debugSuperBoostActive ? 2000 : 400;
-  ringsEl.textContent = `${collectedRings}/${rings.length}`;
+  dnaEl.textContent = `${collectedDna}/${dnaItems.length}`;
   speedEl.textContent = `${Math.round(Math.min(getHorizontalSpeed() * speedDisplayScale, speedCap))}`;
   timeEl.textContent = getElapsedSeconds().toFixed(2);
   scoreEl.textContent = `${score}`;
@@ -7473,7 +7677,7 @@ function warpToGoalProgress(progress) {
   player.velocity.set(0, 0, 0);
   player.grounded = true;
   resetCameraView();
-  clearLooseRings();
+  clearLooseDnaItems();
   finishEl.classList.add("hidden");
   updateHud();
 }
@@ -7516,7 +7720,7 @@ function resetGame(options = {}) {
   debugSuperBoostActive = false;
   startedAt = performance.now();
   if (touchControlsEnabled) resetTouchRunState();
-  collectedRings = 0;
+  collectedDna = 0;
   score = scoreOverride;
   finishEl.classList.add("hidden");
   finishKickerEl.textContent = `${currentStage.label}`;
@@ -7558,13 +7762,13 @@ function resetGame(options = {}) {
     }
   }
 
-  for (const ring of rings) {
-    ring.collected = false;
-    ring.spinAngle = 0;
+  for (const dna of dnaItems) {
+    dna.collected = false;
+    dna.spinAngle = 0;
   }
-  refreshRingInstances();
+  refreshDnaInstances();
 
-  clearLooseRings();
+  clearLooseDnaItems();
 
   for (const pad of dashPads) {
     pad.cooldown = 0;
@@ -7576,11 +7780,11 @@ function resetGame(options = {}) {
   updateHud();
 }
 
-function clearLooseRings() {
-  for (const loose of looseRings) {
+function clearLooseDnaItems() {
+  for (const loose of looseDnaItems) {
     scene.remove(loose.mesh);
   }
-  looseRings.length = 0;
+  looseDnaItems.length = 0;
 }
 
 function getHorizontalSpeed() {

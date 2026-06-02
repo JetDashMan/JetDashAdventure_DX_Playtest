@@ -30,6 +30,75 @@ body {
   outline: none;
 }
 
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(13, 31, 47, 0.94), rgba(3, 9, 16, 0.96)),
+    #07121f;
+  transition: opacity 220ms ease;
+}
+
+.loading-screen.is-complete {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-screen.hidden {
+  display: none;
+}
+
+.loading-panel {
+  display: grid;
+  gap: 12px;
+  width: min(360px, calc(100vw - 48px));
+  text-align: center;
+}
+
+.loading-kicker {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 900;
+  color: rgba(248, 251, 255, 0.7);
+}
+
+.loading-panel strong {
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  line-height: 0.95;
+  color: #ffd86a;
+}
+
+.loading-track {
+  position: relative;
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.loading-track span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 8%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #33f3ff, #ffd344);
+  box-shadow: 0 0 20px rgba(51, 243, 255, 0.38);
+  transition: width 160ms ease;
+}
+
+.loading-panel p:last-child {
+  min-height: 18px;
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: rgba(248, 251, 255, 0.72);
+}
+
 body.touch-enabled {
   user-select: none;
   -webkit-user-select: none;
@@ -1076,5 +1145,139 @@ body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
 
   .debug-check {
     grid-template-columns: 1fr auto;
+  }
+}
+
+.main-menu {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 6;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  width: min(156px, calc(100vw - 36px));
+}
+
+.menu-toggle {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(8, 20, 30, 0.64);
+  color: #f8fbff;
+  box-shadow: 0 10px 28px rgba(4, 20, 40, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.menu-toggle[aria-expanded="true"],
+.menu-toggle:hover {
+  background: #ffd344;
+  color: #181100;
+}
+
+.menu-panel {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(7, 18, 31, 0.84);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(14px);
+}
+
+.menu-panel.hidden {
+  display: none;
+}
+
+.main-menu .music-toggle,
+.main-menu .graphics-toggle,
+.main-menu .debug-toggle,
+.main-menu .pause-toggle,
+.main-menu .stage-menu-toggle,
+.main-menu .stage-menu button {
+  position: static;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+}
+
+.main-menu .pause-toggle {
+  font-size: 0.76rem;
+}
+
+.main-menu .stage-select {
+  position: static;
+  display: grid;
+  justify-items: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: none;
+}
+
+.main-menu .stage-menu {
+  width: 100%;
+  gap: 6px;
+  padding: 6px;
+}
+
+body.touch-enabled:not(.portrait-touch) .main-menu {
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  width: 118px;
+  gap: 5px;
+}
+
+body.touch-enabled:not(.portrait-touch) .menu-toggle,
+body.touch-enabled:not(.portrait-touch) .main-menu .music-toggle,
+body.touch-enabled:not(.portrait-touch) .main-menu .graphics-toggle,
+body.touch-enabled:not(.portrait-touch) .main-menu .debug-toggle,
+body.touch-enabled:not(.portrait-touch) .main-menu .pause-toggle,
+body.touch-enabled:not(.portrait-touch) .main-menu .stage-menu-toggle,
+body.touch-enabled:not(.portrait-touch) .main-menu .stage-menu button {
+  position: static;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 7px;
+  font-size: 0.62rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .menu-panel {
+  gap: 5px;
+  padding: 5px;
+}
+
+body.touch-enabled:not(.portrait-touch) .main-menu .stage-menu {
+  gap: 5px;
+  padding: 5px;
+}
+
+@media (max-width: 520px) {
+  .main-menu {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    width: 132px;
+  }
+
+  .menu-toggle,
+  .main-menu .music-toggle,
+  .main-menu .graphics-toggle,
+  .main-menu .debug-toggle,
+  .main-menu .pause-toggle,
+  .main-menu .stage-menu-toggle,
+  .main-menu .stage-menu button {
+    position: static;
+    inset: auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
   }
 }
