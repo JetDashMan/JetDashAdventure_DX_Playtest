@@ -1907,6 +1907,7 @@ function addGwangalliBeachEnvironment() {
   addGwangalliSuspensionStructure();
   addGwangalliTourBoats();
   addGwangalliCoastalLandmarks();
+  addYonghoBayLandmarkScenery();
   addGwangalliDenseUrbanCorridor();
   addShinseondaeTunnelApproach();
   addShinseondaeTunnel();
@@ -3750,6 +3751,320 @@ function addGwangalliApartmentCluster({ x, z, count, seed }) {
   }
 
   scene.add(group);
+}
+
+function addYonghoBayLandmarkScenery() {
+  if (!currentStage.gwangalliTheme) return;
+
+  const sceneryZ = getStageZAtGoalProgress(0.5);
+  const group = new THREE.Group();
+  setStageSceneryTransform(group, new THREE.Vector3(-178, seaLevelY + 0.62, sceneryZ), Math.PI * 0.5 - 0.08, 0, true);
+  group.scale.setScalar(0.9);
+
+  addYonghoBayIslandAndCruiseTerminal(group);
+  addYonghoBayReclaimedPier(group);
+  addYonghoBayPark(group);
+  addYonghoBaySmallApartments(group);
+  addYonghoBayWTowers(group);
+
+  scene.add(group);
+}
+
+function addYonghoBayWTowers(group) {
+  const towers = [
+    { x: 10, z: 18, width: 25, depth: 27, height: 138, logo: "W", offset: -1 },
+    { x: 72, z: 8, width: 23, depth: 25, height: 126, logo: "S", offset: 1 },
+    { x: 122, z: 20, width: 20, depth: 23, height: 108, logo: "", offset: 0 },
+  ];
+
+  towers.forEach((tower, index) => {
+    addYonghoBayWTower(group, { ...tower, index });
+  });
+
+  const podium = new THREE.Mesh(new THREE.BoxGeometry(162, 8, 24), materials.haeundaeExordiumCore);
+  podium.position.set(60, 4.9, 13);
+  podium.castShadow = true;
+  podium.receiveShadow = true;
+  group.add(podium);
+
+  const podiumGlass = new THREE.Mesh(new THREE.BoxGeometry(154, 2.8, 0.18), materials.rightCityGlass);
+  podiumGlass.position.set(60, 7.3, 0.72);
+  group.add(podiumGlass);
+}
+
+function addYonghoBayWTower(group, { x, z, width, depth, height, logo, offset, index }) {
+  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), materials.gwangalliIparkDarkGlass);
+  body.position.set(x, height * 0.5 + 8.2, z);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(width * 0.78, height * 0.86, 0.18), materials.gwangalliIparkGlass);
+  frontGlass.position.set(x, height * 0.51 + 8.4, z - depth * 0.5 - 0.11);
+  group.add(frontGlass);
+
+  const sideCore = new THREE.Mesh(new THREE.BoxGeometry(width * 0.35, height * 0.78, depth * 0.82), materials.haeundaeExordiumCore);
+  sideCore.position.set(x + offset * width * 0.42, height * 0.46 + 8.2, z + depth * 0.08);
+  sideCore.castShadow = true;
+  sideCore.receiveShadow = true;
+  group.add(sideCore);
+
+  const crown = new THREE.Mesh(new THREE.BoxGeometry(width + 3.8, 7.2, depth + 2.6), materials.gwangalliIparkFacade);
+  crown.position.set(x, height + 12.1, z);
+  crown.castShadow = true;
+  group.add(crown);
+
+  const topInset = new THREE.Mesh(new THREE.BoxGeometry(width * 0.72, 3.2, depth * 0.76), materials.rightCityFacade);
+  topInset.position.set(x, height + 17.0, z);
+  topInset.castShadow = true;
+  group.add(topInset);
+
+  if (logo) {
+    const logoPanel = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.4, 2.4),
+      createCanvasLabelMaterial(logo, 160, 80, index === 0 ? "#29415a" : "#1e6aae", "rgba(245, 248, 250, 0)"),
+    );
+    logoPanel.position.set(x + width * 0.18, height + 18.8, z - depth * 0.5 - 0.14);
+    group.add(logoPanel);
+  }
+
+  for (let floor = 1; floor < 18; floor += 1) {
+    const y = 12 + floor * (height - 12) / 18;
+    const band = new THREE.Mesh(new THREE.BoxGeometry(width * 0.76, 0.32, 0.12), materials.gwangalliWindow);
+    band.position.set(x, y, z - depth * 0.5 - 0.18);
+    group.add(band);
+  }
+
+  for (const side of [-1, 1]) {
+    const whiteRail = new THREE.Mesh(new THREE.BoxGeometry(0.72, height * 0.88, 0.16), materials.gwangalliIparkFacade);
+    whiteRail.position.set(x + side * width * 0.44, height * 0.51 + 8.2, z - depth * 0.5 - 0.22);
+    group.add(whiteRail);
+  }
+
+  for (const plaqueY of [height * 0.34 + 8.2, height * 0.58 + 8.2]) {
+    const redPlaque = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.2, 0.18), materials.tourBoatRed);
+    redPlaque.position.set(x + width * 0.42, plaqueY, z - depth * 0.5 - 0.28);
+    group.add(redPlaque);
+  }
+}
+
+function addYonghoBaySmallApartments(group) {
+  const base = new THREE.Mesh(new THREE.BoxGeometry(260, 1.0, 58), materials.coastalRock);
+  base.position.set(50, 0.56, 72);
+  base.receiveShadow = true;
+  group.add(base);
+
+  for (let i = 0; i < 16; i += 1) {
+    const row = Math.floor(i / 8);
+    const column = i % 8;
+    const height = 32 + ((i * 7) % 5) * 4.5 + row * 6;
+    const width = 10 + (i % 3) * 1.2;
+    const depth = 13 + (i % 2) * 2;
+    const x = -82 + column * 24 + (row % 2) * 7;
+    const z = 54 + row * 32 + ((i % 3) - 1) * 2;
+    const apartment = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), materials.gwangalliIparkFacade);
+    apartment.position.set(x, height * 0.5 + 1.2, z);
+    apartment.castShadow = true;
+    apartment.receiveShadow = true;
+    group.add(apartment);
+
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(width * 0.72, height * 0.76, 0.12), materials.haeundaeExordiumGlass);
+    glass.position.set(x, height * 0.5 + 1.4, z - depth * 0.5 - 0.08);
+    group.add(glass);
+
+    for (let floor = 1; floor < 6; floor += 1) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(width * 0.84, 0.2, 0.12), materials.haeundaeExordiumBalcony);
+      band.position.set(x, 4 + floor * (height - 5) / 6, z - depth * 0.5 - 0.16);
+      group.add(band);
+    }
+  }
+}
+
+function addYonghoBayPark(group) {
+  const parkBase = new THREE.Mesh(new THREE.BoxGeometry(238, 0.78, 38), materials.coastalRock);
+  parkBase.position.set(34, 0.42, -18);
+  parkBase.receiveShadow = true;
+  group.add(parkBase);
+
+  const grass = new THREE.Mesh(new THREE.BoxGeometry(222, 0.16, 27), materials.coastalForest);
+  grass.position.set(34, 0.92, -18);
+  grass.receiveShadow = true;
+  group.add(grass);
+
+  const path = new THREE.Mesh(new THREE.BoxGeometry(210, 0.18, 4.2), materials.gwangalliBoardwalk);
+  path.position.set(34, 1.04, -17.5);
+  path.receiveShadow = true;
+  group.add(path);
+
+  const flowerBed = new THREE.Mesh(new THREE.BoxGeometry(88, 0.2, 5.2), materials.tourBoatRed);
+  flowerBed.position.set(64, 1.08, -29.5);
+  group.add(flowerBed);
+
+  for (let i = 0; i < 28; i += 1) {
+    const tree = new THREE.Group();
+    tree.position.set(-72 + (i % 14) * 16, 0.98, -28 + Math.floor(i / 14) * 18 + ((i % 3) - 1) * 1.5);
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 3.2, 8), materials.coastalRock);
+    trunk.position.y = 1.65;
+    trunk.castShadow = true;
+    tree.add(trunk);
+
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(3.2 + (i % 3) * 0.35, 7.2, 10), materials.coastalForest);
+    crown.position.y = 5.4;
+    crown.castShadow = true;
+    tree.add(crown);
+    group.add(tree);
+  }
+
+  for (let i = 0; i < 7; i += 1) {
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 8.4, 8), materials.marinaPost);
+    lamp.position.set(-92 + i * 34, 4.2, -41.5);
+    lamp.castShadow = true;
+    group.add(lamp);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.18, 0.42), materials.beachLamp);
+    head.position.set(lamp.position.x + 0.78, 8.1, -41.5);
+    group.add(head);
+  }
+}
+
+function addYonghoBayReclaimedPier(group) {
+  const quay = new THREE.Mesh(new THREE.BoxGeometry(270, 1.05, 11.5), materials.marinaDock);
+  quay.position.set(20, 0.62, -54);
+  quay.castShadow = true;
+  quay.receiveShadow = true;
+  group.add(quay);
+
+  const seawall = new THREE.Mesh(new THREE.BoxGeometry(280, 2.2, 3.6), materials.coastalRock);
+  seawall.position.set(20, 0.92, -61.8);
+  seawall.receiveShadow = true;
+  group.add(seawall);
+
+  const railing = new THREE.Mesh(new THREE.BoxGeometry(264, 0.32, 0.28), materials.gwangalliRail);
+  railing.position.set(20, 2.35, -67.0);
+  group.add(railing);
+
+  for (let i = 0; i < 16; i += 1) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.4, 8), materials.marinaPost);
+    post.position.set(-110 + i * 16, 1.45, -67);
+    post.castShadow = true;
+    group.add(post);
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    const finger = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.28, 28), materials.marinaDock);
+    finger.position.set(-86 + i * 40, 0.54, -82);
+    finger.castShadow = true;
+    finger.receiveShadow = true;
+    group.add(finger);
+  }
+
+  addYonghoBayCruiseBoat(group, -124, -86, 1.15, "BUSAN CRUISE");
+  addYonghoBayCruiseBoat(group, -52, -94, 0.72, "");
+}
+
+function addYonghoBayIslandAndCruiseTerminal(group) {
+  const island = new THREE.Group();
+  island.position.set(-228, -0.15, -72);
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(76, 92, 15, 32), materials.coastalRock);
+  base.position.y = 7.4;
+  base.scale.z = 0.58;
+  base.receiveShadow = true;
+  island.add(base);
+
+  const hillA = new THREE.Mesh(new THREE.ConeGeometry(64, 46, 32), materials.coastalForest);
+  hillA.position.set(-18, 33, -6);
+  hillA.scale.z = 0.74;
+  hillA.castShadow = true;
+  island.add(hillA);
+
+  const hillB = new THREE.Mesh(new THREE.ConeGeometry(55, 34, 28), materials.coastalForest);
+  hillB.position.set(38, 27, 8);
+  hillB.scale.z = 0.82;
+  hillB.castShadow = true;
+  island.add(hillB);
+
+  const shore = new THREE.Mesh(new THREE.BoxGeometry(150, 0.45, 6), materials.marinaDock);
+  shore.position.set(0, 1.2, 47);
+  island.add(shore);
+  group.add(island);
+
+  const breakwater = new THREE.Mesh(new THREE.BoxGeometry(148, 0.58, 4.2), materials.coastalRock);
+  breakwater.position.set(-222, 0.34, -126);
+  breakwater.rotation.y = -0.08;
+  breakwater.receiveShadow = true;
+  group.add(breakwater);
+
+  const lighthouse = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.45, 10, 16), materials.gwangalliBridge);
+  lighthouse.position.set(-294, 5.6, -128);
+  lighthouse.castShadow = true;
+  group.add(lighthouse);
+
+  const terminal = new THREE.Group();
+  terminal.position.set(-137, 0.65, -62);
+  const hall = new THREE.Mesh(new THREE.BoxGeometry(44, 8.5, 18), materials.rightCityFacade);
+  hall.position.y = 4.2;
+  hall.castShadow = true;
+  hall.receiveShadow = true;
+  terminal.add(hall);
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(36, 4.2, 0.16), materials.rightCityGlass);
+  glass.position.set(0, 4.6, -9.2);
+  terminal.add(glass);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(52, 1.1, 22), materials.gwangalliIparkFacade);
+  roof.position.y = 9.1;
+  roof.castShadow = true;
+  terminal.add(roof);
+
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(28, 3.2),
+    createCanvasLabelMaterial("YONGHO BAY", 384, 96, "#17314a", "rgba(245, 248, 250, 0)"),
+  );
+  sign.position.set(0, 7.2, -9.36);
+  terminal.add(sign);
+  group.add(terminal);
+
+  const terminalDock = new THREE.Mesh(new THREE.BoxGeometry(66, 0.3, 5.2), materials.marinaDock);
+  terminalDock.position.set(-137, 0.5, -77);
+  terminalDock.receiveShadow = true;
+  group.add(terminalDock);
+}
+
+function addYonghoBayCruiseBoat(group, x, z, scale, label) {
+  const boat = new THREE.Group();
+  boat.position.set(x, 0.62, z);
+  boat.scale.setScalar(scale);
+
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(36, 2.8, 9.0), materials.tourBoatHull);
+  hull.position.y = 1.4;
+  hull.castShadow = true;
+  boat.add(hull);
+
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(36.4, 0.6, 9.2), materials.tourBoatNavy);
+  stripe.position.y = 1.1;
+  boat.add(stripe);
+
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(26, 6.2, 7.2), materials.tourBoatGlass);
+  cabin.position.set(0, 5.1, 0);
+  cabin.castShadow = true;
+  boat.add(cabin);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(29, 0.72, 8.5), materials.tourBoatHull);
+  roof.position.y = 8.65;
+  boat.add(roof);
+
+  if (label) {
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(22, 3.0),
+      createCanvasLabelMaterial(label, 320, 80, "#f8fbff", "rgba(10, 32, 75, 0)"),
+    );
+    sign.position.set(0, 2.4, -4.62);
+    boat.add(sign);
+  }
+
+  group.add(boat);
 }
 
 function addGwangalliDenseUrbanCorridor() {
