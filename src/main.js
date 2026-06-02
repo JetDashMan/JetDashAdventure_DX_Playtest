@@ -454,7 +454,16 @@ function scheduleHideLoadingScreen() {
 const textureLoader = new THREE.TextureLoader(loadingManager);
 const textureAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const roadTextureTileMeters = 10;
+const materialTextureQualitySuffix = {
+  low: "_256",
+  medium: "_512",
+  high: "_1024",
+  ultra: "",
+};
+const realtimeMaterialTextureBindings = [];
+const realtimeMaterialTextureCache = new Map();
 let activeAsphaltTextureQuality = graphicsSettings.textureQuality;
+let activeMaterialTextureQuality = graphicsSettings.textureQuality;
 let asphaltRoadTextures = createAsphaltTextureSet(activeAsphaltTextureQuality);
 
 const materials = {
@@ -929,8 +938,10 @@ const materials = {
     color: 0xdfe4dc,
     roughness: 0.66,
   }),
-  tunnelDarkWall: new THREE.MeshBasicMaterial({
+  tunnelDarkWall: new THREE.MeshStandardMaterial({
     color: 0x2f3d2c,
+    roughness: 0.88,
+    metalness: 0.02,
   }),
   tunnelTileStripe: new THREE.MeshStandardMaterial({
     color: 0x2d6b58,
@@ -1015,6 +1026,106 @@ const materials = {
   }),
 };
 
+materials.roadMarkingWhite = createRealtimePbrMaterial("road_marking_white", {
+  color: 0xffffff,
+  roughness: 0.52,
+  metalness: 0,
+  textureAlpha: true,
+  textureNormalScale: 0.42,
+  textureAoMapIntensity: 0.34,
+});
+materials.roadMarkingYellow = createRealtimePbrMaterial("road_marking_yellow", {
+  color: 0xffd862,
+  roughness: 0.5,
+  metalness: 0,
+  textureAlpha: true,
+  textureNormalScale: 0.42,
+  textureAoMapIntensity: 0.34,
+});
+
+bindRealtimeMaterialTexture(materials.rail, "guardrail_white_metal", { normalScale: 0.3, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.railStripe, "hazard_red_paint", { normalScale: 0.28, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.gwangalliRail, "guardrail_white_metal", { normalScale: 0.34, aoMapIntensity: 0.34 });
+bindRealtimeMaterialTexture(materials.gwangalliRailStripe, "painted_bridge_metal", { normalScale: 0.28, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.harborRail, "painted_bridge_metal", { normalScale: 0.32, aoMapIntensity: 0.34 });
+bindRealtimeMaterialTexture(materials.harborRailStripe, "hazard_yellow_paint", { normalScale: 0.32, aoMapIntensity: 0.34 });
+
+bindRealtimeMaterialTexture(materials.obstacle, "hazard_red_paint", { normalScale: 0.45, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.obstacleDark, "black_rubber_tire", { normalScale: 0.5, aoMapIntensity: 0.45 });
+bindRealtimeMaterialTexture(materials.obstacleStripe, "hazard_yellow_paint", { normalScale: 0.4, aoMapIntensity: 0.38 });
+bindRealtimeMaterialTexture(materials.speedsterSkin, "skin_subtle", { normalScale: 0.16, aoMapIntensity: 0.2 });
+bindRealtimeMaterialTexture(materials.glove, "jet_black_leather", { normalScale: 0.45, aoMapIntensity: 0.45 });
+bindRealtimeMaterialTexture(materials.shoe, "shoe_white_leather", { normalScale: 0.38, aoMapIntensity: 0.35 });
+bindRealtimeMaterialTexture(materials.shoeSole, "black_rubber_tire", { normalScale: 0.38, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.jetHoodie, "jet_white_fabric", { normalScale: 0.36, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.jetHoodieShadow, "jet_white_fabric", { normalScale: 0.34, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.jetPants, "jet_red_fabric", { normalScale: 0.42, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.jetPantsTrim, "jet_white_fabric", { normalScale: 0.34, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.jetHarness, "jet_black_leather", { normalScale: 0.45, aoMapIntensity: 0.46 });
+bindRealtimeMaterialTexture(materials.jetHarnessPlate, "painted_bridge_metal", { normalScale: 0.32, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.jetHair, "hair_dark", { normalScale: 0.42, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.jetSkin, "skin_subtle", { normalScale: 0.14, aoMapIntensity: 0.18 });
+bindRealtimeMaterialTexture(materials.jetShoeWhite, "shoe_white_leather", { normalScale: 0.42, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.jetShoeSole, "black_rubber_tire", { normalScale: 0.42, aoMapIntensity: 0.4 });
+bindRealtimeMaterialTexture(materials.jetAccentRed, "hazard_red_paint", { normalScale: 0.32, aoMapIntensity: 0.3 });
+
+bindRealtimeMaterialTexture(materials.harborDock, "concrete_dock", { repeat: [2, 2], normalScale: 0.42, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.harborDockDark, "concrete_dock", { repeat: [2, 2], normalScale: 0.4, aoMapIntensity: 0.48 });
+bindRealtimeMaterialTexture(materials.gwangalliBoardwalk, "wood_boardwalk", { repeat: [2, 2], normalScale: 0.5, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.gwangalliBridge, "painted_bridge_concrete", { repeat: [2, 2], normalScale: 0.34, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.gwangalliBridgeCable, "painted_bridge_metal", { normalScale: 0.3, aoMapIntensity: 0.34 });
+
+bindRealtimeMaterialTexture(materials.gwangalliBuilding, "white_facade_panel", { repeat: [1.5, 2], normalScale: 0.28, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.gwangalliBuildingLight, "blue_glass_facade", { repeat: [1.5, 2], normalScale: 0.24, aoMapIntensity: 0.24 });
+bindRealtimeMaterialTexture(materials.gwangalliWindow, "blue_glass_facade", { normalScale: 0.2, aoMapIntensity: 0.22 });
+bindRealtimeMaterialTexture(materials.gwangalliIparkGlass, "blue_glass_facade", { repeat: [1.4, 2.4], normalScale: 0.24, aoMapIntensity: 0.26 });
+bindRealtimeMaterialTexture(materials.gwangalliIparkDarkGlass, "dark_glass_facade", { repeat: [1.4, 2.4], normalScale: 0.24, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.gwangalliIparkFacade, "white_facade_panel", { repeat: [1.5, 2.4], normalScale: 0.26, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.haeundaeExordiumGlass, "dark_glass_facade", { repeat: [1.3, 2.2], normalScale: 0.24, aoMapIntensity: 0.28 });
+bindRealtimeMaterialTexture(materials.haeundaeExordiumBalcony, "apartment_balcony_facade", { repeat: [1.4, 2.4], normalScale: 0.3, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.haeundaeExordiumCore, "dark_glass_facade", { repeat: [1.2, 2.2], normalScale: 0.25, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.hyegangSchoolWall, "school_wall", { repeat: [1.5, 1.6], normalScale: 0.28, aoMapIntensity: 0.36 });
+bindRealtimeMaterialTexture(materials.hyegangSchoolTrim, "noise_wall_concrete", { normalScale: 0.3, aoMapIntensity: 0.38 });
+bindRealtimeMaterialTexture(materials.hyegangSchoolGlass, "blue_glass_facade", { normalScale: 0.22, aoMapIntensity: 0.24 });
+bindRealtimeMaterialTexture(materials.hyegangSchoolField, "coastal_forest_canopy", { repeat: [2, 2], normalScale: 0.3, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.noiseWallConcrete, "noise_wall_concrete", { repeat: [2, 1], normalScale: 0.38, aoMapIntensity: 0.45 });
+bindRealtimeMaterialTexture(materials.noiseWallFrame, "painted_bridge_metal", { normalScale: 0.3, aoMapIntensity: 0.34 });
+bindRealtimeMaterialTexture(materials.noiseWallGreen, "tunnel_green_stripe", { normalScale: 0.3, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.rightCityGlass, "blue_glass_facade", { repeat: [1.5, 2.5], normalScale: 0.24, aoMapIntensity: 0.26 });
+bindRealtimeMaterialTexture(materials.rightCityDarkGlass, "dark_glass_facade", { repeat: [1.5, 2.5], normalScale: 0.24, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.rightCityFacade, "white_facade_panel", { repeat: [1.5, 2.3], normalScale: 0.26, aoMapIntensity: 0.34 });
+bindRealtimeMaterialTexture(materials.bexcoWall, "noise_wall_concrete", { repeat: [1.5, 1.5], normalScale: 0.34, aoMapIntensity: 0.4 });
+bindRealtimeMaterialTexture(materials.bexcoGlass, "blue_glass_facade", { repeat: [1.5, 2], normalScale: 0.24, aoMapIntensity: 0.28 });
+
+bindRealtimeMaterialTexture(materials.marinaDock, "concrete_dock", { repeat: [2, 2], normalScale: 0.42, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.marinaPost, "painted_bridge_metal", { normalScale: 0.28, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.tourBoatHull, "painted_bridge_metal", { normalScale: 0.26, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.tourBoatStripe, "hazard_yellow_paint", { normalScale: 0.26, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.tourBoatGlass, "blue_glass_facade", { normalScale: 0.22, aoMapIntensity: 0.24 });
+bindRealtimeMaterialTexture(materials.tourBoatRed, "hazard_red_paint", { normalScale: 0.28, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.tourBoatYellow, "hazard_yellow_paint", { normalScale: 0.28, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.tourBoatNavy, "dark_glass_facade", { normalScale: 0.22, aoMapIntensity: 0.3 });
+
+bindRealtimeMaterialTexture(materials.coastalForest, "coastal_forest_canopy", { repeat: [2, 2], normalScale: 0.44, aoMapIntensity: 0.38 });
+bindRealtimeMaterialTexture(materials.coastalRock, "coastal_rock", { repeat: [2, 2], normalScale: 0.55, aoMapIntensity: 0.48 });
+bindRealtimeMaterialTexture(materials.tunnelWall, "tunnel_white_tile", { repeat: [2, 2], normalScale: 0.5, aoMapIntensity: 0.48 });
+bindRealtimeMaterialTexture(materials.tunnelDarkWall, "tunnel_dark_ceiling", { repeat: [2, 2], normalScale: 0.5, aoMapIntensity: 0.5 });
+bindRealtimeMaterialTexture(materials.tunnelTileStripe, "tunnel_green_stripe", { repeat: [2, 1], normalScale: 0.42, aoMapIntensity: 0.4 });
+bindRealtimeMaterialTexture(materials.tunnelBlueStripe, "tunnel_blue_stripe", { repeat: [2, 1], normalScale: 0.42, aoMapIntensity: 0.4 });
+
+bindRealtimeMaterialTexture(materials.containerRed, "harbor_container_red", { repeat: [1.5, 1.5], normalScale: 0.6, aoMapIntensity: 0.46 });
+bindRealtimeMaterialTexture(materials.containerBlue, "harbor_container_blue", { repeat: [1.5, 1.5], normalScale: 0.6, aoMapIntensity: 0.46 });
+bindRealtimeMaterialTexture(materials.containerYellow, "harbor_container_yellow", { repeat: [1.5, 1.5], normalScale: 0.6, aoMapIntensity: 0.46 });
+bindRealtimeMaterialTexture(materials.containerGreen, "harbor_container_green", { repeat: [1.5, 1.5], normalScale: 0.6, aoMapIntensity: 0.46 });
+bindRealtimeMaterialTexture(materials.containerTrim, "black_rubber_tire", { normalScale: 0.38, aoMapIntensity: 0.4 });
+bindRealtimeMaterialTexture(materials.crane, "crane_yellow_metal", { repeat: [1.5, 1.5], normalScale: 0.45, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.craneDark, "painted_bridge_metal", { normalScale: 0.36, aoMapIntensity: 0.38 });
+bindRealtimeMaterialTexture(materials.truckCab, "painted_bridge_metal", { normalScale: 0.3, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.truckTrailer, "harbor_container_blue", { normalScale: 0.46, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.excavatorBody, "crane_yellow_metal", { normalScale: 0.44, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.excavatorArm, "crane_yellow_metal", { normalScale: 0.44, aoMapIntensity: 0.42 });
+bindRealtimeMaterialTexture(materials.tire, "black_rubber_tire", { normalScale: 0.48, aoMapIntensity: 0.46 });
+
 const asphaltRoadMaterials = [
   materials.harborRoad,
   materials.harborRoadAlt,
@@ -1042,7 +1153,122 @@ function loadPbrTexture(path, options = {}) {
   texture.wrapT = THREE.RepeatWrapping;
   texture.anisotropy = textureAnisotropy;
   texture.colorSpace = options.colorSpace ?? THREE.NoColorSpace;
+  if (Array.isArray(options.repeat)) {
+    texture.repeat.set(options.repeat[0], options.repeat[1] ?? options.repeat[0]);
+  }
   return texture;
+}
+
+function getMaterialTexturePath(textureName, mapName, extension) {
+  const suffix = materialTextureQualitySuffix[graphicsSettings.textureQuality] ?? materialTextureQualitySuffix.high;
+  return `./assets/textures/materials/${textureName}_${mapName}${suffix}.${extension}`;
+}
+
+function createRealtimePbrMaterial(textureName, parameters = {}) {
+  const {
+    textureRepeat,
+    textureNormalScale,
+    textureAoMapIntensity,
+    textureAlpha,
+    ...materialParameters
+  } = parameters;
+  const material = new THREE.MeshStandardMaterial(materialParameters);
+  return bindRealtimeMaterialTexture(material, textureName, {
+    repeat: textureRepeat,
+    normalScale: textureNormalScale,
+    aoMapIntensity: textureAoMapIntensity,
+    alpha: textureAlpha,
+  });
+}
+
+function bindRealtimeMaterialTexture(material, textureName, options = {}) {
+  if (!material) return material;
+
+  material.userData.realtimeTextureName = textureName;
+  material.userData.realtimeTextureOptions = {
+    repeat: options.repeat ?? [1, 1],
+    normalScale: options.normalScale ?? 0.35,
+    aoMapIntensity: options.aoMapIntensity ?? 0.38,
+    alpha: Boolean(options.alpha),
+  };
+  if (!realtimeMaterialTextureBindings.includes(material)) {
+    realtimeMaterialTextureBindings.push(material);
+  }
+  applyRealtimeTextureSetToMaterial(material);
+  return material;
+}
+
+function getRealtimeMaterialTextureSet(textureName, options = {}) {
+  const repeat = options.repeat ?? [1, 1];
+  const repeatKey = `${repeat[0]}x${repeat[1] ?? repeat[0]}`;
+  const alphaKey = options.alpha ? "alpha" : "opaque";
+  const quality = graphicsSettings.textureQuality;
+  const cacheKey = `${quality}:${textureName}:${repeatKey}:${alphaKey}`;
+  const cached = realtimeMaterialTextureCache.get(cacheKey);
+  if (cached) return cached;
+
+  const textureSet = {
+    baseColor: loadPbrTexture(getMaterialTexturePath(textureName, "basecolor", "jpg"), {
+      colorSpace: THREE.SRGBColorSpace,
+      repeat,
+    }),
+    normal: loadPbrTexture(getMaterialTexturePath(textureName, "normal", "jpg"), { repeat }),
+    roughness: loadPbrTexture(getMaterialTexturePath(textureName, "roughness", "jpg"), { repeat }),
+    ao: loadPbrTexture(getMaterialTexturePath(textureName, "ao", "jpg"), { repeat }),
+  };
+  if (options.alpha) {
+    textureSet.alpha = loadPbrTexture(getMaterialTexturePath(textureName, "alpha", "png"), { repeat });
+  }
+
+  realtimeMaterialTextureCache.set(cacheKey, textureSet);
+  return textureSet;
+}
+
+function applyRealtimeTextureSetToMaterial(material) {
+  const textureName = material.userData.realtimeTextureName;
+  if (!textureName) return;
+
+  const options = material.userData.realtimeTextureOptions ?? {};
+  const textureSet = getRealtimeMaterialTextureSet(textureName, options);
+  material.map = textureSet.baseColor;
+  if (material.isMeshStandardMaterial) {
+    material.normalMap = textureSet.normal;
+    material.roughnessMap = textureSet.roughness;
+    material.aoMap = textureSet.ao;
+    material.normalScale = new THREE.Vector2(options.normalScale ?? 0.35, options.normalScale ?? 0.35);
+    material.aoMapIntensity = options.aoMapIntensity ?? 0.38;
+  }
+  if (options.alpha) {
+    material.alphaMap = textureSet.alpha;
+    material.transparent = true;
+    material.alphaTest = 0.05;
+  }
+  material.needsUpdate = true;
+}
+
+function applyRealtimeMaterialTextureSettings() {
+  const quality = graphicsSettings.textureQuality;
+  if (quality === activeMaterialTextureQuality) return;
+
+  activeMaterialTextureQuality = quality;
+  for (const material of realtimeMaterialTextureBindings) {
+    applyRealtimeTextureSetToMaterial(material);
+  }
+  disposeInactiveRealtimeTextureSets(quality);
+}
+
+function disposeInactiveRealtimeTextureSets(activeQuality) {
+  for (const [cacheKey, textureSet] of realtimeMaterialTextureCache) {
+    if (cacheKey.startsWith(`${activeQuality}:`)) continue;
+    disposeRealtimeTextureSet(textureSet);
+    realtimeMaterialTextureCache.delete(cacheKey);
+  }
+}
+
+function disposeRealtimeTextureSet(textureSet) {
+  for (const texture of Object.values(textureSet)) {
+    texture.dispose();
+  }
 }
 
 function applyAsphaltTextureSettings() {
@@ -3088,7 +3314,7 @@ function addGwangalliLaneMarkings() {
 
     const mark = new THREE.Mesh(
       new THREE.BoxGeometry(0.18, 0.04, 8.5),
-      materials.gwangalliBridge,
+      materials.roadMarkingWhite,
     );
     setStageObjectTransform(mark, new THREE.Vector3(0, sample.y + 0.69, z), 0, 0.02, true);
     mark.receiveShadow = false;
@@ -5012,6 +5238,7 @@ function makeScenerySlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, thickne
   const half = width * 0.5;
   const steps = Math.max(1, Math.ceil(Math.abs(zStart - zEnd) / 10));
   const vertices = [];
+  const uvs = [];
   const indices = [];
 
   for (let i = 0; i <= steps; i += 1) {
@@ -5028,6 +5255,7 @@ function makeScenerySlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, thickne
     for (const local of row) {
       const world = toSceneryWorldPosition(local, true);
       vertices.push(world.x, world.y, world.z);
+      uvs.push(local.x / roadTextureTileMeters, -local.z / roadTextureTileMeters);
     }
   }
 
@@ -5057,6 +5285,7 @@ function makeScenerySlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, thickne
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vertices), 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -5066,6 +5295,7 @@ function makeContinuousScenerySideBoxGeometry(xCenter, zStart, zEnd, yOffset, wi
   const half = width * 0.5;
   const steps = Math.max(1, Math.ceil(Math.abs(zStart - zEnd) / step));
   const vertices = [];
+  const uvs = [];
   const indices = [];
 
   for (let i = 0; i <= steps; i += 1) {
@@ -5083,6 +5313,7 @@ function makeContinuousScenerySideBoxGeometry(xCenter, zStart, zEnd, yOffset, wi
     for (const local of row) {
       const world = toSceneryWorldPosition(local, true);
       vertices.push(world.x, world.y, world.z);
+      uvs.push(local.x / roadTextureTileMeters, -local.z / roadTextureTileMeters);
     }
   }
 
@@ -5112,6 +5343,7 @@ function makeContinuousScenerySideBoxGeometry(xCenter, zStart, zEnd, yOffset, wi
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vertices), 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -5121,6 +5353,7 @@ function makeContinuousSceneryVerticalBoxGeometry(xCenter, zStart, zEnd, yBottom
   const half = thickness * 0.5;
   const steps = Math.max(1, Math.ceil(Math.abs(zStart - zEnd) / step));
   const vertices = [];
+  const uvs = [];
   const indices = [];
 
   for (let i = 0; i <= steps; i += 1) {
@@ -5138,6 +5371,7 @@ function makeContinuousSceneryVerticalBoxGeometry(xCenter, zStart, zEnd, yBottom
     for (const local of row) {
       const world = toSceneryWorldPosition(local, true);
       vertices.push(world.x, world.y, world.z);
+      uvs.push(-local.z / roadTextureTileMeters, local.y / roadTextureTileMeters);
     }
   }
 
@@ -5167,6 +5401,7 @@ function makeContinuousSceneryVerticalBoxGeometry(xCenter, zStart, zEnd, yBottom
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vertices), 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -7436,6 +7671,7 @@ function syncDebugControls() {
 function applyGraphicsSettings(save = true) {
   applyRenderScale();
   applyAsphaltTextureSettings();
+  applyRealtimeMaterialTextureSettings();
   applyShadowSettings();
   applyViewDistanceSettings();
   applyLightingSettings();
