@@ -1163,6 +1163,9 @@ function createSkyTexture(quality = graphicsSettings.textureQuality) {
   texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.anisotropy = textureAnisotropy;
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
   return texture;
 }
 
