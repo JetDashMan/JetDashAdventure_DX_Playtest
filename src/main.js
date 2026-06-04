@@ -151,6 +151,12 @@ const asphaltTextureQualityConfig = {
     ao: "./assets/textures/asphalt/busan_coastal_asphalt_ao.png",
   },
 };
+const skyTextureQualityConfig = {
+  low: "./assets/textures/sky/blue_cloud_sky_512x256.jpg",
+  medium: "./assets/textures/sky/blue_cloud_sky_1024x512.jpg",
+  high: "./assets/textures/sky/blue_cloud_sky_2048x1024.jpg",
+  ultra: "./assets/textures/sky/blue_cloud_sky_4096x2048.jpg",
+};
 const shadowQualityConfig = {
   off: { enabled: false, size: 256 },
   low: { enabled: true, size: 512 },
@@ -464,7 +470,10 @@ const realtimeMaterialTextureBindings = [];
 const realtimeMaterialTextureCache = new Map();
 let activeAsphaltTextureQuality = graphicsSettings.textureQuality;
 let activeMaterialTextureQuality = graphicsSettings.textureQuality;
+let activeSkyTextureQuality = graphicsSettings.textureQuality;
 let asphaltRoadTextures = createAsphaltTextureSet(activeAsphaltTextureQuality);
+let skyTexture = createSkyTexture(activeSkyTextureQuality);
+let skyDomeMesh;
 
 const materials = {
   track: new THREE.MeshStandardMaterial({
@@ -1147,6 +1156,16 @@ function createAsphaltTextureSet(quality = graphicsSettings.textureQuality) {
   };
 }
 
+function createSkyTexture(quality = graphicsSettings.textureQuality) {
+  const path = skyTextureQualityConfig[quality] ?? skyTextureQualityConfig.high;
+  const texture = textureLoader.load(path);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.anisotropy = textureAnisotropy;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function loadPbrTexture(path, options = {}) {
   const texture = textureLoader.load(path);
   texture.wrapS = THREE.RepeatWrapping;
@@ -1271,6 +1290,24 @@ function disposeRealtimeTextureSet(textureSet) {
   }
 }
 
+function applySkyTextureSettings() {
+  const quality = graphicsSettings.textureQuality;
+  if (quality !== activeSkyTextureQuality) {
+    const previousTexture = skyTexture;
+    skyTexture = createSkyTexture(quality);
+    activeSkyTextureQuality = quality;
+    if (skyDomeMesh?.material) {
+      skyDomeMesh.material.map = skyTexture;
+      skyDomeMesh.material.needsUpdate = true;
+    }
+    previousTexture.dispose();
+  }
+
+  if (skyDomeMesh) {
+    skyDomeMesh.scale.setScalar(getSkyDomeRadius());
+  }
+}
+
 function applyAsphaltTextureSettings() {
   const quality = graphicsSettings.textureQuality;
   if (quality === activeAsphaltTextureQuality) return;
@@ -1321,6 +1358,7 @@ requestAnimationFrame(tick);
 
 function init() {
   addLights();
+  addSkyDome();
   addEnvironment();
   addTrack();
   addStageThreeHarbor();
@@ -1355,6 +1393,33 @@ function addLights() {
   sunTarget = sunLight.target;
   scene.add(sunTarget);
   scene.add(sunLight);
+}
+
+function addSkyDome() {
+  const geometry = new THREE.SphereGeometry(1, 64, 32);
+  const material = new THREE.MeshBasicMaterial({
+    map: skyTexture,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    toneMapped: false,
+  });
+  skyDomeMesh = new THREE.Mesh(geometry, material);
+  skyDomeMesh.name = "BlueCloudSkyDome";
+  skyDomeMesh.frustumCulled = false;
+  skyDomeMesh.renderOrder = -1000;
+  skyDomeMesh.scale.setScalar(getSkyDomeRadius());
+  scene.add(skyDomeMesh);
+  updateSkyDome();
+}
+
+function getSkyDomeRadius() {
+  return Math.max(1400, Math.min(camera.far * 0.72, 6200));
+}
+
+function updateSkyDome() {
+  if (!skyDomeMesh) return;
+  skyDomeMesh.position.copy(camera.position);
 }
 
 function getStageIndex(stageRoute) {
@@ -7247,6 +7312,7 @@ function updateBoostMotionBlur(dt) {
 }
 
 function renderFrame() {
+  updateSkyDome();
   boostMotionBlurMaterial.uniforms.uStrength.value = boostMotionBlurStrength;
   boostMotionBlurMaterial.uniforms.tDiffuse.value = sceneRenderTarget.texture;
 
@@ -7674,6 +7740,7 @@ function applyGraphicsSettings(save = true) {
   applyRealtimeMaterialTextureSettings();
   applyShadowSettings();
   applyViewDistanceSettings();
+  applySkyTextureSettings();
   applyLightingSettings();
   applyWaterSettings();
   boostMotionBlurMaterial.uniforms.uStrength.value = boostMotionBlurStrength;
