@@ -21,6 +21,7 @@ const graphicsPanel = document.querySelector("#graphics-panel");
 const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
 const mouseObjectLabelEl = document.querySelector("#mouse-object-label");
+const performanceHudEl = document.querySelector("#performance-hud");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
 const menuButton = document.querySelector("#menu-toggle");
@@ -58,6 +59,7 @@ const debugControls = {
   superBoost: document.querySelector("#debug-super-boost"),
   infiniteJump: document.querySelector("#debug-infinite-jump"),
   mouseObject: document.querySelector("#debug-mouse-object"),
+  performanceHud: document.querySelector("#debug-performance-hud"),
 };
 
 const scene = new THREE.Scene();
@@ -70,6 +72,7 @@ renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.info.autoReset = false;
 
 const graphicsStorageKey = "jetdash-graphics-settings";
 const graphicsPresets = {
@@ -233,6 +236,7 @@ const debugDefaults = {
   superBoost: false,
   infiniteJump: false,
   mouseObject: false,
+  performanceHud: false,
 };
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
@@ -317,6 +321,12 @@ const mouseObjectPointerState = {
   clientX: 0,
   clientY: 0,
   raf: 0,
+};
+const performanceHudState = {
+  enabled: false,
+  frames: 0,
+  lastUpdateAt: performance.now(),
+  fps: 0,
 };
 const worldUp = new THREE.Vector3(0, 1, 0);
 const sunFollowOffset = new THREE.Vector3(-28, 46, 24);
@@ -8597,6 +8607,7 @@ function renderGame(dt) {
   updateSunShadow();
   updateBoostMotionBlur(dt);
   renderFrame();
+  updatePerformanceHud();
 }
 
 function updateBoostMotionBlur(dt) {
@@ -8617,6 +8628,7 @@ function renderFrame() {
   boostMotionBlurMaterial.uniforms.uStrength.value = boostMotionBlurStrength;
   boostMotionBlurMaterial.uniforms.tDiffuse.value = sceneRenderTarget.texture;
 
+  renderer.info.reset();
   renderer.setRenderTarget(sceneRenderTarget);
   renderer.render(scene, camera);
   renderer.setRenderTarget(null);
@@ -8969,6 +8981,7 @@ function normalizeDebugSettings(source = {}) {
     superBoost: typeof source.superBoost === "boolean" ? source.superBoost : debugDefaults.superBoost,
     infiniteJump: typeof source.infiniteJump === "boolean" ? source.infiniteJump : debugDefaults.infiniteJump,
     mouseObject: typeof source.mouseObject === "boolean" ? source.mouseObject : debugDefaults.mouseObject,
+    performanceHud: typeof source.performanceHud === "boolean" ? source.performanceHud : debugDefaults.performanceHud,
   };
 }
 
@@ -9022,6 +9035,8 @@ function bindDebugControls() {
         hideMouseObjectLabel();
       } else if (key === "mouseObject") {
         requestMouseObjectPick();
+      } else if (key === "performanceHud") {
+        updatePerformanceHudVisibility();
       }
     });
   }
@@ -9042,6 +9057,7 @@ function syncDebugControls() {
   if (!debugSettings.mouseObject) {
     hideMouseObjectLabel();
   }
+  updatePerformanceHudVisibility();
 }
 
 function handleMouseObjectPointerMove(event) {
@@ -9154,6 +9170,75 @@ function showMouseObjectLabel(label, clientX, clientY) {
 function hideMouseObjectLabel() {
   if (!mouseObjectLabelEl) return;
   mouseObjectLabelEl.classList.add("hidden");
+}
+
+function updatePerformanceHudVisibility() {
+  if (!performanceHudEl) return;
+
+  const enabled = Boolean(debugSettings.performanceHud);
+  performanceHudEl.classList.toggle("hidden", !enabled);
+  if (!enabled) {
+    performanceHudState.enabled = false;
+    performanceHudState.frames = 0;
+    performanceHudState.lastUpdateAt = performance.now();
+    performanceHudEl.textContent = "";
+    return;
+  }
+
+  if (!performanceHudState.enabled) {
+    performanceHudState.enabled = true;
+    performanceHudState.frames = 0;
+    performanceHudState.lastUpdateAt = performance.now();
+    renderPerformanceHud(0);
+  } else if (!performanceHudEl.innerHTML) {
+    renderPerformanceHud(performanceHudState.fps);
+  }
+}
+
+function updatePerformanceHud() {
+  if (!debugSettings.performanceHud || !performanceHudEl) return;
+
+  performanceHudState.frames += 1;
+  const now = performance.now();
+  const elapsed = now - performanceHudState.lastUpdateAt;
+  if (elapsed < 500) return;
+
+  performanceHudState.fps = Math.round((performanceHudState.frames * 1000) / elapsed);
+  performanceHudState.frames = 0;
+  performanceHudState.lastUpdateAt = now;
+  renderPerformanceHud(performanceHudState.fps);
+}
+
+function renderPerformanceHud(fps) {
+  if (!performanceHudEl) return;
+
+  const renderInfo = renderer.info.render;
+  const memoryInfo = renderer.info.memory;
+  const renderScale = getEffectiveRenderScale();
+  const canvasWidth = renderer.domElement.width;
+  const canvasHeight = renderer.domElement.height;
+  performanceHudEl.innerHTML = [
+    formatPerformanceHudRow("FPS", fps),
+    formatPerformanceHudRow("Draw", renderInfo.calls),
+    formatPerformanceHudRow("Tri", formatPerformanceMetric(renderInfo.triangles)),
+    formatPerformanceHudRow("Tex", memoryInfo.textures),
+    formatPerformanceHudRow("Scale", `${Math.round(renderScale * 100)}%`),
+    formatPerformanceHudRow("Canvas", `${canvasWidth}x${canvasHeight}`),
+    formatPerformanceHudRow("View", graphicsSettings.viewDistance),
+    formatPerformanceHudRow("Water", graphicsSettings.waterQuality),
+  ].join("");
+}
+
+function formatPerformanceHudRow(label, value) {
+  return `<span>${label}<b>${value}</b></span>`;
+}
+
+function formatPerformanceMetric(value) {
+  if (!Number.isFinite(value)) return "0";
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}m`;
+  if (value >= 10000) return `${Math.round(value / 1000)}k`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return `${Math.round(value)}`;
 }
 
 function applyGraphicsSettings(save = true) {

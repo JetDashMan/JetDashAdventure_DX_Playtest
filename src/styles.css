@@ -71,6 +71,43 @@ body {
   display: none;
 }
 
+.performance-hud {
+  position: fixed;
+  left: 18px;
+  bottom: max(36px, calc(env(safe-area-inset-bottom) + 32px));
+  z-index: 7;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  gap: 5px 10px;
+  width: min(260px, calc(100vw - 36px));
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(5, 14, 24, 0.82);
+  color: rgba(248, 251, 255, 0.9);
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.2;
+  pointer-events: none;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.performance-hud.hidden {
+  display: none;
+}
+
+.performance-hud span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.performance-hud b {
+  color: #ffd86a;
+  font-weight: 900;
+}
+
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -956,6 +993,16 @@ body.touch-enabled:not(.portrait-touch) .boost-track {
 body.touch-enabled:not(.portrait-touch) .game-version {
   bottom: max(6px, env(safe-area-inset-bottom));
   padding: 2px 6px;
+  font-size: 0.54rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .performance-hud {
+  left: 8px;
+  top: 104px;
+  bottom: auto;
+  grid-template-columns: repeat(2, minmax(70px, 1fr));
+  width: min(220px, 34vw);
+  padding: 7px 8px;
   font-size: 0.54rem;
 }
 

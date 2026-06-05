@@ -17,6 +17,7 @@
   <body>
     <canvas id="game"></canvas>
     <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
+    <div id="performance-hud" class="performance-hud hidden" aria-live="off" aria-label="Performance debug"></div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -237,6 +238,10 @@
       <label class="debug-check">
         <span>Mouse Object</span>
         <input id="debug-mouse-object" type="checkbox" />
+      </label>
+      <label class="debug-check">
+        <span>Performance HUD</span>
+        <input id="debug-performance-hud" type="checkbox" />
       </label>
     </section>
 
