@@ -34,6 +34,9 @@ const stageMenu = document.querySelector("#stage-menu");
 const stageSelectButtons = document.querySelectorAll("[data-stage-select]");
 const tutorialPromptEl = document.querySelector("#tutorial-prompt");
 const rotatePromptEl = document.querySelector("#rotate-prompt");
+const mobileStartEl = document.querySelector("#mobile-start");
+const mobileStartFullscreenButton = document.querySelector("#mobile-start-fullscreen");
+const mobileStartWindowedButton = document.querySelector("#mobile-start-windowed");
 const touchControlsEl = document.querySelector("#touch-controls");
 const touchControlButtons = document.querySelectorAll("[data-touch-control]");
 const fullscreenButton = document.querySelector("#fullscreen-toggle");
@@ -426,6 +429,7 @@ let musicAudio;
 let isPaused = false;
 let pauseStartedAt = 0;
 let musicWasPlayingBeforePause = false;
+let mobileStartDismissed = false;
 let hemiLight;
 let sunLight;
 let sunTarget;
@@ -7829,6 +7833,7 @@ function bindInput() {
   document.querySelector("[data-close-panel='help']")?.addEventListener("click", () => setHelpPanelOpen(false));
   fullscreenButton?.addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", updateFullscreenButton);
+  document.addEventListener("fullscreenchange", updateMobileStartPrompt);
   document.addEventListener("visibilitychange", handleVisibilityPause);
   window.addEventListener("pagehide", handleVisibilityPause);
   window.addEventListener("blur", handleWindowBlurPause);
@@ -7857,6 +7862,7 @@ function bindTouchControls() {
 
   document.body.classList.add("touch-enabled");
   updateTouchOrientationState();
+  setupMobileStartPrompt();
   syncTouchControls();
   window.addEventListener("resize", updateTouchOrientationState);
   window.addEventListener("orientationchange", updateTouchOrientationState);
@@ -7869,6 +7875,42 @@ function bindTouchControls() {
     button.addEventListener("pointercancel", handleTouchControlUp);
     button.addEventListener("lostpointercapture", handleTouchControlUp);
   });
+}
+
+function setupMobileStartPrompt() {
+  if (!touchControlsEnabled || !mobileStartEl) return;
+
+  mobileStartFullscreenButton?.addEventListener("click", handleMobileStartFullscreen);
+  mobileStartWindowedButton?.addEventListener("click", handleMobileStartWindowed);
+  updateMobileStartPrompt();
+}
+
+async function handleMobileStartFullscreen(event) {
+  event.preventDefault();
+  mobileStartDismissed = true;
+  await requestGameFullscreen();
+  tryLockLandscape();
+  if (musicWanted) startMusic();
+  updateMobileStartPrompt();
+}
+
+function handleMobileStartWindowed(event) {
+  event.preventDefault();
+  mobileStartDismissed = true;
+  tryLockLandscape();
+  if (musicWanted) startMusic();
+  updateMobileStartPrompt();
+}
+
+function updateMobileStartPrompt() {
+  if (!touchControlsEnabled || !mobileStartEl) return;
+
+  const fullscreenLike = Boolean(document.fullscreenElement)
+    || window.matchMedia?.("(display-mode: fullscreen)").matches
+    || window.matchMedia?.("(display-mode: standalone)").matches;
+  const showPrompt = !mobileStartDismissed && !fullscreenLike;
+  mobileStartEl.classList.toggle("hidden", !showPrompt);
+  mobileStartEl.setAttribute("aria-hidden", showPrompt ? "false" : "true");
 }
 
 function updateTouchOrientationState() {
@@ -9394,15 +9436,33 @@ async function toggleFullscreen() {
     return;
   }
 
-  try {
-    if (document.fullscreenElement) {
+  if (document.fullscreenElement) {
+    try {
       await document.exitFullscreen();
-    } else {
-      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-      tryLockLandscape();
+    } catch (error) {
+      console.warn("Fullscreen exit failed", error);
+    } finally {
+      updateFullscreenButton();
     }
+    return;
+  }
+
+  await requestGameFullscreen();
+  tryLockLandscape();
+}
+
+async function requestGameFullscreen() {
+  if (!document.fullscreenEnabled || document.fullscreenElement) {
+    updateFullscreenButton();
+    return false;
+  }
+
+  try {
+    await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+    return true;
   } catch (error) {
     console.warn("Fullscreen request failed", error);
+    return false;
   } finally {
     updateFullscreenButton();
   }

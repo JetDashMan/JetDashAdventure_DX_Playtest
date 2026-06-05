@@ -633,6 +633,65 @@ body.touch-enabled.portrait-touch .rotate-prompt {
   display: grid;
 }
 
+.mobile-start {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background: rgba(2, 8, 16, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.mobile-start.hidden,
+body.touch-enabled.portrait-touch .mobile-start {
+  display: none;
+}
+
+.mobile-start-panel {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(8, 20, 30, 0.82);
+  text-align: center;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+}
+
+.mobile-start-kicker {
+  margin: 0;
+  color: rgba(248, 251, 255, 0.72);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.mobile-start-panel strong {
+  color: #ffd86a;
+  font-size: clamp(1.5rem, 7vw, 2.25rem);
+  font-weight: 950;
+  line-height: 0.95;
+}
+
+.mobile-start-panel button {
+  width: 100%;
+  min-height: 44px;
+}
+
+.mobile-start-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fbff;
+}
+
+.mobile-start-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #f8fbff;
+}
+
 .rotate-prompt-panel {
   display: grid;
   justify-items: center;
