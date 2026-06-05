@@ -1362,10 +1362,20 @@ const dnaGeometry = createPickupClusterGeometry();
 let dnaInstances;
 const dnaInstanceObject = new THREE.Object3D();
 const hiddenDnaMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-const harborContainerGeometry = new THREE.BoxGeometry(3.4, 1.12, 6.2);
-const harborContainerRibGeometry = new THREE.BoxGeometry(0.08, 1.18, 6.34);
-const harborContainerDoorGeometry = new THREE.BoxGeometry(3.46, 1.0, 0.08);
-const harborWheelGeometry = new THREE.CylinderGeometry(0.28, 0.28, 0.34, 12);
+const harborContainerSize = {
+  width: 2.8,
+  height: 2.65,
+  length: 6.4,
+  stackGap: 0.08,
+};
+const harborContainerGeometry = new THREE.BoxGeometry(
+  harborContainerSize.width,
+  harborContainerSize.height,
+  harborContainerSize.length,
+);
+const harborContainerRibGeometry = new THREE.BoxGeometry(0.1, harborContainerSize.height + 0.14, harborContainerSize.length + 0.16);
+const harborContainerDoorGeometry = new THREE.BoxGeometry(harborContainerSize.width + 0.08, harborContainerSize.height * 0.82, 0.1);
+const harborWheelGeometry = new THREE.CylinderGeometry(0.42, 0.42, 0.42, 18);
 const harborAnimatedCranes = [];
 const harborCargoTrucks = [];
 const harborExcavators = [];
@@ -1876,24 +1886,46 @@ function getGwangalliBridgeRoadY(z, baseY, startZ, rampEndZ, fenceEndZ, raisedY)
 }
 
 function createStageThreeDefinition(label = "STAGE 3") {
+  const goalZ = -9000;
   const trackNodes = [
-    [28, 0, 22],
-    [-260, 0, 22],
-    [-520, 1.5, 23],
-    [-800, 1.5, 22],
-    [-1080, 0, 24],
-    [-1360, 0, 22],
-    [-1640, 2, 23],
-    [-1920, 2, 22],
-    [-2200, 0.5, 24],
-    [-2480, 0.5, 22],
-    [-2760, 1.2, 23],
-    [-3040, 1.2, 24],
+    [28, 0, 24],
+    [-260, 0, 24],
+    [-520, 1.1, 24],
+    [-760, 1.1, 22],
+    [-980, 0.4, 23],
+    [-1180, 0.4, 24],
+    [-1460, 0, 24],
+    [-1760, 0, 23],
+    [-2060, 1, 24],
+    [-2360, 1, 22],
+    [-2660, 0.2, 24],
+    [-2960, 0.2, 25],
+    [-3260, 1.5, 24],
+    [-3560, 1.5, 23],
+    [-3860, 0.8, 24],
+    [-4160, 0.8, 25],
+    [-4460, 0, 23],
+    [-4760, 0, 24],
+    [-5060, 1.3, 24],
+    [-5360, 1.3, 22],
+    [-5660, 0.3, 24],
+    [-5960, 0.3, 25],
+    [-6260, 1.6, 24],
+    [-6560, 1.6, 23],
+    [-6860, 0.8, 24],
+    [-7160, 0.8, 25],
+    [-7460, 0.1, 23],
+    [-7760, 0.1, 24],
+    [-8060, 1.4, 24],
+    [-8360, 1.4, 23],
+    [-8660, 0.7, 24],
+    [goalZ, 0.7, 25],
+    [goalZ - 140, 0.7, 25],
   ];
 
   return {
       label,
-      goalZ: -3000,
+      goalZ,
       rollClearStartZ: -9999,
       rollClearEndZ: -10000,
       rollLiftHeight: 0,
@@ -1901,14 +1933,30 @@ function createStageThreeDefinition(label = "STAGE 3") {
       harborTheme: true,
       curvePoints: [
         [0, 0, playerStart.z],
-        [0, 0, -360],
-        [0, 0, -780],
-        [0, 0, -1200],
-        [0, 0, -1620],
-        [0, 0, -2040],
-        [0, 0, -2460],
-        [0, 0, -3000],
-        [0, 0, -3040],
+        [0, 0, -420],
+        [-38, 0, -600],
+        [-170, 0, -780],
+        [-220, 0, -1040],
+        [-220, 0, -1760],
+        [-160, 0, -1960],
+        [-20, 0, -2160],
+        [18, 0, -2440],
+        [18, 0, -3260],
+        [130, 0, -3480],
+        [250, 0, -3720],
+        [250, 0, -4480],
+        [190, 0, -4700],
+        [40, 0, -4940],
+        [-55, 0, -5200],
+        [-55, 0, -6060],
+        [-165, 0, -6300],
+        [-285, 0, -6560],
+        [-285, 0, -7320],
+        [-220, 0, -7560],
+        [-40, 0, -7840],
+        [75, 0, -8120],
+        [75, 0, goalZ],
+        [75, 0, goalZ - 140],
       ],
       trackSegments: makeTrackSegments(trackNodes),
       sidePlatforms: makeHarborSidePlatforms(trackNodes),
@@ -1921,6 +1969,20 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { lane: 2, z: -1920 },
         { lane: 1, z: -2360 },
         { lane: 2, z: -2740 },
+        { lane: 0, z: -3180 },
+        { lane: 1, z: -3620 },
+        { lane: 2, z: -4080 },
+        { lane: 0, z: -4520 },
+        { lane: 1, z: -4980 },
+        { lane: 2, z: -5420 },
+        { lane: 0, z: -5860 },
+        { lane: 1, z: -6320 },
+        { lane: 2, z: -6760 },
+        { lane: 0, z: -7240 },
+        { lane: 1, z: -7680 },
+        { lane: 2, z: -8120 },
+        { lane: 0, z: -8560 },
+        { lane: 1, z: -8860 },
       ],
       obstacles: [
         { lanes: [2], z: -330, height: 2.0 },
@@ -1930,6 +1992,20 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { lanes: [1, 2], z: -1740, height: 2.15 },
         { lanes: [0, 2], z: -2180, height: 2.05 },
         { lanes: [1], z: -2600, height: 1.9 },
+        { lanes: [0, 2], z: -3120, height: 2.1 },
+        { lanes: [2], z: -3560, height: 2.0 },
+        { lanes: [0, 1], z: -4040, height: 2.15 },
+        { lanes: [1], z: -4480, height: 1.9 },
+        { lanes: [0], z: -4920, height: 2.0 },
+        { lanes: [1, 2], z: -5380, height: 2.15 },
+        { lanes: [2], z: -5820, height: 2.0 },
+        { lanes: [0, 2], z: -6260, height: 2.05 },
+        { lanes: [1], z: -6720, height: 1.9 },
+        { lanes: [0, 1], z: -7180, height: 2.15 },
+        { lanes: [2], z: -7620, height: 2.0 },
+        { lanes: [0], z: -8080, height: 2.0 },
+        { lanes: [1, 2], z: -8520, height: 2.15 },
+        { lanes: [0, 2], z: -8840, height: 2.05 },
       ],
       dnaPlan: [
         { type: "trail", lane: 1, zStart: -48, count: 6, spacing: 9.0 },
@@ -1952,6 +2028,26 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { type: "switch", pattern: [0, 2], zStart: -2510, count: 6, spacing: 9.0 },
         { type: "trail", lane: 2, zStart: -2670, count: 5, spacing: 8.0 },
         { type: "switch", pattern: [2, 1, 0, 1], zStart: -2840, count: 8, spacing: 8.0 },
+        { type: "rows", zStart: -3160, rowCount: 2, spacing: 16.0 },
+        { type: "switch", pattern: [0, 1, 2, 1], zStart: -3340, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -3600, count: 7, spacing: 9.0 },
+        { type: "switch", pattern: [2, 1, 0, 1], zStart: -3920, count: 9, spacing: 9.0 },
+        { type: "rows", zStart: -4240, rowCount: 2, spacing: 16.0 },
+        { type: "trail", lane: 2, zStart: -4540, count: 7, spacing: 9.0 },
+        { type: "switch", pattern: [1, 0, 1, 2], zStart: -4820, count: 9, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -5140, count: 8, spacing: 9.0 },
+        { type: "rows", zStart: -5460, rowCount: 2, spacing: 16.0 },
+        { type: "switch", pattern: [0, 2, 1, 2], zStart: -5760, count: 9, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -6060, count: 8, spacing: 9.0 },
+        { type: "switch", pattern: [2, 1, 0, 1], zStart: -6380, count: 9, spacing: 9.0 },
+        { type: "rows", zStart: -6680, rowCount: 2, spacing: 16.0 },
+        { type: "trail", lane: 2, zStart: -7000, count: 8, spacing: 9.0 },
+        { type: "switch", pattern: [0, 1, 2, 1], zStart: -7320, count: 9, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -7640, count: 8, spacing: 9.0 },
+        { type: "rows", zStart: -7960, rowCount: 2, spacing: 16.0 },
+        { type: "switch", pattern: [2, 1, 0, 1], zStart: -8240, count: 9, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -8560, count: 8, spacing: 9.0 },
+        { type: "switch", pattern: [0, 1, 2, 1], zStart: -8780, count: 8, spacing: 8.0 },
       ],
     };
 }
@@ -1971,9 +2067,9 @@ function makeHarborSidePlatforms(nodes) {
   for (let i = 0; i < nodes.length - 1; i += 1) {
     const [zStart, yStart] = nodes[i];
     const [zEnd, yEnd] = nodes[i + 1];
-    for (const xOffset of [-25, 25]) {
+    for (const xOffset of [-35, 35]) {
       platforms.push({
-        width: 22,
+        width: 42,
         zStart,
         zEnd,
         yStart,
@@ -5528,7 +5624,6 @@ function addTrack() {
       ),
       stagePlatformMaterial,
     );
-    mesh.userData.debugName = "Side Platform";
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     scene.add(mesh);
@@ -5538,55 +5633,503 @@ function addTrack() {
 function addStageThreeHarbor() {
   if (!currentStage.harborTheme) return;
 
+  const harborEndZ = getStageEndZ(currentStage);
   addHarborDockEdges();
+  addHarborFeatureContainerStacks(harborEndZ);
+  addDenseHarborContainers(harborEndZ);
+  addHarborSupportDetails(harborEndZ);
+  addHarborLargeShipFleet(harborEndZ);
+  addHarborCraneField(harborEndZ);
+  addHarborCargoTruckRoutes(harborEndZ);
+  addHarborExcavatorField(harborEndZ);
+}
 
-  [
-    [-20, -120, 2, 0], [-27, -170, 3, 1], [22, -220, 2, 2], [29, -310, 3, 3],
-    [-24, -390, 2, 4], [20, -480, 3, 5], [-30, -580, 2, 6], [27, -690, 3, 7],
-    [-21, -820, 2, 8], [24, -940, 3, 9], [-29, -1060, 3, 10], [30, -1180, 2, 11],
-    [-23, -1310, 3, 12], [21, -1440, 2, 13], [-31, -1580, 3, 14], [28, -1710, 2, 15],
-    [-24, -1840, 3, 16], [22, -1970, 2, 17], [-30, -2100, 3, 18], [29, -2230, 2, 19],
-    [-22, -2360, 3, 20], [24, -2490, 3, 21], [-29, -2620, 2, 22], [30, -2760, 3, 23],
-    [-24, -2890, 2, 24],
-  ].forEach(([x, z, layers, seed]) => addHarborContainerStack(x, z, layers, seed));
+function addHarborFeatureContainerStacks(harborEndZ) {
+  const stackSpacing = 220;
+  const stackCount = Math.ceil(Math.abs(harborEndZ) / stackSpacing);
+  for (let index = 0; index < stackCount; index += 1) {
+    const side = index % 2 === 0 ? -1 : 1;
+    const z = -120 - index * stackSpacing;
+    if (z < harborEndZ + 120) break;
+    const x = side * (34 + (index % 4) * 4.0);
+    const layers = 2 + (index % 3 === 1 ? 1 : 0) + (index % 9 === 0 ? 1 : 0);
+    addHarborContainerStack(x, z, layers, index);
+  }
+}
 
-  addDenseHarborContainers();
-
-  Array.from({ length: 35 }, (_, index) => {
+function addHarborCraneField(harborEndZ) {
+  const craneCount = Math.min(44, Math.ceil(Math.abs(harborEndZ) / 210));
+  Array.from({ length: craneCount }, (_, index) => {
     const side = index % 2 === 0 ? -1 : 1;
     return {
-      x: side * (30 + (index % 3)),
-      z: -120 - index * 84,
+      x: side * (48 + (index % 3) * 2.4),
+      z: -180 - index * 210,
       side,
       phase: index * 0.43,
     };
-  }).forEach(addHarborCrane);
+  })
+    .filter(({ z }) => z > harborEndZ + 120)
+    .forEach(addHarborCrane);
+}
 
-  [
-    { x: 18.5, zStart: -120, zEnd: -560, z: -240, direction: -1, speed: 18, material: materials.truckTrailer },
-    { x: -18.5, zStart: -360, zEnd: -840, z: -620, direction: 1, speed: 16, material: materials.containerGreen },
-    { x: 22.5, zStart: -820, zEnd: -1320, z: -1020, direction: -1, speed: 15, material: materials.containerBlue },
-    { x: -22.5, zStart: -1220, zEnd: -1720, z: -1500, direction: 1, speed: 20, material: materials.containerRed },
-    { x: 18.5, zStart: -1660, zEnd: -2160, z: -1880, direction: -1, speed: 18, material: materials.containerYellow },
-    { x: -18.5, zStart: -2060, zEnd: -2580, z: -2340, direction: 1, speed: 17, material: materials.truckTrailer },
-    { x: 22.5, zStart: -2420, zEnd: -2960, z: -2680, direction: -1, speed: 19, material: materials.containerGreen },
-  ].forEach(addHarborCargoTruck);
+function addHarborCargoTruckRoutes(harborEndZ) {
+  const truckMaterials = [
+    materials.truckTrailer,
+    materials.containerGreen,
+    materials.containerBlue,
+    materials.containerRed,
+    materials.containerYellow,
+  ];
+  let index = 0;
+  for (let zStart = -160; zStart > harborEndZ + 180; zStart -= 520) {
+    const side = index % 2 === 0 ? 1 : -1;
+    const routeLength = 260 + (index % 3) * 55;
+    const zEnd = Math.max(zStart - routeLength, harborEndZ + 90);
+    if (zEnd >= zStart - 90) break;
+    const startRatio = 0.28 + (index % 4) * 0.12;
+    addHarborCargoTruck({
+      x: side * (20 + (index % 2) * 3.8),
+      zStart,
+      zEnd,
+      z: THREE.MathUtils.lerp(zStart, zEnd, startRatio),
+      direction: index % 2 === 0 ? -1 : 1,
+      speed: 15 + (index % 4) * 1.6,
+      material: truckMaterials[index % truckMaterials.length],
+    });
+    index += 1;
+  }
+}
 
-  [
-    { x: -29, z: -520, phase: 0.4 },
-    { x: 29, z: -860, phase: 1.1 },
-    { x: -30, z: -1240, phase: 1.8 },
-    { x: 30, z: -1660, phase: 2.5 },
-    { x: -29, z: -2060, phase: 3.1 },
-    { x: 29, z: -2460, phase: 3.7 },
-    { x: -30, z: -2860, phase: 4.3 },
-  ].forEach(addHarborExcavator);
+function addHarborExcavatorField(harborEndZ) {
+  for (let index = 0; index < 15; index += 1) {
+    const z = -520 - index * 560;
+    if (z < harborEndZ + 160) break;
+    const side = index % 2 === 0 ? -1 : 1;
+    addHarborExcavator({
+      x: side * (46 + (index % 2) * 2.4),
+      z,
+      phase: 0.4 + index * 0.67,
+    });
+  }
+}
+
+function addHarborSupportDetails(harborEndZ) {
+  for (let index = 0, z = -260; z > harborEndZ + 180; index += 1, z -= 360) {
+    const side = index % 2 === 0 ? -1 : 1;
+    addHarborWarehouse({ x: side * 50, z: z - 30, side, seed: index });
+    addHarborLightPole(side * 13.2, z + 24, 7.2 + (index % 2) * 0.6);
+    addHarborLightPole(-side * 52, z - 42, 8.4);
+    if (index % 3 === 0) {
+      addHarborFuelTanks({ x: -side * 49, z: z - 130, side: -side, seed: index });
+    }
+    if (index % 3 === 1) {
+      addHarborPipeRack({ x: -side * 47, z: z - 120, side: -side, seed: index });
+    }
+    if (index % 4 === 2) {
+      addHarborMooredShip({ x: side * 72, z: z - 170, side, seed: index });
+    }
+    if (index % 4 === 0) {
+      addHarborServiceGate(z - 210, index);
+    }
+  }
+}
+
+function addHarborLargeShipFleet(harborEndZ) {
+  const fleet = [
+    { type: "megaContainer", side: -1, x: -128, z: -620, scale: 1.02, seed: 3 },
+    { type: "oilTanker", side: 1, x: 132, z: -1320, scale: 0.95, seed: 7 },
+    { type: "ultraTrade", side: -1, x: -250, z: -2500, scale: 1.0, seed: 9 },
+    { type: "bulkCarrier", side: -1, x: -138, z: -2140, scale: 1.0, seed: 11 },
+    { type: "feederContainer", side: 1, x: 104, z: -2920, scale: 0.76, seed: 15 },
+    { type: "tugboat", side: -1, x: -84, z: -3340, scale: 0.72, seed: 19 },
+    { type: "megaContainer", side: 1, x: 140, z: -4080, scale: 1.12, seed: 23 },
+    { type: "oilTanker", side: -1, x: -146, z: -5120, scale: 1.04, seed: 27 },
+    { type: "bulkCarrier", side: 1, x: 132, z: -6060, scale: 0.92, seed: 31 },
+    { type: "feederContainer", side: -1, x: -108, z: -7020, scale: 0.84, seed: 35 },
+    { type: "tugboat", side: 1, x: 86, z: -7440, scale: 0.76, seed: 39 },
+    { type: "megaContainer", side: -1, x: -150, z: -8240, scale: 1.0, seed: 43 },
+  ];
+
+  for (const ship of fleet) {
+    if (ship.z < harborEndZ + 240) continue;
+    if (ship.type === "ultraTrade") {
+      addHarborUltraTradeShip(ship);
+    } else if (ship.type === "megaContainer") {
+      addHarborMegaContainerShip(ship);
+    } else if (ship.type === "oilTanker") {
+      addHarborOilTanker(ship);
+    } else if (ship.type === "bulkCarrier") {
+      addHarborBulkCarrier(ship);
+    } else if (ship.type === "feederContainer") {
+      addHarborFeederShip(ship);
+    } else {
+      addHarborTugboat(ship);
+    }
+  }
+}
+
+function addHarborUltraTradeShip({ x, z, side, scale, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Ultra Trade Ship";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 28 * scale, z), 0, 0, true);
+
+  const length = 528 * scale;
+  const width = 58 * scale;
+  const hullHeight = 28 * scale;
+  addLargeShipHull(group, width, hullHeight, length, materials.tourBoatNavy, materials.tourBoatRed, side);
+
+  const mainDeck = new THREE.Mesh(new THREE.BoxGeometry(width * 0.88, 0.9 * scale, length * 0.82), materials.harborDock);
+  mainDeck.position.y = hullHeight + 0.32 * scale;
+  mainDeck.castShadow = true;
+  mainDeck.receiveShadow = true;
+  group.add(mainDeck);
+
+  const colorMaterials = [materials.containerRed, materials.containerBlue, materials.containerYellow, materials.containerGreen];
+  for (let bay = 0; bay < 14; bay += 1) {
+    for (let column = 0; column < 7; column += 1) {
+      const stackHeight = 2 + ((bay + column + seed) % 4);
+      const cargo = new THREE.Mesh(
+        new THREE.BoxGeometry(5.6 * scale, stackHeight * 3.4 * scale, 18 * scale),
+        colorMaterials[(seed + bay + column) % colorMaterials.length],
+      );
+      cargo.position.set(
+        (column - 3) * 6.6 * scale,
+        hullHeight + 0.9 * scale + stackHeight * 1.7 * scale,
+        -length * 0.32 + bay * 21.5 * scale,
+      );
+      cargo.castShadow = true;
+      cargo.receiveShadow = true;
+      group.add(cargo);
+
+      const cargoTop = new THREE.Mesh(
+        new THREE.BoxGeometry(5.75 * scale, 0.16 * scale, 18.2 * scale),
+        materials.containerTrim,
+      );
+      cargoTop.position.set(cargo.position.x, cargo.position.y + stackHeight * 1.7 * scale + 0.1 * scale, cargo.position.z);
+      cargoTop.castShadow = true;
+      group.add(cargoTop);
+    }
+  }
+
+  addShipBridge(
+    group,
+    side * width * 0.18,
+    hullHeight + 17.8 * scale,
+    length * 0.36,
+    24 * scale,
+    28 * scale,
+    22 * scale,
+  );
+  addShipBridge(
+    group,
+    side * width * 0.12,
+    hullHeight + 35.0 * scale,
+    length * 0.37,
+    18 * scale,
+    10 * scale,
+    15 * scale,
+  );
+  addShipMast(group, side * width * 0.2, hullHeight + 44 * scale, length * 0.41, 22 * scale);
+  addShipRails(group, width, hullHeight + 1.5 * scale, length * 0.88, scale * 2.6);
+
+  const bowNamePlate = new THREE.Mesh(new THREE.BoxGeometry(width * 0.42, 2.0 * scale, 0.55 * scale), materials.truckCab);
+  bowNamePlate.position.set(0, hullHeight * 0.55, -length * 0.49);
+  bowNamePlate.castShadow = true;
+  group.add(bowNamePlate);
+
+  for (const craneZ of [-length * 0.18, length * 0.02, length * 0.22]) {
+    const deckCrane = new THREE.Group();
+    deckCrane.position.set(-side * width * 0.34, hullHeight + 1.4 * scale, craneZ);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * scale, 0.7 * scale, 18 * scale, 12), materials.crane);
+    post.position.y = 9 * scale;
+    post.castShadow = true;
+    deckCrane.add(post);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(34 * scale, 0.65 * scale, 0.65 * scale), materials.crane);
+    arm.position.set(side * 14 * scale, 17.2 * scale, 0);
+    arm.rotation.z = -side * 0.14;
+    arm.castShadow = true;
+    deckCrane.add(arm);
+    group.add(deckCrane);
+  }
+
+  scene.add(group);
+}
+
+function addHarborMegaContainerShip({ x, z, side, scale, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Mega Container Ship";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 7.4 * scale, z), 0, 0, true);
+
+  const length = 132 * scale;
+  const width = 22 * scale;
+  const hullHeight = 9.0 * scale;
+  addLargeShipHull(group, width, hullHeight, length, materials.tourBoatNavy, materials.tourBoatHull, side);
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(width * 0.92, 0.42 * scale, length * 0.86), materials.harborDock);
+  deck.position.y = hullHeight + 0.15 * scale;
+  deck.castShadow = true;
+  group.add(deck);
+
+  const colorMaterials = [materials.containerRed, materials.containerBlue, materials.containerYellow, materials.containerGreen];
+  for (let row = 0; row < 6; row += 1) {
+    for (let column = 0; column < 4; column += 1) {
+      const stackHeight = 2 + ((row + column + seed) % 3);
+      for (let layer = 0; layer < stackHeight; layer += 1) {
+        const cargo = new THREE.Mesh(
+          new THREE.BoxGeometry(3.2 * scale, 2.0 * scale, 8.0 * scale),
+          colorMaterials[(seed + row + column + layer) % colorMaterials.length],
+        );
+        cargo.position.set(
+          (column - 1.5) * 4.0 * scale,
+          hullHeight + 1.25 * scale + layer * 2.05 * scale,
+          -length * 0.25 + row * 8.8 * scale,
+        );
+        cargo.castShadow = true;
+        cargo.receiveShadow = true;
+        group.add(cargo);
+      }
+    }
+  }
+
+  addShipBridge(group, side * width * 0.16, hullHeight + 5.6 * scale, length * 0.34, 11.0 * scale, 9.2 * scale, 10.8 * scale);
+  addShipMast(group, side * width * 0.22, hullHeight + 12.5 * scale, length * 0.39, 8.0 * scale);
+  addShipRails(group, width, hullHeight + 0.8 * scale, length * 0.9, scale);
+
+  scene.add(group);
+}
+
+function addHarborOilTanker({ x, z, side, scale, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Oil Tanker";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 6.8 * scale, z), 0, 0, true);
+
+  const length = 118 * scale;
+  const width = 20 * scale;
+  const hullHeight = 8.0 * scale;
+  addLargeShipHull(group, width, hullHeight, length, materials.craneDark, materials.tourBoatRed, side);
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(width * 0.86, 0.34 * scale, length * 0.78), materials.harborRail);
+  deck.position.y = hullHeight + 0.1 * scale;
+  deck.castShadow = true;
+  group.add(deck);
+
+  for (let index = 0; index < 6; index += 1) {
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(3.2 * scale, 3.2 * scale, 9.5 * scale, 24), materials.truckCab);
+    tank.rotation.z = Math.PI * 0.5;
+    tank.position.set(0, hullHeight + 2.2 * scale, -length * 0.26 + index * 9.8 * scale);
+    tank.castShadow = true;
+    tank.receiveShadow = true;
+    group.add(tank);
+  }
+
+  for (const pipeX of [-width * 0.22, width * 0.22]) {
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * scale, 0.28 * scale, length * 0.62, 12), materials.craneDark);
+    pipe.rotation.x = Math.PI * 0.5;
+    pipe.position.set(pipeX, hullHeight + 1.1 * scale, -length * 0.02);
+    pipe.castShadow = true;
+    group.add(pipe);
+  }
+
+  addShipBridge(group, side * width * 0.18, hullHeight + 4.7 * scale, length * 0.34, 9.0 * scale, 8.2 * scale, 8.8 * scale);
+  addShipMast(group, side * width * 0.18, hullHeight + 11.2 * scale, length * 0.39, 7.0 * scale);
+  addShipRails(group, width, hullHeight + 0.65 * scale, length * 0.86, scale);
+
+  scene.add(group);
+}
+
+function addHarborBulkCarrier({ x, z, side, scale, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Bulk Carrier";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 6.4 * scale, z), 0, 0, true);
+
+  const length = 104 * scale;
+  const width = 21 * scale;
+  const hullHeight = 8.2 * scale;
+  addLargeShipHull(group, width, hullHeight, length, materials.tourBoatNavy, materials.harborDockDark, side);
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(width * 0.84, 0.35 * scale, length * 0.82), materials.harborDock);
+  deck.position.y = hullHeight + 0.08 * scale;
+  deck.castShadow = true;
+  group.add(deck);
+
+  for (let index = 0; index < 5; index += 1) {
+    const hold = new THREE.Mesh(new THREE.BoxGeometry(width * 0.58, 0.3 * scale, 10.5 * scale), materials.containerTrim);
+    hold.position.set(0, hullHeight + 0.35 * scale, -length * 0.28 + index * 13.0 * scale);
+    hold.castShadow = true;
+    group.add(hold);
+
+    const cargo = new THREE.Mesh(new THREE.BoxGeometry(width * 0.46, 0.75 * scale, 8.3 * scale), seed % 2 === 0 ? materials.coastalRock : materials.harborDockDark);
+    cargo.position.set(0, hullHeight + 0.85 * scale, -length * 0.28 + index * 13.0 * scale);
+    cargo.castShadow = true;
+    group.add(cargo);
+  }
+
+  for (let craneIndex = 0; craneIndex < 3; craneIndex += 1) {
+    const miniCrane = new THREE.Group();
+    miniCrane.position.set(side * width * 0.32, hullHeight + 1.2 * scale, -length * 0.18 + craneIndex * 19 * scale);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * scale, 0.18 * scale, 5.8 * scale, 10), materials.crane);
+    post.position.y = 2.9 * scale;
+    post.castShadow = true;
+    miniCrane.add(post);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(9.2 * scale, 0.22 * scale, 0.22 * scale), materials.crane);
+    arm.position.set(-side * 3.8 * scale, 5.4 * scale, 0);
+    arm.rotation.z = side * 0.18;
+    arm.castShadow = true;
+    miniCrane.add(arm);
+    group.add(miniCrane);
+  }
+
+  addShipBridge(group, side * width * 0.18, hullHeight + 4.5 * scale, length * 0.35, 8.0 * scale, 7.4 * scale, 8.2 * scale);
+  addShipRails(group, width, hullHeight + 0.68 * scale, length * 0.84, scale);
+
+  scene.add(group);
+}
+
+function addHarborFeederShip({ x, z, side, scale, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Feeder Container Ship";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 4.8 * scale, z), 0, 0, true);
+
+  const length = 76 * scale;
+  const width = 14.5 * scale;
+  const hullHeight = 6.6 * scale;
+  addLargeShipHull(group, width, hullHeight, length, seed % 2 === 0 ? materials.containerBlue : materials.tourBoatNavy, materials.tourBoatHull, side);
+
+  const colorMaterials = [materials.containerRed, materials.containerBlue, materials.containerYellow, materials.containerGreen];
+  for (let row = 0; row < 4; row += 1) {
+    for (let column = 0; column < 3; column += 1) {
+      const cargo = new THREE.Mesh(
+        new THREE.BoxGeometry(3.0 * scale, 1.8 * scale, 7.0 * scale),
+        colorMaterials[(seed + row + column) % colorMaterials.length],
+      );
+      cargo.position.set((column - 1) * 3.6 * scale, hullHeight + 1.1 * scale, -length * 0.22 + row * 8.2 * scale);
+      cargo.castShadow = true;
+      group.add(cargo);
+    }
+  }
+
+  addShipBridge(group, side * width * 0.14, hullHeight + 3.6 * scale, length * 0.32, 6.0 * scale, 5.6 * scale, 6.2 * scale);
+  addShipRails(group, width, hullHeight + 0.52 * scale, length * 0.82, scale);
+
+  scene.add(group);
+}
+
+function addHarborTugboat({ x, z, side, scale, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Tugboat";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 2.1 * scale, z), 0, 0, true);
+
+  const length = 24 * scale;
+  const width = 8.6 * scale;
+  const hullHeight = 3.1 * scale;
+  addLargeShipHull(group, width, hullHeight, length, seed % 2 === 0 ? materials.tourBoatRed : materials.tourBoatYellow, materials.craneDark, side);
+
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(5.0 * scale, 3.0 * scale, 6.0 * scale), materials.truckCab);
+  cabin.position.set(0, hullHeight + 2.1 * scale, -length * 0.08);
+  cabin.castShadow = true;
+  group.add(cabin);
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(4.1 * scale, 0.72 * scale, 0.12 * scale), materials.tourBoatGlass);
+  glass.position.set(0, hullHeight + 2.75 * scale, -length * 0.08 - 3.05 * scale);
+  group.add(glass);
+
+  const tireRail = new THREE.Mesh(new THREE.BoxGeometry(width * 1.05, 0.42 * scale, 0.42 * scale), materials.tire);
+  for (const tireZ of [-length * 0.3, length * 0.05, length * 0.34]) {
+    const rail = tireRail.clone();
+    rail.position.set(0, hullHeight + 0.5 * scale, tireZ);
+    rail.castShadow = true;
+    group.add(rail);
+  }
+
+  addShipMast(group, 0, hullHeight + 5.0 * scale, length * 0.16, 5.0 * scale);
+  scene.add(group);
+}
+
+function addLargeShipHull(group, width, height, length, hullMaterial, stripeMaterial, side) {
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(width, height, length), hullMaterial);
+  hull.position.y = height * 0.5;
+  hull.castShadow = true;
+  hull.receiveShadow = true;
+  group.add(hull);
+
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(width * 0.5, length * 0.13, 4), hullMaterial);
+  bow.rotation.x = Math.PI * 0.5;
+  bow.rotation.z = Math.PI * 0.25;
+  bow.position.set(0, height * 0.5, -length * 0.565);
+  bow.castShadow = true;
+  group.add(bow);
+
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(width * 1.02, height * 0.14, length * 0.92), stripeMaterial);
+  stripe.position.y = height * 0.32;
+  stripe.castShadow = true;
+  group.add(stripe);
+
+  const keel = new THREE.Mesh(new THREE.BoxGeometry(width * 0.72, height * 0.18, length * 0.82), materials.craneDark);
+  keel.position.y = height * 0.08;
+  keel.castShadow = true;
+  group.add(keel);
+}
+
+function addShipBridge(group, x, y, z, width, height, depth) {
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), materials.truckCab);
+  tower.position.set(x, y, z);
+  tower.castShadow = true;
+  tower.receiveShadow = true;
+  group.add(tower);
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(width * 0.82, height * 0.18, 0.16), materials.tourBoatGlass);
+  glass.position.set(x, y + height * 0.18, z - depth * 0.52);
+  group.add(glass);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(width * 1.06, height * 0.08, depth * 1.04), materials.harborRail);
+  roof.position.set(x, y + height * 0.54, z);
+  roof.castShadow = true;
+  group.add(roof);
+}
+
+function addShipMast(group, x, y, z, height) {
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, height, 10), materials.harborRail);
+  mast.position.set(x, y + height * 0.5, z);
+  mast.castShadow = true;
+  group.add(mast);
+
+  const radar = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 0.42), materials.harborRail);
+  radar.position.set(x, y + height * 0.86, z);
+  radar.castShadow = true;
+  group.add(radar);
+}
+
+function addShipRails(group, width, y, length, scale) {
+  for (const railX of [-width * 0.49, width * 0.49]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12 * scale, 0.12 * scale, length), materials.harborRail);
+    rail.position.set(railX, y, 0);
+    rail.castShadow = true;
+    group.add(rail);
+  }
 }
 
 function addHarborDockEdges() {
   for (const segment of currentStage.trackSegments) {
     const width = 0.5;
-    for (const xOffset of [-36.1, -14.1, 14.1, 36.1]) {
+    for (const xOffset of [-56.1, -14.1, 14.1, 56.1]) {
       const edge = new THREE.Mesh(
         makeSlopedBoxGeometry(width, segment.zStart, segment.zEnd, segment.yStart + 0.12, segment.yEnd + 0.12, 0.26, xOffset),
         materials.harborDockDark,
@@ -5597,17 +6140,237 @@ function addHarborDockEdges() {
   }
 }
 
+function addHarborWarehouse({ x, z, side, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const depth = 22 + (seed % 3) * 3.2;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(12.4, 6.2, depth), materials.harborDockDark);
+  body.position.y = 3.1;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(13.4, 0.68, depth + 1.2), materials.harborRail);
+  roof.position.y = 6.58;
+  roof.castShadow = true;
+  group.add(roof);
+
+  const doorMaterial = seed % 2 === 0 ? materials.harborRail : materials.containerTrim;
+  for (const doorZ of [-7.2, 0, 7.2]) {
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.65, 3.6), doorMaterial);
+    door.position.set(-side * 6.28, 1.78, doorZ);
+    door.castShadow = true;
+    group.add(door);
+  }
+
+  const office = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.7, 3.2), materials.truckCab);
+  office.position.set(side * 4.0, 5.9, -depth * 0.24);
+  office.castShadow = true;
+  group.add(office);
+
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.32, depth + 0.8), materials.harborRailStripe);
+  trim.position.set(-side * 6.36, 4.55, 0);
+  trim.castShadow = true;
+  group.add(trim);
+
+  scene.add(group);
+}
+
+function addHarborLightPole(x, z, height) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, height, 10), materials.harborRail);
+  pole.position.y = height * 0.5;
+  pole.castShadow = true;
+  group.add(pole);
+
+  const armDirection = x > 0 ? -1 : 1;
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, 0.12), materials.harborRail);
+  arm.position.set(armDirection * 0.8, height - 0.25, 0);
+  arm.castShadow = true;
+  group.add(arm);
+
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 0.42), materials.beachLamp);
+  lamp.position.set(armDirection * 1.62, height - 0.38, 0);
+  group.add(lamp);
+
+  scene.add(group);
+}
+
+function addHarborFuelTanks({ x, z, side, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const tankMaterial = seed % 2 === 0 ? materials.truckCab : materials.harborRail;
+  for (let index = 0; index < 3; index += 1) {
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 2.05, 5.4, 24), tankMaterial);
+    tank.position.set((index - 1) * 4.2, 2.7, 0);
+    tank.castShadow = true;
+    tank.receiveShadow = true;
+    group.add(tank);
+
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(2.08, 2.08, 0.16, 24), materials.harborRailStripe);
+    band.position.set((index - 1) * 4.2, 4.5, 0);
+    band.castShadow = true;
+    group.add(band);
+  }
+
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 12.6, 12), materials.craneDark);
+  pipe.rotation.z = Math.PI * 0.5;
+  pipe.position.set(0, 0.82, side * 2.5);
+  pipe.castShadow = true;
+  group.add(pipe);
+
+  scene.add(group);
+}
+
+function addHarborPipeRack({ x, z, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  for (const postX of [-2.8, 2.8]) {
+    for (const postZ of [-3.8, 3.8]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.4, 0.18), materials.harborRail);
+      post.position.set(postX, 1.2, postZ);
+      post.castShadow = true;
+      group.add(post);
+    }
+  }
+
+  for (let level = 0; level < 4; level += 1) {
+    for (let index = 0; index < 3; index += 1) {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 8.0, 10), seed % 2 === 0 ? materials.containerTrim : materials.harborRail);
+      pipe.rotation.x = Math.PI * 0.5;
+      pipe.position.set((index - 1) * 1.35, 0.68 + level * 0.42, 0);
+      pipe.castShadow = true;
+      group.add(pipe);
+    }
+  }
+
+  scene.add(group);
+}
+
+function addHarborMooredShip({ x, z, side, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 2.2, z), 0, 0, true);
+
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(14.5, 4.0, 58), seed % 2 === 0 ? materials.tourBoatNavy : materials.containerBlue);
+  hull.position.y = 1.9;
+  hull.castShadow = true;
+  hull.receiveShadow = true;
+  group.add(hull);
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(13.2, 0.38, 52), materials.harborDock);
+  deck.position.y = 4.05;
+  deck.castShadow = true;
+  group.add(deck);
+
+  const bowBlock = new THREE.Mesh(new THREE.BoxGeometry(9.8, 2.2, 8.0), materials.tourBoatHull);
+  bowBlock.position.set(0, 4.65, -23.0);
+  bowBlock.castShadow = true;
+  group.add(bowBlock);
+
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(6.8, 3.35, 7.6), materials.truckCab);
+  cabin.position.set(side * 1.0, 5.8, -15.8);
+  cabin.castShadow = true;
+  group.add(cabin);
+
+  const bridgeGlass = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.82, 0.12), materials.tourBoatGlass);
+  bridgeGlass.position.set(side * 1.0, 6.4, -19.66);
+  group.add(bridgeGlass);
+
+  for (let railZ = -23; railZ <= 23; railZ += 5.6) {
+    for (const railX of [-6.9, 6.9]) {
+      const railPost = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.8, 0.12), materials.harborRail);
+      railPost.position.set(railX, 4.62, railZ);
+      railPost.castShadow = true;
+      group.add(railPost);
+    }
+  }
+
+  for (const railX of [-6.9, 6.9]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 48), materials.harborRail);
+    rail.position.set(railX, 5.05, 1);
+    rail.castShadow = true;
+    group.add(rail);
+  }
+
+  for (let index = 0; index < 10; index += 1) {
+    const container = createHarborContainer(seed + index);
+    container.scale.set(0.82, 0.82, 0.82);
+    container.position.set(
+      (index % 3 - 1) * 3.0,
+      5.25 + Math.floor(index / 6) * 2.2,
+      -5.5 + (index % 5) * 4.8,
+    );
+    group.add(container);
+  }
+
+  scene.add(group);
+}
+
+function addHarborServiceGate(z, seed) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(0, sample.y, z), 0, 0, true);
+
+  for (const x of [-13.35, 13.35]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, 6.4, 0.32), materials.harborRail);
+    post.position.set(x, 3.2, 0);
+    post.castShadow = true;
+    group.add(post);
+  }
+
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(27.8, 0.34, 0.44), materials.harborRail);
+  beam.position.y = 6.25;
+  beam.castShadow = true;
+  group.add(beam);
+
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(8.8, 1.05, 0.18), materials.roadSign);
+  sign.position.set(0, 5.48, -0.1);
+  sign.castShadow = true;
+  group.add(sign);
+
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.12, 0.2), seed % 2 === 0 ? materials.harborRailStripe : materials.dashPad);
+  stripe.position.set(0, 5.48, -0.22);
+  group.add(stripe);
+
+  scene.add(group);
+}
+
 function addHarborContainerStack(x, z, layers, seed) {
   const sample = getGroundSample(0, z);
   if (!sample) return;
 
   const group = new THREE.Group();
-  group.userData.debugName = "Harbor Container Stack";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
 
   for (let layer = 0; layer < layers; layer += 1) {
     const container = createHarborContainer(seed + layer);
-    container.position.set(layer % 2 === 0 ? 0 : 0.24, 0.58 + layer * 1.12, layer % 2 === 0 ? 0 : -0.3);
+    container.position.set(
+      layer % 2 === 0 ? 0 : 0.24,
+      harborContainerSize.height * 0.5 + layer * (harborContainerSize.height + harborContainerSize.stackGap),
+      layer % 2 === 0 ? 0 : -0.3,
+    );
     if ((seed + layer) % 3 === 0) container.rotation.y = Math.PI * 0.5;
     group.add(container);
   }
@@ -5615,7 +6378,7 @@ function addHarborContainerStack(x, z, layers, seed) {
   scene.add(group);
 }
 
-function addDenseHarborContainers() {
+function addDenseHarborContainers(harborEndZ = stageEndZ) {
   const containerMaterials = [
     materials.containerRed,
     materials.containerBlue,
@@ -5623,11 +6386,12 @@ function addDenseHarborContainers() {
     materials.containerGreen,
   ];
   const slots = containerMaterials.map(() => []);
-  const xColumns = [-34, -30, -26, -22, -18, 18, 22, 26, 30, 34];
+  const xColumns = [-50, -46, -42, -38, -34, 34, 38, 42, 46, 50];
   let seed = 0;
 
-  for (let row = 0; row < 120; row += 1) {
-    const z = -42 - row * 25;
+  for (let row = 0; ; row += 1) {
+    const z = -42 - row * 30;
+    if (z < harborEndZ + 80) break;
     const sample = getGroundSample(0, z);
     if (!sample) continue;
 
@@ -5639,7 +6403,7 @@ function addDenseHarborContainers() {
         slots[materialIndex].push({
           x,
           z: z - (column % 3) * 3.4,
-          y: sample.y + 0.56 + layer * 1.12,
+          y: sample.y + harborContainerSize.height * 0.5 + layer * (harborContainerSize.height + harborContainerSize.stackGap),
           rotationY: (row + column + layer) % 4 === 0 ? Math.PI * 0.5 : 0,
         });
         seed += 1;
@@ -5650,7 +6414,6 @@ function addDenseHarborContainers() {
   const instanceObject = new THREE.Object3D();
   slots.forEach((items, materialIndex) => {
     const mesh = new THREE.InstancedMesh(harborContainerGeometry, containerMaterials[materialIndex], items.length);
-    mesh.userData.debugName = "Dense Harbor Container";
     mesh.castShadow = false;
     mesh.receiveShadow = true;
     items.forEach((item, index) => {
@@ -5676,23 +6439,66 @@ function createHarborContainer(seed) {
     materials.containerGreen,
   ];
   const group = new THREE.Group();
-  group.userData.debugName = "Harbor Container";
   const body = new THREE.Mesh(harborContainerGeometry, colorMaterials[seed % colorMaterials.length]);
   body.castShadow = true;
   body.receiveShadow = true;
   group.add(body);
 
+  const halfW = harborContainerSize.width * 0.5;
+  const halfL = harborContainerSize.length * 0.5;
+  const halfH = harborContainerSize.height * 0.5;
+
   for (let i = -1; i <= 1; i += 1) {
     const rib = new THREE.Mesh(harborContainerRibGeometry, materials.containerTrim);
-    rib.position.x = i * 1.05;
+    rib.position.x = i * halfW * 0.72;
     rib.castShadow = true;
     group.add(rib);
   }
 
+  for (const x of [-halfW - 0.04, halfW + 0.04]) {
+    for (const z of [-halfL - 0.04, halfL + 0.04]) {
+      const corner = new THREE.Mesh(new THREE.BoxGeometry(0.16, harborContainerSize.height + 0.18, 0.16), materials.containerTrim);
+      corner.position.set(x, 0, z);
+      corner.castShadow = true;
+      group.add(corner);
+    }
+  }
+
+  for (const y of [-halfH - 0.04, halfH + 0.04]) {
+    const topBottomX = new THREE.Mesh(new THREE.BoxGeometry(harborContainerSize.width + 0.18, 0.12, 0.14), materials.containerTrim);
+    for (const z of [-halfL - 0.04, halfL + 0.04]) {
+      const rail = topBottomX.clone();
+      rail.position.set(0, y, z);
+      rail.castShadow = true;
+      group.add(rail);
+    }
+
+    const topBottomZ = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, harborContainerSize.length + 0.18), materials.containerTrim);
+    for (const x of [-halfW - 0.04, halfW + 0.04]) {
+      const rail = topBottomZ.clone();
+      rail.position.set(x, y, 0);
+      rail.castShadow = true;
+      group.add(rail);
+    }
+  }
+
   const door = new THREE.Mesh(harborContainerDoorGeometry, materials.containerTrim);
-  door.position.z = 3.14;
+  door.position.z = halfL + 0.06;
   door.castShadow = true;
   group.add(door);
+
+  for (const x of [-0.46, 0.46]) {
+    const doorBar = new THREE.Mesh(new THREE.BoxGeometry(0.08, harborContainerSize.height * 0.75, 0.12), materials.harborRail);
+    doorBar.position.set(x, 0, halfL + 0.13);
+    doorBar.castShadow = true;
+    group.add(doorBar);
+  }
+
+  const idPlate = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.13), seed % 2 === 0 ? materials.harborRailStripe : materials.truckCab);
+  idPlate.position.set(-halfW - 0.08, halfH * 0.42, -halfL * 0.2);
+  idPlate.castShadow = true;
+  group.add(idPlate);
+
   return group;
 }
 
@@ -5701,50 +6507,83 @@ function addHarborCrane({ x, z, side, phase }) {
   if (!sample) return;
 
   const group = new THREE.Group();
-  group.userData.debugName = "Harbor Crane";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
 
-  const legGeometry = new THREE.BoxGeometry(0.55, 8.3, 0.55);
-  for (const legX of [-2.3, 2.3]) {
-    const leg = new THREE.Mesh(legGeometry, materials.crane);
-    leg.position.set(legX, 4.15, -1.1);
-    leg.castShadow = true;
-    group.add(leg);
+  const legGeometry = new THREE.BoxGeometry(0.82, 20, 0.82);
+  for (const legX of [-4.6, 4.6]) {
+    for (const legZ of [-3.1, 3.1]) {
+      const leg = new THREE.Mesh(legGeometry, materials.crane);
+      leg.position.set(legX, 10, legZ);
+      leg.castShadow = true;
+      group.add(leg);
+
+      const wheelBase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.38, 1.25), materials.craneDark);
+      wheelBase.position.set(legX, 0.26, legZ);
+      wheelBase.castShadow = true;
+      group.add(wheelBase);
+    }
   }
 
-  const topBeam = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.5, 0.72), materials.crane);
-  topBeam.position.set(0, 8.25, -1.1);
+  const topBeam = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.72, 1.05), materials.crane);
+  topBeam.position.set(0, 20.2, -3.1);
   topBeam.castShadow = true;
   group.add(topBeam);
 
+  const rearBeam = topBeam.clone();
+  rearBeam.position.z = 3.1;
+  group.add(rearBeam);
+
+  const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.62, 7.0), materials.crane);
+  for (const crossX of [-4.6, 4.6]) {
+    const beam = crossBeam.clone();
+    beam.position.set(crossX, 19.95, 0);
+    beam.castShadow = true;
+    group.add(beam);
+  }
+
+  for (const braceX of [-3.2, 3.2]) {
+    for (const braceZ of [-3.1, 3.1]) {
+      const brace = new THREE.Mesh(new THREE.BoxGeometry(0.24, 13.5, 0.24), materials.craneDark);
+      brace.position.set(braceX, 10.2, braceZ);
+      brace.rotation.z = braceX < 0 ? -0.22 : 0.22;
+      brace.castShadow = true;
+      group.add(brace);
+    }
+  }
+
   const boomPivot = new THREE.Group();
-  boomPivot.position.set(0, 8.65, -1.1);
-  const boom = new THREE.Mesh(new THREE.BoxGeometry(19, 0.28, 0.34), materials.crane);
-  boom.position.x = -side * 8.2;
+  boomPivot.position.set(0, 21.25, -3.1);
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(42, 0.46, 0.52), materials.crane);
+  boom.position.x = -side * 18.4;
   boom.castShadow = true;
   boomPivot.add(boom);
 
-  const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.62, 0.7), materials.craneDark);
-  counter.position.x = side * 2.2;
+  const boomTop = new THREE.Mesh(new THREE.BoxGeometry(38, 0.18, 0.2), materials.craneDark);
+  boomTop.position.set(-side * 17.2, 0.72, 0);
+  boomTop.castShadow = true;
+  boomPivot.add(boomTop);
+
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(6.8, 1.25, 1.25), materials.craneDark);
+  counter.position.x = side * 4.6;
   counter.castShadow = true;
   boomPivot.add(counter);
 
   const trolley = new THREE.Group();
-  const trolleyBody = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.72), materials.craneDark);
+  const trolleyBody = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.82, 1.05), materials.craneDark);
   trolleyBody.castShadow = true;
   trolley.add(trolleyBody);
-  const cable = new THREE.Mesh(new THREE.BoxGeometry(0.08, 5.2, 0.08), materials.craneDark);
-  cable.position.y = -2.85;
+  const cable = new THREE.Mesh(new THREE.BoxGeometry(0.08, 11.2, 0.08), materials.craneDark);
+  cable.position.y = -6.0;
   trolley.add(cable);
-  const hook = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.34, 0.34), materials.craneDark);
-  hook.position.y = -5.5;
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.52, 0.52), materials.craneDark);
+  hook.position.y = -11.9;
   hook.castShadow = true;
   trolley.add(hook);
   boomPivot.add(trolley);
   group.add(boomPivot);
 
   scene.add(group);
-  harborAnimatedCranes.push({ boomPivot, trolley, side, phase });
+  harborAnimatedCranes.push({ boomPivot, trolley, side, phase, trolleyBase: 10.5, trolleyRange: 8.0 });
 }
 
 function addHarborCargoTruck({ x, zStart, zEnd, z, direction, speed, material }) {
@@ -5752,27 +6591,83 @@ function addHarborCargoTruck({ x, zStart, zEnd, z, direction, speed, material })
   if (!sample) return;
 
   const group = new THREE.Group();
-  group.userData.debugName = "Harbor Cargo Truck";
-  const trailer = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.05, 4.8), material);
-  trailer.position.set(0, 0.9, 0.5);
+  const trailer = new THREE.Mesh(new THREE.BoxGeometry(2.65, 2.55, 8.6), material);
+  trailer.position.set(0, 1.9, 1.45);
   trailer.castShadow = true;
   trailer.receiveShadow = true;
   group.add(trailer);
 
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.18, 1.8), materials.truckCab);
-  cab.position.set(0, 0.88, -2.8);
+  const trailerRoof = new THREE.Mesh(new THREE.BoxGeometry(2.75, 0.12, 8.7), materials.containerTrim);
+  trailerRoof.position.set(0, 3.24, 1.45);
+  trailerRoof.castShadow = true;
+  group.add(trailerRoof);
+
+  for (const stripeY of [1.35, 2.38]) {
+    const sideStripeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.11, 8.72), materials.containerTrim);
+    sideStripeLeft.position.set(-1.36, stripeY, 1.45);
+    sideStripeLeft.castShadow = true;
+    group.add(sideStripeLeft);
+    const sideStripeRight = sideStripeLeft.clone();
+    sideStripeRight.position.x = 1.36;
+    group.add(sideStripeRight);
+  }
+
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.45, 2.35, 2.6), materials.truckCab);
+  cab.position.set(0, 1.62, -4.55);
   cab.castShadow = true;
   group.add(cab);
 
+  const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(2.28, 0.24, 2.05), materials.harborRail);
+  cabRoof.position.set(0, 2.92, -4.62);
+  cabRoof.castShadow = true;
+  group.add(cabRoof);
+
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.72, 0.08), materials.tourBoatGlass);
+  windshield.position.set(0, 2.05, -5.88);
+  windshield.castShadow = false;
+  group.add(windshield);
+
+  for (const side of [-1, 1]) {
+    const sideWindow = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.54, 0.76), materials.tourBoatGlass);
+    sideWindow.position.set(side * 1.26, 2.02, -4.78);
+    sideWindow.castShadow = false;
+    group.add(sideWindow);
+
+    const mirrorArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.05), materials.craneDark);
+    mirrorArm.position.set(side * 1.38, 1.98, -5.58);
+    mirrorArm.castShadow = true;
+    group.add(mirrorArm);
+
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.32, 0.22), materials.craneDark);
+    mirror.position.set(side * 1.64, 1.98, -5.58);
+    mirror.castShadow = true;
+    group.add(mirror);
+
+    const headlight = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.08), materials.beachLamp);
+    headlight.position.set(side * 0.62, 0.82, -5.92);
+    group.add(headlight);
+  }
+
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.38, 0.28, 0.22), materials.craneDark);
+  bumper.position.set(0, 0.72, -6.03);
+  bumper.castShadow = true;
+  group.add(bumper);
+
   const wheels = [];
-  for (const wheelX of [-1.18, 1.18]) {
-    for (const wheelZ of [-2.55, -0.4, 2.25]) {
+  for (const wheelX of [-1.42, 1.42]) {
+    for (const wheelZ of [-5.25, -3.75, 0.9, 3.65, 5.25]) {
       const wheel = new THREE.Mesh(harborWheelGeometry, materials.tire);
       wheel.rotation.z = Math.PI * 0.5;
-      wheel.position.set(wheelX, 0.32, wheelZ);
+      wheel.position.set(wheelX, 0.52, wheelZ);
       wheel.castShadow = true;
       group.add(wheel);
       wheels.push(wheel);
+
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.44, 14), materials.harborRail);
+      hub.rotation.z = Math.PI * 0.5;
+      hub.position.copy(wheel.position);
+      hub.castShadow = true;
+      group.add(hub);
     }
   }
 
@@ -5796,29 +6691,28 @@ function addHarborExcavator({ x, z, phase }) {
   if (!sample) return;
 
   const group = new THREE.Group();
-  group.userData.debugName = "Harbor Excavator";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
 
-  const base = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.55, 2.2), materials.tire);
-  base.position.y = 0.35;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.75, 3.2), materials.tire);
+  base.position.y = 0.46;
   base.castShadow = true;
   group.add(base);
 
   const bodyPivot = new THREE.Group();
-  bodyPivot.position.y = 1.0;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.05, 1.8), materials.excavatorBody);
+  bodyPivot.position.y = 1.45;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.65, 2.55), materials.excavatorBody);
   body.castShadow = true;
   bodyPivot.add(body);
 
   const armPivot = new THREE.Group();
-  armPivot.position.set(0.55, 0.35, -0.15);
-  const boom = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 4.2), materials.excavatorArm);
-  boom.position.z = -1.9;
+  armPivot.position.set(0.84, 0.55, -0.2);
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 6.2), materials.excavatorArm);
+  boom.position.z = -2.85;
   boom.rotation.x = -0.35;
   boom.castShadow = true;
   armPivot.add(boom);
-  const bucket = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.48, 0.72), materials.craneDark);
-  bucket.position.set(0, -0.4, -4.0);
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.68, 1.05), materials.craneDark);
+  bucket.position.set(0, -0.58, -5.95);
   bucket.castShadow = true;
   armPivot.add(bucket);
   bodyPivot.add(armPivot);
@@ -5834,7 +6728,9 @@ function updateStageThreeHarbor(dt) {
   harborTime += dt;
   for (const crane of harborAnimatedCranes) {
     crane.boomPivot.rotation.y = Math.sin(harborTime * 0.48 + crane.phase) * 0.045;
-    crane.trolley.position.x = -crane.side * (4.2 + Math.sin(harborTime * 0.78 + crane.phase) * 3.3);
+    crane.trolley.position.x = -crane.side * (
+      (crane.trolleyBase ?? 4.2) + Math.sin(harborTime * 0.78 + crane.phase) * (crane.trolleyRange ?? 3.3)
+    );
   }
 
   for (const truck of harborCargoTrucks) {
@@ -5881,9 +6777,6 @@ function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
     makeSlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, 1.25),
     material,
   );
-  track.userData.debugName = currentStage.harborTheme
-    ? "Harbor Road Segment"
-    : currentStage.gwangalliTheme ? "Gwangalli Road Segment" : "Road Segment";
   track.receiveShadow = true;
   track.castShadow = false;
   scene.add(track);
@@ -5906,7 +6799,6 @@ function addRail(segment, x) {
     makeSlopedBoxGeometry(0.34, segment.zStart, segment.zEnd, segment.yStart + 0.74, segment.yEnd + 0.74, 0.4, x),
     railMaterials.base,
   );
-  rail.userData.debugName = "Guardrail";
   rail.castShadow = false;
   scene.add(rail);
 
@@ -5914,7 +6806,6 @@ function addRail(segment, x) {
     makeSlopedBoxGeometry(0.38, segment.zStart + 5, segment.zEnd - 5, segment.yStart + 1.03, segment.yEnd + 1.03, 0.08, x),
     railMaterials.stripe,
   );
-  stripe.userData.debugName = "Guardrail Stripe";
   stripe.castShadow = false;
   scene.add(stripe);
 }
@@ -6117,7 +7008,6 @@ function addDnaItems() {
   }
 
   dnaInstances = new THREE.InstancedMesh(dnaGeometry, materials.dna, dnaItems.length);
-  dnaInstances.userData.debugName = "DNA Item";
   dnaInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   dnaInstances.castShadow = false;
   dnaInstances.receiveShadow = false;
@@ -6149,7 +7039,6 @@ function createDashPad(x, z) {
   if (!sample) return;
 
   const group = new THREE.Group();
-  group.userData.debugName = "Dash Pad";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y + 0.09, z), 0, 0, true);
 
   const pad = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.16, 6.1), materials.dashPad);
@@ -6205,7 +7094,6 @@ function createObstacle(x, z, width, height, depth) {
   if (!sample) return;
 
   const group = new THREE.Group();
-  group.userData.debugName = "Obstacle";
   const localPosition = new THREE.Vector3(x, sample.y + height * 0.5, z);
   setStageObjectTransform(group, localPosition, 0, 0, true);
 
@@ -6248,7 +7136,6 @@ function addGoal() {
   const y = sample.y + 5.8;
 
   const goal = new THREE.Group();
-  goal.userData.debugName = "Goal Gate";
   setStageObjectTransform(goal, new THREE.Vector3(0, y, z), 0, 0, true);
 
   const ring = new THREE.Mesh(new THREE.TorusGeometry(8.2, 0.32, 18, 72), materials.goal);
@@ -6280,7 +7167,6 @@ function addGoal() {
 
 function addPlayer() {
   const group = new THREE.Group();
-  group.userData.debugName = "Player JET";
   const model = new THREE.Group();
   model.position.y = 0.1;
   group.add(model);
