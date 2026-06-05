@@ -30,6 +30,22 @@ body {
   outline: none;
 }
 
+.game-version {
+  position: fixed;
+  left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 1;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(4, 12, 22, 0.34);
+  color: rgba(248, 251, 255, 0.58);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
 .mouse-object-label {
   position: fixed;
   z-index: 8;
@@ -935,6 +951,12 @@ body.touch-enabled:not(.portrait-touch) .boost-stat strong {
 body.touch-enabled:not(.portrait-touch) .boost-track {
   height: 10px;
   margin-top: 5px;
+}
+
+body.touch-enabled:not(.portrait-touch) .game-version {
+  bottom: max(6px, env(safe-area-inset-bottom));
+  padding: 2px 6px;
+  font-size: 0.54rem;
 }
 
 body.touch-enabled:not(.portrait-touch) .music-toggle,
