@@ -629,10 +629,6 @@ body.game-paused .help-panel {
   backdrop-filter: blur(16px);
 }
 
-body.touch-enabled.portrait-touch .rotate-prompt {
-  display: grid;
-}
-
 .mobile-start {
   position: fixed;
   inset: 0;
@@ -644,8 +640,7 @@ body.touch-enabled.portrait-touch .rotate-prompt {
   backdrop-filter: blur(14px);
 }
 
-.mobile-start.hidden,
-body.touch-enabled.portrait-touch .mobile-start {
+.mobile-start.hidden {
   display: none;
 }
 

@@ -7889,15 +7889,15 @@ async function handleMobileStartFullscreen(event) {
   event.preventDefault();
   mobileStartDismissed = true;
   await requestGameFullscreen();
-  tryLockLandscape();
+  await tryLockLandscape();
   if (musicWanted) startMusic();
   updateMobileStartPrompt();
 }
 
-function handleMobileStartWindowed(event) {
+async function handleMobileStartWindowed(event) {
   event.preventDefault();
   mobileStartDismissed = true;
-  tryLockLandscape();
+  await tryLockLandscape();
   if (musicWanted) startMusic();
   updateMobileStartPrompt();
 }
@@ -7918,7 +7918,7 @@ function updateTouchOrientationState() {
 
   const portrait = window.innerHeight > window.innerWidth;
   document.body.classList.toggle("portrait-touch", portrait);
-  rotatePromptEl?.setAttribute("aria-hidden", portrait ? "false" : "true");
+  rotatePromptEl?.setAttribute("aria-hidden", "true");
 }
 
 function handleTouchControlDown(event) {
@@ -8013,12 +8013,14 @@ function syncTouchControls() {
   });
 }
 
-function tryLockLandscape() {
-  if (!touchControlsEnabled || !screen.orientation?.lock) return;
+async function tryLockLandscape() {
+  if (!touchControlsEnabled || !screen.orientation?.lock) return false;
   try {
-    screen.orientation.lock("landscape").catch(() => {});
+    await screen.orientation.lock("landscape");
+    return true;
   } catch {
     // Some mobile browsers only allow orientation lock after fullscreen.
+    return false;
   }
 }
 
@@ -9448,7 +9450,7 @@ async function toggleFullscreen() {
   }
 
   await requestGameFullscreen();
-  tryLockLandscape();
+  await tryLockLandscape();
 }
 
 async function requestGameFullscreen() {
