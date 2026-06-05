@@ -20,6 +20,7 @@ const graphicsButton = document.querySelector("#graphics-toggle");
 const graphicsPanel = document.querySelector("#graphics-panel");
 const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
+const mouseObjectLabelEl = document.querySelector("#mouse-object-label");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
 const menuButton = document.querySelector("#menu-toggle");
@@ -56,6 +57,7 @@ const graphicsControls = {
 const debugControls = {
   superBoost: document.querySelector("#debug-super-boost"),
   infiniteJump: document.querySelector("#debug-infinite-jump"),
+  mouseObject: document.querySelector("#debug-mouse-object"),
 };
 
 const scene = new THREE.Scene();
@@ -230,6 +232,7 @@ const debugStorageKey = "jetdash-debug-settings";
 const debugDefaults = {
   superBoost: false,
   infiniteJump: false,
+  mouseObject: false,
 };
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
@@ -307,6 +310,14 @@ postQuad.frustumCulled = false;
 postScene.add(postQuad);
 
 const clock = new THREE.Clock();
+const mouseObjectRaycaster = new THREE.Raycaster();
+const mouseObjectPointer = new THREE.Vector2();
+const mouseObjectPointerState = {
+  active: false,
+  clientX: 0,
+  clientY: 0,
+  raf: 0,
+};
 const worldUp = new THREE.Vector3(0, 1, 0);
 const sunFollowOffset = new THREE.Vector3(-28, 46, 24);
 const playerStart = new THREE.Vector3(0, 2.2, 20);
@@ -1052,6 +1063,12 @@ materials.roadMarkingYellow = createRealtimePbrMaterial("road_marking_yellow", {
   textureAoMapIntensity: 0.34,
 });
 
+for (const [key, material] of Object.entries(materials)) {
+  if (material && !material.name) {
+    material.name = key;
+  }
+}
+
 bindRealtimeMaterialTexture(materials.rail, "guardrail_white_metal", { normalScale: 0.3, aoMapIntensity: 0.32 });
 bindRealtimeMaterialTexture(materials.railStripe, "hazard_red_paint", { normalScale: 0.28, aoMapIntensity: 0.3 });
 bindRealtimeMaterialTexture(materials.gwangalliRail, "guardrail_white_metal", { normalScale: 0.34, aoMapIntensity: 0.34 });
@@ -1409,6 +1426,7 @@ function addSkyDome() {
   });
   skyDomeMesh = new THREE.Mesh(geometry, material);
   skyDomeMesh.name = "BlueCloudSkyDome";
+  skyDomeMesh.userData.ignoreMouseObject = true;
   skyDomeMesh.frustumCulled = false;
   skyDomeMesh.renderOrder = -1000;
   skyDomeMesh.scale.setScalar(getSkyDomeRadius());
@@ -5510,6 +5528,7 @@ function addTrack() {
       ),
       stagePlatformMaterial,
     );
+    mesh.userData.debugName = "Side Platform";
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     scene.add(mesh);
@@ -5583,6 +5602,7 @@ function addHarborContainerStack(x, z, layers, seed) {
   if (!sample) return;
 
   const group = new THREE.Group();
+  group.userData.debugName = "Harbor Container Stack";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
 
   for (let layer = 0; layer < layers; layer += 1) {
@@ -5630,6 +5650,7 @@ function addDenseHarborContainers() {
   const instanceObject = new THREE.Object3D();
   slots.forEach((items, materialIndex) => {
     const mesh = new THREE.InstancedMesh(harborContainerGeometry, containerMaterials[materialIndex], items.length);
+    mesh.userData.debugName = "Dense Harbor Container";
     mesh.castShadow = false;
     mesh.receiveShadow = true;
     items.forEach((item, index) => {
@@ -5655,6 +5676,7 @@ function createHarborContainer(seed) {
     materials.containerGreen,
   ];
   const group = new THREE.Group();
+  group.userData.debugName = "Harbor Container";
   const body = new THREE.Mesh(harborContainerGeometry, colorMaterials[seed % colorMaterials.length]);
   body.castShadow = true;
   body.receiveShadow = true;
@@ -5679,6 +5701,7 @@ function addHarborCrane({ x, z, side, phase }) {
   if (!sample) return;
 
   const group = new THREE.Group();
+  group.userData.debugName = "Harbor Crane";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
 
   const legGeometry = new THREE.BoxGeometry(0.55, 8.3, 0.55);
@@ -5729,6 +5752,7 @@ function addHarborCargoTruck({ x, zStart, zEnd, z, direction, speed, material })
   if (!sample) return;
 
   const group = new THREE.Group();
+  group.userData.debugName = "Harbor Cargo Truck";
   const trailer = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.05, 4.8), material);
   trailer.position.set(0, 0.9, 0.5);
   trailer.castShadow = true;
@@ -5772,6 +5796,7 @@ function addHarborExcavator({ x, z, phase }) {
   if (!sample) return;
 
   const group = new THREE.Group();
+  group.userData.debugName = "Harbor Excavator";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
 
   const base = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.55, 2.2), materials.tire);
@@ -5856,6 +5881,9 @@ function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
     makeSlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, 1.25),
     material,
   );
+  track.userData.debugName = currentStage.harborTheme
+    ? "Harbor Road Segment"
+    : currentStage.gwangalliTheme ? "Gwangalli Road Segment" : "Road Segment";
   track.receiveShadow = true;
   track.castShadow = false;
   scene.add(track);
@@ -5878,6 +5906,7 @@ function addRail(segment, x) {
     makeSlopedBoxGeometry(0.34, segment.zStart, segment.zEnd, segment.yStart + 0.74, segment.yEnd + 0.74, 0.4, x),
     railMaterials.base,
   );
+  rail.userData.debugName = "Guardrail";
   rail.castShadow = false;
   scene.add(rail);
 
@@ -5885,6 +5914,7 @@ function addRail(segment, x) {
     makeSlopedBoxGeometry(0.38, segment.zStart + 5, segment.zEnd - 5, segment.yStart + 1.03, segment.yEnd + 1.03, 0.08, x),
     railMaterials.stripe,
   );
+  stripe.userData.debugName = "Guardrail Stripe";
   stripe.castShadow = false;
   scene.add(stripe);
 }
@@ -6087,6 +6117,7 @@ function addDnaItems() {
   }
 
   dnaInstances = new THREE.InstancedMesh(dnaGeometry, materials.dna, dnaItems.length);
+  dnaInstances.userData.debugName = "DNA Item";
   dnaInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   dnaInstances.castShadow = false;
   dnaInstances.receiveShadow = false;
@@ -6118,6 +6149,7 @@ function createDashPad(x, z) {
   if (!sample) return;
 
   const group = new THREE.Group();
+  group.userData.debugName = "Dash Pad";
   setStageObjectTransform(group, new THREE.Vector3(x, sample.y + 0.09, z), 0, 0, true);
 
   const pad = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.16, 6.1), materials.dashPad);
@@ -6173,6 +6205,7 @@ function createObstacle(x, z, width, height, depth) {
   if (!sample) return;
 
   const group = new THREE.Group();
+  group.userData.debugName = "Obstacle";
   const localPosition = new THREE.Vector3(x, sample.y + height * 0.5, z);
   setStageObjectTransform(group, localPosition, 0, 0, true);
 
@@ -6215,6 +6248,7 @@ function addGoal() {
   const y = sample.y + 5.8;
 
   const goal = new THREE.Group();
+  goal.userData.debugName = "Goal Gate";
   setStageObjectTransform(goal, new THREE.Vector3(0, y, z), 0, 0, true);
 
   const ring = new THREE.Mesh(new THREE.TorusGeometry(8.2, 0.32, 18, 72), materials.goal);
@@ -6246,6 +6280,7 @@ function addGoal() {
 
 function addPlayer() {
   const group = new THREE.Group();
+  group.userData.debugName = "Player JET";
   const model = new THREE.Group();
   model.position.y = 0.1;
   group.add(model);
@@ -6493,6 +6528,9 @@ function bindInput() {
   });
 
   bindTouchControls();
+  canvas.addEventListener("pointermove", handleMouseObjectPointerMove);
+  canvas.addEventListener("pointerleave", handleMouseObjectPointerLeave);
+  canvas.addEventListener("pointercancel", handleMouseObjectPointerLeave);
   restartButton.addEventListener("click", resetGame);
   nextStageButton.addEventListener("click", goToNextStage);
   menuButton?.addEventListener("click", () => setMainMenuOpen(menuPanel?.classList.contains("hidden")));
@@ -7670,6 +7708,7 @@ function normalizeDebugSettings(source = {}) {
   return {
     superBoost: typeof source.superBoost === "boolean" ? source.superBoost : debugDefaults.superBoost,
     infiniteJump: typeof source.infiniteJump === "boolean" ? source.infiniteJump : debugDefaults.infiniteJump,
+    mouseObject: typeof source.mouseObject === "boolean" ? source.mouseObject : debugDefaults.mouseObject,
   };
 }
 
@@ -7719,6 +7758,11 @@ function bindDebugControls() {
       });
       saveDebugSettings();
       syncDebugControls();
+      if (key === "mouseObject" && !debugSettings.mouseObject) {
+        hideMouseObjectLabel();
+      } else if (key === "mouseObject") {
+        requestMouseObjectPick();
+      }
     });
   }
 }
@@ -7735,6 +7779,121 @@ function syncDebugControls() {
     if (!control) continue;
     control.checked = Boolean(debugSettings[key]);
   }
+  if (!debugSettings.mouseObject) {
+    hideMouseObjectLabel();
+  }
+}
+
+function handleMouseObjectPointerMove(event) {
+  if (event.pointerType && event.pointerType !== "mouse") return;
+
+  mouseObjectPointerState.active = true;
+  mouseObjectPointerState.clientX = event.clientX;
+  mouseObjectPointerState.clientY = event.clientY;
+  requestMouseObjectPick();
+}
+
+function handleMouseObjectPointerLeave() {
+  mouseObjectPointerState.active = false;
+  hideMouseObjectLabel();
+}
+
+function requestMouseObjectPick() {
+  if (!debugSettings.mouseObject || !mouseObjectPointerState.active) {
+    hideMouseObjectLabel();
+    return;
+  }
+
+  if (mouseObjectPointerState.raf) return;
+  mouseObjectPointerState.raf = requestAnimationFrame(() => {
+    mouseObjectPointerState.raf = 0;
+    updateMouseObjectPick();
+  });
+}
+
+function updateMouseObjectPick() {
+  if (!debugSettings.mouseObject || !mouseObjectPointerState.active) {
+    hideMouseObjectLabel();
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    hideMouseObjectLabel();
+    return;
+  }
+
+  const localX = mouseObjectPointerState.clientX - rect.left;
+  const localY = mouseObjectPointerState.clientY - rect.top;
+  if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) {
+    hideMouseObjectLabel();
+    return;
+  }
+
+  mouseObjectPointer.set((localX / rect.width) * 2 - 1, -(localY / rect.height) * 2 + 1);
+  mouseObjectRaycaster.setFromCamera(mouseObjectPointer, camera);
+  const hits = mouseObjectRaycaster.intersectObjects(scene.children, true);
+  const hit = hits.find(({ object }) => isMouseObjectHitCandidate(object));
+  if (!hit) {
+    hideMouseObjectLabel();
+    return;
+  }
+
+  showMouseObjectLabel(resolveMouseObjectName(hit), mouseObjectPointerState.clientX, mouseObjectPointerState.clientY);
+}
+
+function isMouseObjectHitCandidate(object) {
+  for (let current = object; current; current = current.parent) {
+    if (!current.visible || current.userData.ignoreMouseObject) return false;
+  }
+
+  const material = Array.isArray(object.material) ? object.material[0] : object.material;
+  if (material?.transparent && material.opacity <= 0.04) return false;
+  return true;
+}
+
+function resolveMouseObjectName(hit) {
+  const object = hit.object;
+  if (object === dnaInstances && Number.isInteger(hit.instanceId)) {
+    return `DNA Item #${hit.instanceId + 1}`;
+  }
+
+  for (let current = object; current; current = current.parent) {
+    const explicitName = current.userData.debugName || current.userData.label || current.name;
+    if (explicitName) return explicitName;
+  }
+
+  const materialsToCheck = Array.isArray(object.material) ? object.material : [object.material];
+  const material = materialsToCheck.find((item) => item?.name);
+  if (material?.name) return titleCaseIdentifier(material.name);
+  return object.type || object.geometry?.type || "Scene Object";
+}
+
+function titleCaseIdentifier(value) {
+  return String(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function showMouseObjectLabel(label, clientX, clientY) {
+  if (!mouseObjectLabelEl) return;
+
+  const margin = 12;
+  mouseObjectLabelEl.textContent = label;
+  mouseObjectLabelEl.classList.remove("hidden");
+  const bounds = mouseObjectLabelEl.getBoundingClientRect();
+  const x = Math.min(clientX, window.innerWidth - bounds.width - margin - 14);
+  const y = Math.min(clientY, window.innerHeight - bounds.height - margin - 14);
+  mouseObjectLabelEl.style.left = `${Math.max(margin, x)}px`;
+  mouseObjectLabelEl.style.top = `${Math.max(margin, y)}px`;
+}
+
+function hideMouseObjectLabel() {
+  if (!mouseObjectLabelEl) return;
+  mouseObjectLabelEl.classList.add("hidden");
 }
 
 function applyGraphicsSettings(save = true) {

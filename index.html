@@ -16,6 +16,7 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
       <div class="loading-panel">
@@ -231,6 +232,10 @@
       <label class="debug-check">
         <span>Infinite Jump</span>
         <input id="debug-infinite-jump" type="checkbox" />
+      </label>
+      <label class="debug-check">
+        <span>Mouse Object</span>
+        <input id="debug-mouse-object" type="checkbox" />
       </label>
     </section>
 

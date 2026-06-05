@@ -30,6 +30,31 @@ body {
   outline: none;
 }
 
+.mouse-object-label {
+  position: fixed;
+  z-index: 8;
+  min-width: 92px;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 6px;
+  background: rgba(7, 18, 31, 0.86);
+  color: #f8fbff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  pointer-events: none;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+  transform: translate(14px, 14px);
+}
+
+.mouse-object-label.hidden {
+  display: none;
+}
+
 .loading-screen {
   position: fixed;
   inset: 0;
