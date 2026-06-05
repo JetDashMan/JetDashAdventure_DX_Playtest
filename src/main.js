@@ -5654,9 +5654,12 @@ function addStageThreeHarbor() {
 
   const harborEndZ = getStageEndZ(currentStage);
   addHarborDockEdges();
+  addHarborServiceLanes(harborEndZ);
+  addHarborQuayFixtures(harborEndZ);
   addHarborFeatureContainerStacks(harborEndZ);
   addDenseHarborContainers(harborEndZ);
   addHarborSupportDetails(harborEndZ);
+  addHarborPortWorkZones(harborEndZ);
   addHarborLargeShipFleet(harborEndZ);
   addHarborCraneField(harborEndZ);
   addHarborCargoTruckRoutes(harborEndZ);
@@ -5664,25 +5667,26 @@ function addStageThreeHarbor() {
 }
 
 function addHarborFeatureContainerStacks(harborEndZ) {
-  const stackSpacing = 220;
+  const stackSpacing = 420;
   const stackCount = Math.ceil(Math.abs(harborEndZ) / stackSpacing);
   for (let index = 0; index < stackCount; index += 1) {
     const side = index % 2 === 0 ? -1 : 1;
-    const z = -120 - index * stackSpacing;
+    const z = -180 - index * stackSpacing;
     if (z < harborEndZ + 120) break;
-    const x = side * (34 + (index % 4) * 4.0);
-    const layers = 2 + (index % 3 === 1 ? 1 : 0) + (index % 9 === 0 ? 1 : 0);
+    const x = side * (35 + (index % 3) * 4.8);
+    const layers = 2 + (index % 5 === 0 ? 1 : 0);
     addHarborContainerStack(x, z, layers, index);
   }
 }
 
 function addHarborCraneField(harborEndZ) {
-  const craneCount = Math.min(44, Math.ceil(Math.abs(harborEndZ) / 210));
+  const craneSpacing = 360;
+  const craneCount = Math.min(28, Math.ceil(Math.abs(harborEndZ) / craneSpacing));
   Array.from({ length: craneCount }, (_, index) => {
     const side = index % 2 === 0 ? -1 : 1;
     return {
-      x: side * (48 + (index % 3) * 2.4),
-      z: -180 - index * 210,
+      x: side * (49 + (index % 2) * 3.4),
+      z: -240 - index * craneSpacing,
       side,
       phase: index * 0.43,
     };
@@ -5720,8 +5724,8 @@ function addHarborCargoTruckRoutes(harborEndZ) {
 }
 
 function addHarborExcavatorField(harborEndZ) {
-  for (let index = 0; index < 15; index += 1) {
-    const z = -520 - index * 560;
+  for (let index = 0; index < 10; index += 1) {
+    const z = -620 - index * 820;
     if (z < harborEndZ + 160) break;
     const side = index % 2 === 0 ? -1 : 1;
     addHarborExcavator({
@@ -5733,7 +5737,7 @@ function addHarborExcavatorField(harborEndZ) {
 }
 
 function addHarborSupportDetails(harborEndZ) {
-  for (let index = 0, z = -260; z > harborEndZ + 180; index += 1, z -= 360) {
+  for (let index = 0, z = -260; z > harborEndZ + 180; index += 1, z -= 520) {
     const side = index % 2 === 0 ? -1 : 1;
     addHarborWarehouse({ x: side * 50, z: z - 30, side, seed: index });
     addHarborLightPole(side * 13.2, z + 24, 7.2 + (index % 2) * 0.6);
@@ -5751,6 +5755,250 @@ function addHarborSupportDetails(harborEndZ) {
       addHarborServiceGate(z - 210, index);
     }
   }
+}
+
+function addHarborServiceLanes(harborEndZ) {
+  const zStart = -70;
+  const zEnd = harborEndZ + 140;
+  for (const side of [-1, 1]) {
+    const laneCenterX = side * 27.4;
+    const lane = new THREE.Mesh(
+      makeContinuousScenerySideBoxGeometry(laneCenterX, zStart, zEnd, 0.16, 5.4, 0.08, 28),
+      materials.harborRoadAlt,
+    );
+    lane.receiveShadow = true;
+    scene.add(lane);
+
+    for (const stripeOffset of [-2.35, 2.35]) {
+      const stripe = new THREE.Mesh(
+        makeContinuousScenerySideBoxGeometry(laneCenterX + stripeOffset, zStart, zEnd, 0.22, 0.12, 0.04, 34),
+        materials.harborRailStripe,
+      );
+      stripe.receiveShadow = false;
+      scene.add(stripe);
+    }
+  }
+}
+
+function addHarborQuayFixtures(harborEndZ) {
+  for (let index = 0, z = -160; z > harborEndZ + 180; index += 1, z -= 420) {
+    for (const side of [-1, 1]) {
+      const sample = getGroundSample(0, z);
+      if (!sample) continue;
+
+      const group = new THREE.Group();
+      group.userData.debugName = "Harbor Quay Fixtures";
+      setStageObjectTransform(group, new THREE.Vector3(side * 59.2, sample.y, z), 0, 0, true);
+
+      const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.72, 14), materials.craneDark);
+      bollard.position.y = 0.46;
+      bollard.castShadow = false;
+      group.add(bollard);
+
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.16, 14), materials.harborRailStripe);
+      cap.position.y = 0.9;
+      cap.castShadow = false;
+      group.add(cap);
+
+      const fender = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.7, 3.4), materials.containerTrim);
+      fender.position.set(-side * 1.2, 1.0, index % 2 === 0 ? 1.4 : -1.4);
+      fender.castShadow = false;
+      group.add(fender);
+
+      scene.add(group);
+    }
+  }
+}
+
+function addHarborPortWorkZones(harborEndZ) {
+  for (let index = 0, z = -420; z > harborEndZ + 260; index += 1, z -= 760) {
+    const side = index % 2 === 0 ? 1 : -1;
+    addHarborTrailerParking({ x: side * 42, z: z - 80, side, seed: index });
+    addHarborCargoPallets({ x: side * 51, z: z - 205, seed: index });
+    addHarborForklift({ x: -side * 33, z: z - 150, side: -side, seed: index });
+    addHarborHighMastLight(side * 18.6, z + 52, 12.5 + (index % 3) * 1.2);
+    if (index % 2 === 0) {
+      addHarborInspectionBooth({ x: -side * 30.5, z: z + 92, side: -side, seed: index });
+    }
+  }
+}
+
+function addHarborTrailerParking({ x, z, side, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Parked Container Trailers";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const trailerMaterials = [materials.containerBlue, materials.containerGreen, materials.containerRed, materials.truckTrailer];
+  for (let index = 0; index < 4; index += 1) {
+    const trailer = new THREE.Mesh(
+      new THREE.BoxGeometry(2.85, 2.38, 8.8),
+      trailerMaterials[(seed + index) % trailerMaterials.length],
+    );
+    trailer.position.set((index % 2 - 0.5) * 4.0, 1.65, (Math.floor(index / 2) - 0.5) * 11.0);
+    trailer.rotation.y = side * 0.05;
+    trailer.castShadow = false;
+    trailer.receiveShadow = true;
+    group.add(trailer);
+
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.22, 0.38), materials.containerTrim);
+    stand.position.set(trailer.position.x, 0.58, trailer.position.z - 3.4);
+    stand.castShadow = false;
+    group.add(stand);
+
+    for (const wheelX of [-1.52, 1.52]) {
+      const wheel = new THREE.Mesh(harborWheelGeometry, materials.tire);
+      wheel.rotation.z = Math.PI * 0.5;
+      wheel.position.set(trailer.position.x + wheelX, 0.5, trailer.position.z + 3.2);
+      wheel.castShadow = false;
+      group.add(wheel);
+    }
+  }
+
+  scene.add(group);
+}
+
+function addHarborCargoPallets({ x, z, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Port Cargo Pallets";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const crateGeometry = new THREE.BoxGeometry(1.35, 0.82, 1.45);
+  const crateMesh = new THREE.InstancedMesh(crateGeometry, materials.harborDockDark, 16);
+  const instanceObject = new THREE.Object3D();
+  for (let index = 0; index < 16; index += 1) {
+    const row = Math.floor(index / 4);
+    const column = index % 4;
+    const stack = 1 + ((seed + index) % 3);
+    instanceObject.position.set((column - 1.5) * 1.75, 0.45 + stack * 0.25, (row - 1.5) * 1.85);
+    instanceObject.scale.set(1, 0.7 + stack * 0.22, 1);
+    instanceObject.rotation.y = ((seed + index) % 2) * 0.08;
+    instanceObject.updateMatrix();
+    crateMesh.setMatrixAt(index, instanceObject.matrix);
+  }
+  crateMesh.instanceMatrix.needsUpdate = true;
+  crateMesh.castShadow = false;
+  crateMesh.receiveShadow = true;
+  group.add(crateMesh);
+
+  const tarp = new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.16, 7.2), seed % 2 === 0 ? materials.harborRailStripe : materials.containerBlue);
+  tarp.position.y = 1.82;
+  tarp.castShadow = false;
+  group.add(tarp);
+
+  scene.add(group);
+}
+
+function addHarborForklift({ x, z, side, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Port Forklift";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+  group.rotateY(side * (Math.PI * 0.5 + 0.16 * ((seed % 3) - 1)));
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.4, 2.6), materials.excavatorBody);
+  body.position.y = 1.0;
+  body.castShadow = false;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.65, 1.3), materials.craneDark);
+  cabin.position.set(0, 2.1, 0.45);
+  cabin.castShadow = false;
+  group.add(cabin);
+
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.65, 0.18), materials.containerTrim);
+  mast.position.set(0, 1.8, -1.55);
+  mast.castShadow = false;
+  group.add(mast);
+
+  for (const forkX of [-0.42, 0.42]) {
+    const fork = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 2.2), materials.containerTrim);
+    fork.position.set(forkX, 0.42, -2.25);
+    fork.castShadow = false;
+    group.add(fork);
+  }
+
+  for (const wheelX of [-0.95, 0.95]) {
+    for (const wheelZ of [-0.75, 0.9]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.28, 14), materials.tire);
+      wheel.rotation.z = Math.PI * 0.5;
+      wheel.position.set(wheelX, 0.38, wheelZ);
+      wheel.castShadow = false;
+      group.add(wheel);
+    }
+  }
+
+  scene.add(group);
+}
+
+function addHarborHighMastLight(x, z, height) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor High Mast Light";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, height, 10), materials.harborRail);
+  pole.position.y = height * 0.5;
+  pole.castShadow = false;
+  group.add(pole);
+
+  const crown = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.16, 2.8), materials.harborRail);
+  crown.position.y = height;
+  crown.castShadow = false;
+  group.add(crown);
+
+  for (const [lampX, lampZ] of [[1.3, 0], [-1.3, 0], [0, 1.3], [0, -1.3]]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.44), materials.beachLamp);
+    lamp.position.set(lampX, height - 0.22, lampZ);
+    group.add(lamp);
+  }
+
+  scene.add(group);
+}
+
+function addHarborInspectionBooth({ x, z, side, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Port Checkpoint Booth";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+
+  const booth = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.7, 3.0), materials.truckCab);
+  booth.position.y = 1.55;
+  booth.castShadow = false;
+  booth.receiveShadow = true;
+  group.add(booth);
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.75, 0.08), materials.tourBoatGlass);
+  glass.position.set(0, 1.95, -1.54);
+  group.add(glass);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.22, 3.8), materials.harborRailStripe);
+  roof.position.y = 3.0;
+  roof.castShadow = false;
+  group.add(roof);
+
+  const barrierPost = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.2, 0.22), materials.containerTrim);
+  barrierPost.position.set(side * 2.4, 0.62, -1.2);
+  group.add(barrierPost);
+
+  const barrier = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.18, 0.16), seed % 2 === 0 ? materials.harborRailStripe : materials.dashPad);
+  barrier.position.set(side * 5.1, 1.2, -1.2);
+  barrier.rotation.z = side * -0.08;
+  group.add(barrier);
+
+  scene.add(group);
 }
 
 function addHarborLargeShipFleet(harborEndZ) {
@@ -6405,7 +6653,7 @@ function addDenseHarborContainers(harborEndZ = stageEndZ) {
     materials.containerGreen,
   ];
   const chunks = new Map();
-  const xColumns = [-50, -46, -42, -38, -34, 34, 38, 42, 46, 50];
+  const xColumns = [-49, -43.5, -38, 38, 43.5, 49];
   let seed = 0;
 
   const getChunk = (z) => {
@@ -6426,14 +6674,20 @@ function addDenseHarborContainers(harborEndZ = stageEndZ) {
   };
 
   for (let row = 0; ; row += 1) {
-    const z = -42 - row * 30;
+    const z = -52 - row * 48;
     if (z < harborEndZ + 80) break;
+    const yardPhase = ((Math.abs(z) + 120) % 760);
+    const inContainerYard = yardPhase < 285 || (yardPhase > 560 && yardPhase < 650);
+    if (!inContainerYard) continue;
+
     const sample = getGroundSample(0, z);
     if (!sample) continue;
 
     for (let column = 0; column < xColumns.length; column += 1) {
+      if ((row + column) % 7 === 0) continue;
+
       const x = xColumns[column] + ((row + column) % 2 === 0 ? -0.45 : 0.45);
-      const layers = (row + column) % 3 === 0 ? 2 : 1;
+      const layers = (row + column) % 5 === 0 ? 2 : 1;
       for (let layer = 0; layer < layers; layer += 1) {
         const materialIndex = seed % containerMaterials.length;
         const itemZ = z - (column % 3) * 3.4;
