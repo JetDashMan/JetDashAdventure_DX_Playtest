@@ -411,6 +411,9 @@ let boostGauge = boostGaugeMax;
 let boostMotionBlurTarget = 0;
 let boostMotionBlurStrength = 0;
 let playerBoostEffectActive = false;
+let boostCameraKick = 0;
+let boostCameraSustain = 0;
+let boostCameraWasActive = false;
 let cameraYawOffset = 0;
 let cameraPitchOffset = 0;
 let dashPadBoostStartSpeed = 0;
@@ -8066,6 +8069,7 @@ function updateGame(dt) {
     updatePlayer(dt);
     checkGoal();
   } else {
+    updateBoostCameraState(false, dt);
     player.velocity.x *= Math.exp(-3.2 * dt);
     player.velocity.z *= Math.exp(-3.2 * dt);
     player.velocity.y += -33 * dt;
@@ -8091,6 +8095,7 @@ function updatePlayer(dt) {
   const touchBoost = touchControlsEnabled && touchInput.boost && touchInput.autoForward;
   const boosting = !stunned && !brakingInput && (keyboardBoost || touchBoost) && boostGauge > 0;
   playerBoostEffectActive = boosting || debugSuperBoostActive;
+  updateBoostCameraState(playerBoostEffectActive, dt);
   const strafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
   const speedLimit = debugSuperBoostActive ? debugSuperBoostSpeed : maxHorizontalSpeed;
 
@@ -8759,14 +8764,40 @@ function animatePlayerModel(dt) {
   }
 }
 
+function getCameraSpeedEase(speed, scale) {
+  return 1 - Math.exp(-Math.max(0, speed) / scale);
+}
+
+function updateBoostCameraState(boostActive, dt) {
+  if (boostActive && !boostCameraWasActive) {
+    boostCameraKick = 1;
+  }
+
+  boostCameraWasActive = boostActive;
+  boostCameraKick = Math.max(0, boostCameraKick - dt / 0.45);
+
+  const sustainTarget = boostActive ? 1 : 0;
+  const sustainRate = boostActive ? 10 : 7;
+  boostCameraSustain = THREE.MathUtils.lerp(
+    boostCameraSustain,
+    sustainTarget,
+    1 - Math.exp(-sustainRate * dt),
+  );
+}
+
 function updateCamera(dt) {
   updateManualCameraInput(dt);
   const speed = getHorizontalSpeed();
-  const cameraSpeed = Math.min(speed, runTopSpeed * 1.08);
+  const backEase = getCameraSpeedEase(speed, 52);
+  const liftEase = getCameraSpeedEase(speed, 56);
+  const lookAheadEase = getCameraSpeedEase(speed, 64);
+  const fovEase = getCameraSpeedEase(speed, 60);
+  const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
+  const boostCameraSustainEase = boostCameraSustain;
   const frame = getStageFrame(player.position.z);
   const centerWorld = toWorldPosition(new THREE.Vector3(0, player.position.y, player.position.z));
-  const cameraBack = 7.8 + cameraSpeed * 0.028;
-  const cameraLift = 4.2 + cameraSpeed * 0.012;
+  const cameraBack = 3.45 + 0.003515625 * backEase + 3.6 * boostCameraKickEase + 1.0 * boostCameraSustainEase;
+  const cameraLift = 1.875 + 0.00196875 * liftEase + 0.7 * boostCameraKickEase + 0.3 * boostCameraSustainEase;
   const cameraOffset = frame.tangent.clone()
     .multiplyScalar(-cameraBack)
     .addScaledVector(frame.up, cameraLift);
@@ -8776,15 +8807,20 @@ function updateCamera(dt) {
   cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
   const desired = centerWorld.clone().add(cameraOffset);
 
-  camera.position.lerp(desired, 1 - Math.exp(-6.2 * dt));
+  camera.position.lerp(desired, 1 - Math.exp(-14 * dt));
 
   const lookAt = centerWorld.clone()
-    .addScaledVector(frame.tangent, 5.8 + speed * 0.085)
+    .addScaledVector(frame.tangent, 2.4 + 0.0121875 * lookAheadEase + 1.6 * boostCameraKickEase + 0.6 * boostCameraSustainEase)
     .addScaledVector(frame.up, 1.05);
   camera.up.lerp(frame.up, 1 - Math.exp(-5.2 * dt)).normalize();
   camera.lookAt(lookAt);
 
-  const targetFov = 68 + Math.min(cameraSpeed * 0.14, 8) + jumpImpact * 2.5 + quickStepFlash * 1.5;
+  const targetFov = 67
+    + 0.0140625 * fovEase
+    + 8.0 * boostCameraKickEase
+    + 2.4 * boostCameraSustainEase
+    + jumpImpact * 2.5
+    + quickStepFlash * 1.5;
   camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-4.2 * dt));
   camera.updateProjectionMatrix();
 }
@@ -9543,6 +9579,9 @@ function warpToGoalProgress(progress) {
   boostMotionBlurTarget = 0;
   boostMotionBlurStrength = 0;
   playerBoostEffectActive = false;
+  boostCameraKick = 0;
+  boostCameraSustain = 0;
+  boostCameraWasActive = false;
   materials.jetEnergy.opacity = 0;
   boostMotionBlurMaterial.uniforms.uStrength.value = 0;
   if (touchControlsEnabled) resetTouchRunState();
@@ -9586,6 +9625,9 @@ function resetGame(options = {}) {
   boostMotionBlurTarget = 0;
   boostMotionBlurStrength = 0;
   playerBoostEffectActive = false;
+  boostCameraKick = 0;
+  boostCameraSustain = 0;
+  boostCameraWasActive = false;
   materials.jetEnergy.opacity = 0;
   boostMotionBlurMaterial.uniforms.uStrength.value = 0;
   resetCameraView();

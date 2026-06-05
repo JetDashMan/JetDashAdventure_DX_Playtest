@@ -30,6 +30,24 @@ body {
   outline: none;
 }
 
+.build-summary {
+  position: fixed;
+  left: 50%;
+  bottom: max(32px, calc(env(safe-area-inset-bottom) + 26px));
+  z-index: 1;
+  max-width: min(560px, calc(100vw - 28px));
+  padding: 4px 9px;
+  border-radius: 5px;
+  background: rgba(4, 12, 22, 0.38);
+  color: rgba(248, 251, 255, 0.72);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
 .game-version {
   position: fixed;
   left: 50%;
@@ -1048,6 +1066,13 @@ body.touch-enabled:not(.portrait-touch) .game-version {
   bottom: max(6px, env(safe-area-inset-bottom));
   padding: 2px 6px;
   font-size: 0.54rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .build-summary {
+  bottom: max(24px, calc(env(safe-area-inset-bottom) + 19px));
+  max-width: min(520px, calc(100vw - 24px));
+  padding: 3px 7px;
+  font-size: 0.56rem;
 }
 
 body.touch-enabled:not(.portrait-touch) .performance-hud {
