@@ -1379,6 +1379,25 @@ const harborWheelGeometry = new THREE.CylinderGeometry(0.42, 0.42, 0.42, 18);
 const harborAnimatedCranes = [];
 const harborCargoTrucks = [];
 const harborExcavators = [];
+const harborContainerChunks = [];
+const harborContainerChunkSize = 420;
+const harborContainerVisibilityRanges = {
+  low: 1100,
+  medium: 1700,
+  high: 2400,
+  ultra: 3200,
+};
+const harborAnimatedVisibilityRanges = {
+  low: 1000,
+  medium: 1500,
+  high: 2200,
+  ultra: 3000,
+};
+const harborVisibilityState = {
+  frame: 0,
+  lastPlayerZ: Number.NaN,
+  lastViewDistance: "",
+};
 const gwangalliTourBoats = [];
 let harborTime = 0;
 let gwangalliBoatTime = 0;
@@ -6385,9 +6404,26 @@ function addDenseHarborContainers(harborEndZ = stageEndZ) {
     materials.containerYellow,
     materials.containerGreen,
   ];
-  const slots = containerMaterials.map(() => []);
+  const chunks = new Map();
   const xColumns = [-50, -46, -42, -38, -34, 34, 38, 42, 46, 50];
   let seed = 0;
+
+  const getChunk = (z) => {
+    const chunkIndex = Math.floor(Math.max(0, stageStartZ - z) / harborContainerChunkSize);
+    if (!chunks.has(chunkIndex)) {
+      chunks.set(chunkIndex, {
+        index: chunkIndex,
+        minZ: Infinity,
+        maxZ: -Infinity,
+        slots: containerMaterials.map(() => []),
+      });
+    }
+
+    const chunk = chunks.get(chunkIndex);
+    chunk.minZ = Math.min(chunk.minZ, z);
+    chunk.maxZ = Math.max(chunk.maxZ, z);
+    return chunk;
+  };
 
   for (let row = 0; ; row += 1) {
     const z = -42 - row * 30;
@@ -6400,9 +6436,10 @@ function addDenseHarborContainers(harborEndZ = stageEndZ) {
       const layers = (row + column) % 3 === 0 ? 2 : 1;
       for (let layer = 0; layer < layers; layer += 1) {
         const materialIndex = seed % containerMaterials.length;
-        slots[materialIndex].push({
+        const itemZ = z - (column % 3) * 3.4;
+        getChunk(itemZ).slots[materialIndex].push({
           x,
-          z: z - (column % 3) * 3.4,
+          z: itemZ,
           y: sample.y + harborContainerSize.height * 0.5 + layer * (harborContainerSize.height + harborContainerSize.stackGap),
           rotationY: (row + column + layer) % 4 === 0 ? Math.PI * 0.5 : 0,
         });
@@ -6412,23 +6449,46 @@ function addDenseHarborContainers(harborEndZ = stageEndZ) {
   }
 
   const instanceObject = new THREE.Object3D();
-  slots.forEach((items, materialIndex) => {
-    const mesh = new THREE.InstancedMesh(harborContainerGeometry, containerMaterials[materialIndex], items.length);
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    items.forEach((item, index) => {
-      const frame = getStageFrame(item.z, true);
-      instanceObject.position.copy(frame.center)
-        .addScaledVector(frame.right, item.x)
-        .addScaledVector(frame.up, item.y);
-      instanceObject.quaternion.copy(getStageQuaternion(frame));
-      instanceObject.rotateY(item.rotationY);
-      instanceObject.updateMatrix();
-      mesh.setMatrixAt(index, instanceObject.matrix);
+  Array.from(chunks.values())
+    .sort((a, b) => a.index - b.index)
+    .forEach((chunk) => {
+      const group = new THREE.Group();
+      group.name = `Harbor Container Chunk ${chunk.index}`;
+
+      chunk.slots.forEach((items, materialIndex) => {
+        if (items.length === 0) return;
+
+        const mesh = new THREE.InstancedMesh(harborContainerGeometry, containerMaterials[materialIndex], items.length);
+        mesh.name = "Harbor Container Instances";
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+        items.forEach((item, index) => {
+          const frame = getStageFrame(item.z, true);
+          instanceObject.position.copy(frame.center)
+            .addScaledVector(frame.right, item.x)
+            .addScaledVector(frame.up, item.y);
+          instanceObject.quaternion.copy(getStageQuaternion(frame));
+          instanceObject.rotateY(item.rotationY);
+          instanceObject.updateMatrix();
+          mesh.setMatrixAt(index, instanceObject.matrix);
+        });
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingBox?.();
+        mesh.computeBoundingSphere?.();
+        group.add(mesh);
+      });
+
+      if (group.children.length === 0) return;
+
+      scene.add(group);
+      harborContainerChunks.push({
+        group,
+        minZ: chunk.minZ,
+        maxZ: chunk.maxZ,
+      });
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    scene.add(mesh);
-  });
+
+  updateHarborVisibility(true);
 }
 
 function createHarborContainer(seed) {
@@ -6583,7 +6643,7 @@ function addHarborCrane({ x, z, side, phase }) {
   group.add(boomPivot);
 
   scene.add(group);
-  harborAnimatedCranes.push({ boomPivot, trolley, side, phase, trolleyBase: 10.5, trolleyRange: 8.0 });
+  harborAnimatedCranes.push({ group, z, boomPivot, trolley, side, phase, trolleyBase: 10.5, trolleyRange: 8.0 });
 }
 
 function addHarborCargoTruck({ x, zStart, zEnd, z, direction, speed, material }) {
@@ -6719,14 +6779,79 @@ function addHarborExcavator({ x, z, phase }) {
   group.add(bodyPivot);
 
   scene.add(group);
-  harborExcavators.push({ bodyPivot, armPivot, phase });
+  harborExcavators.push({ group, z, bodyPivot, armPivot, phase });
+}
+
+function updateHarborVisibility(force = false) {
+  if (!currentStage.harborTheme) return;
+
+  harborVisibilityState.frame += 1;
+  const playerZ = player.position.z;
+  const viewDistance = graphicsSettings.viewDistance;
+  const needsUpdate = force
+    || harborVisibilityState.frame % 8 === 0
+    || Math.abs(playerZ - harborVisibilityState.lastPlayerZ) > 70
+    || viewDistance !== harborVisibilityState.lastViewDistance;
+  if (!needsUpdate) return;
+
+  harborVisibilityState.lastPlayerZ = playerZ;
+  harborVisibilityState.lastViewDistance = viewDistance;
+
+  const containerForwardRange = harborContainerVisibilityRanges[viewDistance] ?? harborContainerVisibilityRanges.high;
+  const containerBackwardRange = Math.min(900, containerForwardRange * 0.45);
+  for (const chunk of harborContainerChunks) {
+    chunk.group.visible = isHarborZRangeVisible(
+      chunk.minZ,
+      chunk.maxZ,
+      playerZ,
+      containerForwardRange,
+      containerBackwardRange,
+    );
+  }
+
+  const animatedForwardRange = harborAnimatedVisibilityRanges[viewDistance] ?? harborAnimatedVisibilityRanges.high;
+  const animatedBackwardRange = Math.min(700, animatedForwardRange * 0.35);
+  for (const crane of harborAnimatedCranes) {
+    crane.active = isHarborZVisible(crane.z, playerZ, animatedForwardRange, animatedBackwardRange);
+    crane.group.visible = crane.active;
+  }
+  for (const truck of harborCargoTrucks) {
+    truck.active = isHarborZVisible(truck.z, playerZ, animatedForwardRange, animatedBackwardRange);
+    truck.mesh.visible = truck.active;
+  }
+  for (const excavator of harborExcavators) {
+    excavator.active = isHarborZVisible(excavator.z, playerZ, animatedForwardRange, animatedBackwardRange);
+    excavator.group.visible = excavator.active;
+  }
+}
+
+function isHarborZVisible(z, playerZ, forwardRange, backwardRange) {
+  return z >= playerZ - forwardRange && z <= playerZ + backwardRange;
+}
+
+function isHarborZRangeVisible(minZ, maxZ, playerZ, forwardRange, backwardRange) {
+  return maxZ >= playerZ - forwardRange && minZ <= playerZ + backwardRange;
+}
+
+function advanceHarborTruckRoute(truck, dt) {
+  truck.z += truck.direction * truck.speed * dt;
+  if (truck.z < truck.minZ) {
+    truck.z = truck.minZ;
+    truck.direction = 1;
+  } else if (truck.z > truck.maxZ) {
+    truck.z = truck.maxZ;
+    truck.direction = -1;
+  }
 }
 
 function updateStageThreeHarbor(dt) {
   if (!currentStage.harborTheme) return;
 
   harborTime += dt;
+  updateHarborVisibility();
+
   for (const crane of harborAnimatedCranes) {
+    if (!crane.active) continue;
     crane.boomPivot.rotation.y = Math.sin(harborTime * 0.48 + crane.phase) * 0.045;
     crane.trolley.position.x = -crane.side * (
       (crane.trolleyBase ?? 4.2) + Math.sin(harborTime * 0.78 + crane.phase) * (crane.trolleyRange ?? 3.3)
@@ -6734,14 +6859,8 @@ function updateStageThreeHarbor(dt) {
   }
 
   for (const truck of harborCargoTrucks) {
-    truck.z += truck.direction * truck.speed * dt;
-    if (truck.z < truck.minZ) {
-      truck.z = truck.minZ;
-      truck.direction = 1;
-    } else if (truck.z > truck.maxZ) {
-      truck.z = truck.maxZ;
-      truck.direction = -1;
-    }
+    advanceHarborTruckRoute(truck, dt);
+    if (!truck.active) continue;
     for (const wheel of truck.wheels) {
       wheel.rotation.x += truck.direction * truck.speed * dt * 0.28;
     }
@@ -6749,6 +6868,7 @@ function updateStageThreeHarbor(dt) {
   }
 
   for (const excavator of harborExcavators) {
+    if (!excavator.active) continue;
     excavator.bodyPivot.rotation.y = Math.sin(harborTime * 0.34 + excavator.phase) * 0.28;
     excavator.armPivot.rotation.x = -0.18 + Math.sin(harborTime * 0.72 + excavator.phase) * 0.18;
   }
@@ -8788,6 +8908,7 @@ function applyGraphicsSettings(save = true) {
   applyRealtimeMaterialTextureSettings();
   applyShadowSettings();
   applyViewDistanceSettings();
+  updateHarborVisibility(true);
   applySkyTextureSettings();
   applyLightingSettings();
   applyWaterSettings();
@@ -9028,6 +9149,7 @@ function warpToGoalProgress(progress) {
   player.velocity.set(0, 0, 0);
   player.grounded = true;
   resetCameraView();
+  updateHarborVisibility(true);
   clearLooseDnaItems();
   finishEl.classList.add("hidden");
   updateHud();
@@ -9128,6 +9250,7 @@ function resetGame(options = {}) {
   const startFrame = getStageFrame(stageStartZ);
   camera.up.copy(startFrame.up);
   camera.position.copy(toWorldPosition(new THREE.Vector3(0, 5.3, stageStartZ + 8)));
+  updateHarborVisibility(true);
   updateHud();
 }
 
