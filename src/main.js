@@ -8707,11 +8707,11 @@ function animatePlayerModel(dt) {
 
   const swing = Math.sin(runPhase) * 0.82 * runAmount;
   const counterSwing = Math.sin(runPhase + Math.PI) * 0.82 * runAmount;
-  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.12;
+  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.05;
   const airborne = !player.grounded;
 
   player.parts.model.position.y = 0.1
-    + (moving && player.grounded ? Math.abs(Math.sin(runPhase * 2)) * 0.035 : 0)
+    + (moving && player.grounded ? Math.abs(Math.sin(runPhase * 2)) * 0.008 : 0)
     + (airborne ? 0.04 : 0);
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
     player.parts.model.rotation.x,
