@@ -68,6 +68,7 @@ const debugControls = {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x75cbef);
 scene.fog = new THREE.Fog(0x75cbef, 140, 3050);
+const quickStepAfterimageScene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(71, 1, 0.1, 3400);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -244,6 +245,10 @@ const debugDefaults = {
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
 let lastFrameTime = 0;
+const quickStepAfterimageCount = 9;
+const quickStepAfterimageRevealLead = 0.08;
+const quickStepAfterimageBlurRadius = 12;
+const quickStepAfterimageBlurIntensity = 1.35;
 
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
@@ -251,16 +256,27 @@ const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   samples: renderer.capabilities.isWebGL2 ? 2 : 0,
 });
 sceneRenderTarget.texture.name = "BoostMotionBlurTarget";
+const quickStepAfterimageRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
+  depthBuffer: true,
+  stencilBuffer: false,
+});
+quickStepAfterimageRenderTarget.texture.name = "QuickStepAfterimageTarget";
+const quickStepAfterimageBlurTarget = new THREE.WebGLRenderTarget(1, 1, {
+  depthBuffer: false,
+  stencilBuffer: false,
+});
+quickStepAfterimageBlurTarget.texture.name = "QuickStepAfterimageLinearBlurTarget";
+const renderClearColorScratch = new THREE.Color();
 
 const postScene = new THREE.Scene();
 const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
-const boostMotionBlurMaterial = new THREE.ShaderMaterial({
-  name: "BoostMotionBlurMaterial",
+const quickStepAfterimageBlurScene = new THREE.Scene();
+const quickStepAfterimageBlurMaterial = new THREE.ShaderMaterial({
+  name: "QuickStepAfterimageLinearBlurMaterial",
   uniforms: {
-    tDiffuse: { value: sceneRenderTarget.texture },
-    uStrength: { value: 0 },
-    uAspect: { value: 1 },
-    uCenter: { value: new THREE.Vector2(0.5, 0.54) },
+    tDiffuse: { value: quickStepAfterimageRenderTarget.texture },
+    uTexelSize: { value: new THREE.Vector2(1, 1) },
+    uRadius: { value: quickStepAfterimageBlurRadius },
   },
   depthTest: false,
   depthWrite: false,
@@ -275,16 +291,67 @@ const boostMotionBlurMaterial = new THREE.ShaderMaterial({
   `,
   fragmentShader: `
     uniform sampler2D tDiffuse;
+    uniform vec2 uTexelSize;
+    uniform float uRadius;
+
+    varying vec2 vUv;
+
+    void main() {
+      vec2 stepUv = vec2(uTexelSize.x * uRadius, 0.0);
+      vec4 color = texture2D(tDiffuse, vUv) * 0.18;
+      color += texture2D(tDiffuse, vUv - stepUv * 0.22) * 0.15;
+      color += texture2D(tDiffuse, vUv + stepUv * 0.22) * 0.15;
+      color += texture2D(tDiffuse, vUv - stepUv * 0.48) * 0.12;
+      color += texture2D(tDiffuse, vUv + stepUv * 0.48) * 0.12;
+      color += texture2D(tDiffuse, vUv - stepUv * 0.78) * 0.09;
+      color += texture2D(tDiffuse, vUv + stepUv * 0.78) * 0.09;
+      color += texture2D(tDiffuse, vUv - stepUv * 1.12) * 0.06;
+      color += texture2D(tDiffuse, vUv + stepUv * 1.12) * 0.06;
+      color += texture2D(tDiffuse, vUv - stepUv * 1.5) * 0.035;
+      color += texture2D(tDiffuse, vUv + stepUv * 1.5) * 0.035;
+      gl_FragColor = color;
+    }
+  `,
+});
+const quickStepAfterimageBlurQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), quickStepAfterimageBlurMaterial);
+quickStepAfterimageBlurQuad.frustumCulled = false;
+quickStepAfterimageBlurScene.add(quickStepAfterimageBlurQuad);
+const boostMotionBlurMaterial = new THREE.ShaderMaterial({
+  name: "BoostMotionBlurMaterial",
+  uniforms: {
+    tDiffuse: { value: sceneRenderTarget.texture },
+    tAfterimage: { value: quickStepAfterimageBlurTarget.texture },
+    uStrength: { value: 0 },
+    uAspect: { value: 1 },
+    uCenter: { value: new THREE.Vector2(0.5, 0.54) },
+    uAfterimageIntensity: { value: quickStepAfterimageBlurIntensity },
+  },
+  depthTest: false,
+  depthWrite: false,
+  toneMapped: false,
+  vertexShader: `
+    varying vec2 vUv;
+
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tAfterimage;
     uniform float uStrength;
     uniform float uAspect;
+    uniform float uAfterimageIntensity;
     uniform vec2 uCenter;
 
     varying vec2 vUv;
 
     void main() {
       vec4 baseColor = texture2D(tDiffuse, vUv);
+      vec4 afterimageColor = texture2D(tAfterimage, vUv);
       if (uStrength <= 0.001) {
-        gl_FragColor = baseColor;
+        gl_FragColor = vec4(baseColor.rgb + afterimageColor.rgb * uAfterimageIntensity, baseColor.a);
         #include <colorspace_fragment>
         return;
       }
@@ -306,6 +373,7 @@ const boostMotionBlurMaterial = new THREE.ShaderMaterial({
 
       float blurMix = edgeAmount * clamp(uStrength * 0.34, 0.0, 0.68);
       vec4 color = vec4(mix(baseColor.rgb, blurredColor.rgb, blurMix), baseColor.a);
+      color.rgb += afterimageColor.rgb * uAfterimageIntensity;
 
       gl_FragColor = color;
       #include <colorspace_fragment>
@@ -353,7 +421,7 @@ const stageCurve = createStageCurve(currentStage.curvePoints);
 const rollClearStartZ = currentStage.rollClearStartZ;
 const rollClearEndZ = currentStage.rollClearEndZ;
 const rollLiftHeight = currentStage.rollLiftHeight;
-const quickStepDuration = 0.1;
+const quickStepDuration = 0.2;
 const quickStepDistance = 4.2;
 const quickStepCooldownDuration = 0.015;
 const quickStepLaneSnapEpsilon = 0.05;
@@ -384,7 +452,7 @@ const dnaItems = [];
 const dashPads = [];
 const obstacles = [];
 const looseDnaItems = [];
-const trail = [];
+const quickStepAfterimages = [];
 const staticStageFrameCache = new Map();
 const staticStageSceneryFrameCache = new Map();
 let waterMesh;
@@ -1433,7 +1501,7 @@ function init() {
   addObstacles();
   addGoal();
   addPlayer();
-  addTrail();
+  addQuickStepAfterimages();
   bindInput();
   applyGraphicsSettings(false);
   syncGraphicsControls();
@@ -7748,19 +7816,184 @@ function createLeg(side, energyLines) {
   return leg;
 }
 
-function addTrail() {
-  const geometry = new THREE.SphereGeometry(0.5, 18, 12);
-  for (let i = 0; i < 18; i += 1) {
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x91e9ff,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
+function addQuickStepAfterimages() {
+  if (!player.mesh) return;
+
+  for (let i = 0; i < quickStepAfterimageCount; i += 1) {
+    const mesh = player.mesh.clone(true);
+    const sourceObjects = [];
+    const cloneObjects = [];
+    const afterimageMaterials = [];
+
+    player.mesh.traverse((object) => sourceObjects.push(object));
+    mesh.traverse((object) => cloneObjects.push(object));
+
+    for (let objectIndex = 0; objectIndex < cloneObjects.length; objectIndex += 1) {
+      const sourceObject = sourceObjects[objectIndex];
+      const cloneObject = cloneObjects[objectIndex];
+
+      cloneObject.frustumCulled = false;
+      cloneObject.castShadow = false;
+      cloneObject.receiveShadow = false;
+
+      if (!cloneObject.isMesh) continue;
+
+      if (Array.isArray(cloneObject.material)) {
+        cloneObject.material = cloneObject.material.map((material) => {
+          const afterimageMaterial = createQuickStepAfterimageMaterial(material);
+          afterimageMaterials.push(afterimageMaterial);
+          return afterimageMaterial;
+        });
+      } else {
+        const afterimageMaterial = createQuickStepAfterimageMaterial(sourceObject?.material);
+        cloneObject.material = afterimageMaterial;
+        afterimageMaterials.push(afterimageMaterial);
+      }
+    }
+
+    mesh.visible = false;
+    mesh.renderOrder = 10;
+    quickStepAfterimageScene.add(mesh);
+    quickStepAfterimages.push({
+      mesh,
+      sourceObjects,
+      cloneObjects,
+      materials: afterimageMaterials,
+      localPosition: new THREE.Vector3(),
+      life: 0,
+      maxLife: 0,
+      baseOpacity: 0,
+      scaleX: 1,
+      scaleY: 1,
+      zRotation: 0,
+      direction: 0,
+      zOffset: 0,
+      pathProgress: 0,
+      revealed: false,
     });
-    const ghost = new THREE.Mesh(geometry, material);
-    ghost.visible = false;
-    scene.add(ghost);
-    trail.push({ mesh: ghost, life: 0 });
+  }
+}
+
+function createQuickStepAfterimageMaterial(sourceMaterial) {
+  const source = Array.isArray(sourceMaterial) ? sourceMaterial[0] : sourceMaterial;
+  const color = source?.color?.clone?.() ?? new THREE.Color(0xffffff);
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  if (source?.vertexColors) {
+    material.vertexColors = source.vertexColors;
+  }
+  return material;
+}
+
+function syncQuickStepAfterimagePose(afterimage) {
+  for (let i = 1; i < afterimage.cloneObjects.length; i += 1) {
+    const sourceObject = afterimage.sourceObjects[i];
+    const cloneObject = afterimage.cloneObjects[i];
+    if (!sourceObject || !cloneObject) continue;
+
+    cloneObject.position.copy(sourceObject.position);
+    cloneObject.quaternion.copy(sourceObject.quaternion);
+    cloneObject.scale.copy(sourceObject.scale);
+    cloneObject.visible = sourceObject.visible;
+  }
+}
+
+function setQuickStepAfterimageOpacity(afterimage, opacity) {
+  for (const material of afterimage.materials) {
+    material.opacity = opacity;
+  }
+}
+
+function applyQuickStepAfterimageTransform(afterimage) {
+  setStageObjectTransform(afterimage.mesh, afterimage.localPosition);
+  afterimage.mesh.rotateY(player.yaw);
+  afterimage.mesh.rotateZ(afterimage.zRotation);
+  afterimage.mesh.scale.set(afterimage.scaleX, afterimage.scaleY, 1);
+}
+
+function spawnQuickStepAfterimages(direction) {
+  const laneDirection = Math.sign(direction);
+  if (laneDirection === 0) return;
+
+  for (let i = 0; i < quickStepAfterimages.length; i += 1) {
+    const afterimage = quickStepAfterimages[i];
+    const progress = quickStepAfterimages.length > 1 ? i / (quickStepAfterimages.length - 1) : 0;
+    const centerWeight = 1 - Math.abs(progress - 0.5) * 1.55;
+    const clampedCenterWeight = THREE.MathUtils.clamp(centerWeight, 0, 1);
+    const x = THREE.MathUtils.lerp(quickStepStartX, quickStepTargetX, progress);
+    const opacity = 0.34 + clampedCenterWeight * 0.24;
+    const scaleX = 1.0 + clampedCenterWeight * 1.45;
+    const scaleY = 0.92 + clampedCenterWeight * 0.1;
+    const z = 0.08 - progress * 0.04;
+
+    syncQuickStepAfterimagePose(afterimage);
+    afterimage.localPosition.set(x, player.position.y, player.position.z + z);
+    afterimage.life = quickStepDuration;
+    afterimage.maxLife = quickStepDuration;
+    afterimage.baseOpacity = opacity;
+    afterimage.scaleX = scaleX;
+    afterimage.scaleY = scaleY;
+    afterimage.zRotation = -laneDirection * (0.05 + progress * 0.10);
+    afterimage.direction = laneDirection;
+    afterimage.zOffset = z;
+    afterimage.pathProgress = progress;
+    afterimage.revealed = false;
+    applyQuickStepAfterimageTransform(afterimage);
+    setQuickStepAfterimageOpacity(afterimage, 0);
+    afterimage.mesh.visible = false;
+  }
+}
+
+function updateQuickStepAfterimages() {
+  const quickStepActive = quickStepTimer > 0;
+  const quickStepRawProgress = quickStepActive ? 1 - quickStepTimer / quickStepDuration : 1;
+  const quickStepProgress = 1 - Math.pow(
+    1 - THREE.MathUtils.clamp(quickStepRawProgress, 0, 1),
+    3,
+  );
+  const revealProgress = Math.min(1, quickStepProgress + quickStepAfterimageRevealLead);
+
+  for (const afterimage of quickStepAfterimages) {
+    if (!quickStepActive) {
+      afterimage.life = 0;
+      afterimage.revealed = false;
+      afterimage.mesh.visible = false;
+      setQuickStepAfterimageOpacity(afterimage, 0);
+      continue;
+    }
+
+    if (!afterimage.revealed && revealProgress >= afterimage.pathProgress) {
+      afterimage.revealed = true;
+      afterimage.mesh.visible = true;
+    }
+
+    if (!afterimage.revealed || afterimage.life <= 0) {
+      afterimage.mesh.visible = false;
+      setQuickStepAfterimageOpacity(afterimage, 0);
+      continue;
+    }
+
+    afterimage.localPosition.y = player.position.y;
+    afterimage.localPosition.z = player.position.z + afterimage.zOffset;
+    applyQuickStepAfterimageTransform(afterimage);
+    setQuickStepAfterimageOpacity(afterimage, afterimage.baseOpacity);
+    afterimage.mesh.visible = true;
+  }
+}
+
+function clearQuickStepAfterimages() {
+  for (const afterimage of quickStepAfterimages) {
+    afterimage.life = 0;
+    afterimage.revealed = false;
+    afterimage.mesh.visible = false;
+    setQuickStepAfterimageOpacity(afterimage, 0);
   }
 }
 
@@ -8077,7 +8310,7 @@ function updateGame(dt) {
     snapToGround();
   }
 
-  updateTrail(dt);
+  updateQuickStepAfterimages(dt);
   updateTutorialPrompt();
   updateHud();
 }
@@ -8167,7 +8400,6 @@ function updatePlayer(dt) {
     player.grounded = false;
     jumpHoldRemaining = 0.075;
     jumpImpact = 1;
-    spawnTrailBurst();
   }
   jumpQueued = false;
 
@@ -8265,8 +8497,8 @@ function startQuickStep(direction) {
   quickStepTimer = quickStepDuration;
   quickStepCooldown = quickStepCooldownDuration;
   quickStepFlash = 1;
+  spawnQuickStepAfterimages(laneDirection);
   player.velocity.x = laneDirection * 36;
-  spawnTrailBurst();
 }
 
 function getQuickStepTargetX(direction, halfWidth) {
@@ -8337,7 +8569,6 @@ function triggerDashPad(pad) {
   pad.cooldown = 0.9;
   quickStepFlash = 1;
   pulseDashPad(pad.mesh);
-  spawnTrailBurst();
 }
 
 function pulseDashPad(mesh) {
@@ -8676,10 +8907,28 @@ function renderFrame() {
   updateSkyDome();
   boostMotionBlurMaterial.uniforms.uStrength.value = boostMotionBlurStrength;
   boostMotionBlurMaterial.uniforms.tDiffuse.value = sceneRenderTarget.texture;
+  boostMotionBlurMaterial.uniforms.tAfterimage.value = quickStepAfterimageBlurTarget.texture;
+  boostMotionBlurMaterial.uniforms.uAfterimageIntensity.value = quickStepAfterimageBlurIntensity;
+  quickStepAfterimageBlurMaterial.uniforms.tDiffuse.value = quickStepAfterimageRenderTarget.texture;
+  quickStepAfterimageBlurMaterial.uniforms.uRadius.value = quickStepAfterimageBlurRadius;
+
+  const clearColor = renderer.getClearColor(renderClearColorScratch);
+  const clearAlpha = renderer.getClearAlpha();
 
   renderer.info.reset();
   renderer.setRenderTarget(sceneRenderTarget);
   renderer.render(scene, camera);
+
+  renderer.setClearColor(0x000000, 0);
+  renderer.setRenderTarget(quickStepAfterimageRenderTarget);
+  renderer.clear(true, true, true);
+  renderer.render(quickStepAfterimageScene, camera);
+
+  renderer.setRenderTarget(quickStepAfterimageBlurTarget);
+  renderer.clear(true, false, false);
+  renderer.render(quickStepAfterimageBlurScene, postCamera);
+
+  renderer.setClearColor(clearColor, clearAlpha);
   renderer.setRenderTarget(null);
   renderer.render(postScene, postCamera);
 }
@@ -8707,7 +8956,7 @@ function animatePlayerModel(dt) {
 
   const swing = Math.sin(runPhase) * 0.82 * runAmount;
   const counterSwing = Math.sin(runPhase + Math.PI) * 0.82 * runAmount;
-  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.05;
+  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.30;
   const airborne = !player.grounded;
 
   player.parts.model.position.y = 0.1
@@ -8764,9 +9013,26 @@ function animatePlayerModel(dt) {
   }
 }
 
-function getCameraSpeedEase(speed, scale) {
-  return 1 - Math.exp(-Math.max(0, speed) / scale);
-}
+const runCameraPreset = Object.freeze({
+  back: 3.45,
+  lift: 1.875,
+  lookAhead: 2.4,
+  fov: 67,
+});
+
+const boostCameraKickPreset = Object.freeze({
+  back: 3.6,
+  lift: 0.7,
+  lookAhead: 1.6,
+  fov: 8.0,
+});
+
+const boostCameraHoldPreset = Object.freeze({
+  back: 1.0,
+  lift: 0.3,
+  lookAhead: 0.6,
+  fov: 2.4,
+});
 
 function updateBoostCameraState(boostActive, dt) {
   if (boostActive && !boostCameraWasActive) {
@@ -8787,17 +9053,16 @@ function updateBoostCameraState(boostActive, dt) {
 
 function updateCamera(dt) {
   updateManualCameraInput(dt);
-  const speed = getHorizontalSpeed();
-  const backEase = getCameraSpeedEase(speed, 52);
-  const liftEase = getCameraSpeedEase(speed, 56);
-  const lookAheadEase = getCameraSpeedEase(speed, 64);
-  const fovEase = getCameraSpeedEase(speed, 60);
   const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
   const boostCameraSustainEase = boostCameraSustain;
   const frame = getStageFrame(player.position.z);
   const centerWorld = toWorldPosition(new THREE.Vector3(0, player.position.y, player.position.z));
-  const cameraBack = 3.45 + 0.003515625 * backEase + 3.6 * boostCameraKickEase + 1.0 * boostCameraSustainEase;
-  const cameraLift = 1.875 + 0.00196875 * liftEase + 0.7 * boostCameraKickEase + 0.3 * boostCameraSustainEase;
+  const cameraBack = runCameraPreset.back
+    + boostCameraKickPreset.back * boostCameraKickEase
+    + boostCameraHoldPreset.back * boostCameraSustainEase;
+  const cameraLift = runCameraPreset.lift
+    + boostCameraKickPreset.lift * boostCameraKickEase
+    + boostCameraHoldPreset.lift * boostCameraSustainEase;
   const cameraOffset = frame.tangent.clone()
     .multiplyScalar(-cameraBack)
     .addScaledVector(frame.up, cameraLift);
@@ -8810,15 +9075,19 @@ function updateCamera(dt) {
   camera.position.lerp(desired, 1 - Math.exp(-14 * dt));
 
   const lookAt = centerWorld.clone()
-    .addScaledVector(frame.tangent, 2.4 + 0.0121875 * lookAheadEase + 1.6 * boostCameraKickEase + 0.6 * boostCameraSustainEase)
+    .addScaledVector(
+      frame.tangent,
+      runCameraPreset.lookAhead
+        + boostCameraKickPreset.lookAhead * boostCameraKickEase
+        + boostCameraHoldPreset.lookAhead * boostCameraSustainEase,
+    )
     .addScaledVector(frame.up, 1.05);
   camera.up.lerp(frame.up, 1 - Math.exp(-5.2 * dt)).normalize();
   camera.lookAt(lookAt);
 
-  const targetFov = 67
-    + 0.0140625 * fovEase
-    + 8.0 * boostCameraKickEase
-    + 2.4 * boostCameraSustainEase
+  const targetFov = runCameraPreset.fov
+    + boostCameraKickPreset.fov * boostCameraKickEase
+    + boostCameraHoldPreset.fov * boostCameraSustainEase
     + jumpImpact * 2.5
     + quickStepFlash * 1.5;
   camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-4.2 * dt));
@@ -8846,40 +9115,6 @@ function updateManualCameraInput(dt) {
 function resetCameraView() {
   cameraYawOffset = 0;
   cameraPitchOffset = 0;
-}
-
-function updateTrail(dt) {
-  if (getHorizontalSpeed() > 18 && Math.random() > 0.25) {
-    const ghost = trail.reduce((oldest, item) => (item.life < oldest.life ? item : oldest), trail[0]);
-    setStageObjectTransform(ghost.mesh, player.position);
-    ghost.mesh.scale.setScalar(0.88);
-    ghost.mesh.material.opacity = 0.32;
-    ghost.mesh.visible = true;
-    ghost.life = 0.46;
-  }
-
-  for (const ghost of trail) {
-    if (ghost.life <= 0) {
-      ghost.mesh.visible = false;
-      continue;
-    }
-    ghost.life -= dt;
-    ghost.mesh.material.opacity = Math.max(0, ghost.life * 0.65);
-    ghost.mesh.scale.multiplyScalar(1 + dt * 1.5);
-  }
-}
-
-function spawnTrailBurst() {
-  for (let i = 0; i < 5; i += 1) {
-    const ghost = trail[i];
-    const localPosition = player.position.clone();
-    localPosition.z += i * 0.45;
-    setStageObjectTransform(ghost.mesh, localPosition);
-    ghost.mesh.material.opacity = 0.42;
-    ghost.mesh.scale.setScalar(1 + i * 0.1);
-    ghost.mesh.visible = true;
-    ghost.life = 0.42 + i * 0.04;
-  }
 }
 
 function setPaused(paused, reason = "manual") {
@@ -9575,6 +9810,7 @@ function warpToGoalProgress(progress) {
   quickStepQueued = 0;
   quickStepTimer = 0;
   quickStepCooldown = 0;
+  clearQuickStepAfterimages();
   dashPadBoostRemaining = 0;
   boostMotionBlurTarget = 0;
   boostMotionBlurStrength = 0;
@@ -9621,6 +9857,7 @@ function resetGame(options = {}) {
   quickStepStartX = 0;
   quickStepTargetX = 0;
   quickStepFlash = 0;
+  clearQuickStepAfterimages();
   boostGauge = boostGaugeMax;
   boostMotionBlurTarget = 0;
   boostMotionBlurStrength = 0;
@@ -9746,9 +9983,11 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
   const pixelRatio = renderer.getPixelRatio();
-  sceneRenderTarget.setSize(
-    Math.max(1, Math.floor(width * pixelRatio)),
-    Math.max(1, Math.floor(height * pixelRatio)),
-  );
+  const targetWidth = Math.max(1, Math.floor(width * pixelRatio));
+  const targetHeight = Math.max(1, Math.floor(height * pixelRatio));
+  sceneRenderTarget.setSize(targetWidth, targetHeight);
+  quickStepAfterimageRenderTarget.setSize(targetWidth, targetHeight);
+  quickStepAfterimageBlurTarget.setSize(targetWidth, targetHeight);
+  quickStepAfterimageBlurMaterial.uniforms.uTexelSize.value.set(1 / targetWidth, 1 / targetHeight);
   boostMotionBlurMaterial.uniforms.uAspect.value = camera.aspect;
 }
