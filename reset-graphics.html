@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JetDashAdventure_DX Graphics Reset</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Arial, "Noto Sans KR", sans-serif;
+        background: #111820;
+        color: #f2f7fb;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+
+      main {
+        width: min(560px, 100%);
+        background: #172331;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(24px, 5vw, 34px);
+        line-height: 1.1;
+      }
+
+      p {
+        margin: 0 0 14px;
+        color: #c9d8e6;
+        line-height: 1.55;
+      }
+
+      .status {
+        margin: 18px 0;
+        padding: 12px 14px;
+        border-radius: 6px;
+        background: rgba(45, 180, 122, 0.14);
+        color: #9ff0c5;
+        font-weight: 700;
+      }
+
+      .actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      a,
+      button {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 44px;
+        border: 0;
+        border-radius: 6px;
+        background: #2d7ef7;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      button {
+        background: #263849;
+      }
+
+      small {
+        display: block;
+        margin-top: 16px;
+        color: #91a4b6;
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Graphics Reset</h1>
+      <p>이 페이지는 Three.js와 WebGL을 실행하지 않고 저장된 그래픽 설정만 안전하게 초기화합니다.</p>
+      <p>모바일에서 Ultra 설정 후 Chrome이 계속 종료될 때 이 페이지를 먼저 열어주세요.</p>
+      <div id="status" class="status">그래픽 설정을 Low 안전 설정으로 저장했습니다.</div>
+      <div class="actions">
+        <a href="./?stage=2&safeGraphics=1&v=graphics-recovery">Stage 2 안전 모드로 실행</a>
+        <a href="./?stage=1&safeGraphics=1&v=graphics-recovery">Stage 1 안전 모드로 실행</a>
+        <button id="reset-again" type="button">다시 초기화</button>
+      </div>
+      <small>그래도 Chrome이 종료되면 Chrome 사이트 설정에서 jetdashman.github.io 저장 데이터를 삭제한 뒤 다시 접속하세요.</small>
+    </main>
+
+    <script>
+      const graphicsStorageKey = "jetdash-graphics-settings";
+      const safeGraphicsSettings = {
+        preset: "low",
+        renderScale: "0.75",
+        mobileRenderScale: "0.75",
+        shadowQuality: "off",
+        shadowSoftness: "hard",
+        motionBlur: "off",
+        textureQuality: "low",
+        waterQuality: "low",
+        viewDistance: "low",
+        lighting: "standard",
+        frameCap: "60",
+      };
+
+      function resetGraphicsSettings() {
+        window.localStorage.removeItem(graphicsStorageKey);
+        window.localStorage.setItem(graphicsStorageKey, JSON.stringify(safeGraphicsSettings));
+        document.querySelector("#status").textContent = "그래픽 설정을 Low 안전 설정으로 저장했습니다.";
+      }
+
+      resetGraphicsSettings();
+      document.querySelector("#reset-again").addEventListener("click", resetGraphicsSettings);
+    </script>
+  </body>
+</html>

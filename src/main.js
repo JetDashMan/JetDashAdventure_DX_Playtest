@@ -9299,12 +9299,41 @@ function updateMusicButton() {
 }
 
 function loadGraphicsSettings() {
+  if (isGraphicsRecoveryRequested()) {
+    const safeSettings = getSafeGraphicsSettings();
+    try {
+      window.localStorage.removeItem(graphicsStorageKey);
+      saveGraphicsSettings(safeSettings);
+    } catch {
+      // Continue with safe in-memory settings even when localStorage is unavailable.
+    }
+    return safeSettings;
+  }
+
   try {
     const stored = JSON.parse(window.localStorage.getItem(graphicsStorageKey));
     return normalizeGraphicsSettings(stored);
   } catch {
     return normalizeGraphicsSettings();
   }
+}
+
+function isGraphicsRecoveryRequested() {
+  const params = new URLSearchParams(window.location.search);
+  const resetGraphics = params.get("resetGraphics");
+  const safeGraphics = params.get("safeGraphics");
+  const graphicsMode = params.get("graphics");
+  return resetGraphics === "1"
+    || resetGraphics === "true"
+    || safeGraphics === "1"
+    || safeGraphics === "true"
+    || graphicsMode === "reset"
+    || graphicsMode === "safe"
+    || graphicsMode === "low";
+}
+
+function getSafeGraphicsSettings() {
+  return normalizeGraphicsSettings({ preset: "low", ...graphicsPresets.low });
 }
 
 function normalizeGraphicsSettings(source = {}) {
@@ -9352,12 +9381,20 @@ function saveDebugSettings() {
   window.localStorage.setItem(debugStorageKey, JSON.stringify(debugSettings));
 }
 
+function saveGraphicsSettings(settings = graphicsSettings) {
+  window.localStorage.setItem(graphicsStorageKey, JSON.stringify(settings));
+}
+
 function bindGraphicsControls() {
   if (!graphicsControls.preset) return;
 
   graphicsControls.preset.addEventListener("change", () => {
     const preset = graphicsControls.preset.value;
     if (graphicsPresets[preset]) {
+      if (shouldConfirmMobileUltraPreset(preset) && !confirmMobileUltraGraphicsChange()) {
+        syncGraphicsControls();
+        return;
+      }
       graphicsSettings = normalizeGraphicsSettings({ preset, ...graphicsPresets[preset] });
       applyGraphicsSettings();
       syncGraphicsControls();
@@ -9367,6 +9404,10 @@ function bindGraphicsControls() {
   for (const [key, control] of Object.entries(graphicsControls)) {
     if (!control || key === "preset") continue;
     control.addEventListener("change", () => {
+      if (shouldConfirmMobileUltraControl(key, control.value) && !confirmMobileUltraGraphicsChange()) {
+        syncGraphicsControls();
+        return;
+      }
       graphicsSettings = normalizeGraphicsSettings({
         ...graphicsSettings,
         preset: "custom",
@@ -9376,6 +9417,24 @@ function bindGraphicsControls() {
       syncGraphicsControls();
     });
   }
+}
+
+function shouldConfirmMobileUltraPreset(preset) {
+  return touchControlsEnabled && preset === "ultra";
+}
+
+function shouldConfirmMobileUltraControl(key, value) {
+  return touchControlsEnabled
+    && String(value) === "ultra"
+    && ["shadowQuality", "motionBlur", "textureQuality", "waterQuality", "viewDistance"].includes(key);
+}
+
+function confirmMobileUltraGraphicsChange() {
+  return window.confirm(
+    "Ultra 그래픽은 일부 모바일 기기에서 Chrome이 강제 종료될 수 있습니다.\n\n"
+    + "테스트 목적이 아니라면 Low 또는 Medium을 권장합니다.\n"
+    + "그래도 Ultra 설정을 적용할까요?"
+  );
 }
 
 function bindDebugControls() {
@@ -9618,7 +9677,7 @@ function applyGraphicsSettings(save = true) {
   resize();
 
   if (save) {
-    window.localStorage.setItem(graphicsStorageKey, JSON.stringify(graphicsSettings));
+    saveGraphicsSettings();
   }
 }
 
