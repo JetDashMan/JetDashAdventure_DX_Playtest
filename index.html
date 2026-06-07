@@ -18,7 +18,7 @@
     <canvas id="game"></canvas>
     <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
     <div id="performance-hud" class="performance-hud hidden" aria-live="off" aria-label="Performance debug"></div>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-019: 퀵스텝 JET 잔상만 별도 렌더 타깃에서 수평 블러하는 테스트입니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-022: View Distance 하나로 카메라, 안개, 항구, 그림자 거리 프로필을 관리하는 테스트입니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -143,15 +143,6 @@
         <select id="graphics-shadow-softness">
           <option value="hard">Hard</option>
           <option value="soft">Soft</option>
-        </select>
-      </label>
-      <label>
-        <span>Shadow Distance</span>
-        <select id="graphics-shadow-distance">
-          <option value="near">Near</option>
-          <option value="medium">Medium</option>
-          <option value="far">Far</option>
-          <option value="ultra">Ultra</option>
         </select>
       </label>
       <label>

@@ -50,7 +50,6 @@ const graphicsControls = {
   mobileRenderScale: document.querySelector("#graphics-mobile-render-scale"),
   shadowQuality: document.querySelector("#graphics-shadow-quality"),
   shadowSoftness: document.querySelector("#graphics-shadow-softness"),
-  shadowDistance: document.querySelector("#graphics-shadow-distance"),
   motionBlur: document.querySelector("#graphics-motion-blur"),
   textureQuality: document.querySelector("#graphics-texture-quality"),
   waterQuality: document.querySelector("#graphics-water-quality"),
@@ -85,7 +84,6 @@ const graphicsPresets = {
     mobileRenderScale: "0.75",
     shadowQuality: "off",
     shadowSoftness: "hard",
-    shadowDistance: "near",
     motionBlur: "off",
     textureQuality: "low",
     waterQuality: "low",
@@ -98,7 +96,6 @@ const graphicsPresets = {
     mobileRenderScale: "1",
     shadowQuality: "medium",
     shadowSoftness: "hard",
-    shadowDistance: "medium",
     motionBlur: "medium",
     textureQuality: "medium",
     waterQuality: "medium",
@@ -111,7 +108,6 @@ const graphicsPresets = {
     mobileRenderScale: "1.5",
     shadowQuality: "high",
     shadowSoftness: "soft",
-    shadowDistance: "far",
     motionBlur: "high",
     textureQuality: "high",
     waterQuality: "high",
@@ -124,7 +120,6 @@ const graphicsPresets = {
     mobileRenderScale: "2",
     shadowQuality: "ultra",
     shadowSoftness: "soft",
-    shadowDistance: "ultra",
     motionBlur: "ultra",
     textureQuality: "ultra",
     waterQuality: "ultra",
@@ -173,17 +168,55 @@ const shadowQualityConfig = {
   high: { enabled: true, size: 2048 },
   ultra: { enabled: true, size: 4096 },
 };
-const shadowDistanceConfig = {
-  near: { far: 150, bounds: 76, lead: 12 },
-  medium: { far: 210, bounds: 104, lead: 18 },
-  far: { far: 320, bounds: 150, lead: 30 },
-  ultra: { far: 470, bounds: 215, lead: 46 },
-};
-const viewDistanceConfig = {
-  low: { fogNear: 110, fogFar: 1750, cameraFar: 1900 },
-  medium: { fogNear: 180, fogFar: 3050, cameraFar: 3400 },
-  high: { fogNear: 260, fogFar: 4700, cameraFar: 5200 },
-  ultra: { fogNear: 420, fogFar: 7600, cameraFar: 8200 },
+const distanceQualityConfig = {
+  low: {
+    fogNear: 110,
+    fogFar: 1750,
+    cameraFar: 1900,
+    harborContainerForward: 1100,
+    harborContainerBackward: 495,
+    harborAnimatedForward: 1000,
+    harborAnimatedBackward: 350,
+    shadowFar: 150,
+    shadowBounds: 76,
+    shadowLead: 12,
+  },
+  medium: {
+    fogNear: 180,
+    fogFar: 3050,
+    cameraFar: 3400,
+    harborContainerForward: 1700,
+    harborContainerBackward: 765,
+    harborAnimatedForward: 1500,
+    harborAnimatedBackward: 525,
+    shadowFar: 210,
+    shadowBounds: 104,
+    shadowLead: 18,
+  },
+  high: {
+    fogNear: 260,
+    fogFar: 4700,
+    cameraFar: 5200,
+    harborContainerForward: 2400,
+    harborContainerBackward: 900,
+    harborAnimatedForward: 2200,
+    harborAnimatedBackward: 700,
+    shadowFar: 320,
+    shadowBounds: 150,
+    shadowLead: 30,
+  },
+  ultra: {
+    fogNear: 420,
+    fogFar: 7600,
+    cameraFar: 8200,
+    harborContainerForward: 3200,
+    harborContainerBackward: 900,
+    harborAnimatedForward: 3000,
+    harborAnimatedBackward: 700,
+    shadowFar: 470,
+    shadowBounds: 215,
+    shadowLead: 46,
+  },
 };
 const lightingConfig = {
   standard: { hemi: 0.9, sun: 1.85, exposure: 1.0, toneMapping: THREE.CineonToneMapping },
@@ -482,6 +515,7 @@ let playerBoostEffectActive = false;
 let boostCameraKick = 0;
 let boostCameraSustain = 0;
 let boostCameraWasActive = false;
+let cameraLateralFocusX = 0;
 let cameraYawOffset = 0;
 let cameraPitchOffset = 0;
 let dashPadBoostStartSpeed = 0;
@@ -1466,18 +1500,6 @@ const harborCargoTrucks = [];
 const harborExcavators = [];
 const harborContainerChunks = [];
 const harborContainerChunkSize = 420;
-const harborContainerVisibilityRanges = {
-  low: 1100,
-  medium: 1700,
-  high: 2400,
-  ultra: 3200,
-};
-const harborAnimatedVisibilityRanges = {
-  low: 1000,
-  medium: 1500,
-  high: 2200,
-  ultra: 3000,
-};
 const harborVisibilityState = {
   frame: 0,
   lastPlayerZ: Number.NaN,
@@ -7127,6 +7149,7 @@ function updateHarborVisibility(force = false) {
   harborVisibilityState.frame += 1;
   const playerZ = player.position.z;
   const viewDistance = graphicsSettings.viewDistance;
+  const distanceConfig = getDistanceQualityConfig(viewDistance);
   const needsUpdate = force
     || harborVisibilityState.frame % 8 === 0
     || Math.abs(playerZ - harborVisibilityState.lastPlayerZ) > 70
@@ -7136,30 +7159,26 @@ function updateHarborVisibility(force = false) {
   harborVisibilityState.lastPlayerZ = playerZ;
   harborVisibilityState.lastViewDistance = viewDistance;
 
-  const containerForwardRange = harborContainerVisibilityRanges[viewDistance] ?? harborContainerVisibilityRanges.high;
-  const containerBackwardRange = Math.min(900, containerForwardRange * 0.45);
   for (const chunk of harborContainerChunks) {
     chunk.group.visible = isHarborZRangeVisible(
       chunk.minZ,
       chunk.maxZ,
       playerZ,
-      containerForwardRange,
-      containerBackwardRange,
+      distanceConfig.harborContainerForward,
+      distanceConfig.harborContainerBackward,
     );
   }
 
-  const animatedForwardRange = harborAnimatedVisibilityRanges[viewDistance] ?? harborAnimatedVisibilityRanges.high;
-  const animatedBackwardRange = Math.min(700, animatedForwardRange * 0.35);
   for (const crane of harborAnimatedCranes) {
-    crane.active = isHarborZVisible(crane.z, playerZ, animatedForwardRange, animatedBackwardRange);
+    crane.active = isHarborZVisible(crane.z, playerZ, distanceConfig.harborAnimatedForward, distanceConfig.harborAnimatedBackward);
     crane.group.visible = crane.active;
   }
   for (const truck of harborCargoTrucks) {
-    truck.active = isHarborZVisible(truck.z, playerZ, animatedForwardRange, animatedBackwardRange);
+    truck.active = isHarborZVisible(truck.z, playerZ, distanceConfig.harborAnimatedForward, distanceConfig.harborAnimatedBackward);
     truck.mesh.visible = truck.active;
   }
   for (const excavator of harborExcavators) {
-    excavator.active = isHarborZVisible(excavator.z, playerZ, animatedForwardRange, animatedBackwardRange);
+    excavator.active = isHarborZVisible(excavator.z, playerZ, distanceConfig.harborAnimatedForward, distanceConfig.harborAnimatedBackward);
     excavator.group.visible = excavator.active;
   }
 }
@@ -8936,10 +8955,10 @@ function renderFrame() {
 function updateSunShadow() {
   if (!sunLight || !sunTarget) return;
 
-  const distanceConfig = shadowDistanceConfig[graphicsSettings.shadowDistance] ?? shadowDistanceConfig.far;
+  const distanceConfig = getDistanceQualityConfig();
   const frame = getStageFrame(player.position.z);
   const target = toWorldPosition(new THREE.Vector3(0, Math.max(player.position.y, 1.2), player.position.z))
-    .addScaledVector(frame.tangent, distanceConfig.lead);
+    .addScaledVector(frame.tangent, distanceConfig.shadowLead);
   sunTarget.position.copy(target);
   sunLight.position.copy(target).add(sunFollowOffset);
   sunTarget.updateMatrixWorld();
@@ -9033,6 +9052,13 @@ const boostCameraHoldPreset = Object.freeze({
   lookAhead: 0.6,
   fov: 2.4,
 });
+const cameraLateralIdleFollowRatio = 0.72;
+const cameraLateralRunFollowRatio = 0.52;
+const cameraLateralBoostFollowRatio = 0.34;
+const cameraLateralQuickStepFollowRatio = 0.42;
+const cameraLateralIdleFollowRate = 3.6;
+const cameraLateralRunFollowRate = 4.2;
+const cameraLateralQuickStepFollowRate = 2.4;
 
 function updateBoostCameraState(boostActive, dt) {
   if (boostActive && !boostCameraWasActive) {
@@ -9056,7 +9082,30 @@ function updateCamera(dt) {
   const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
   const boostCameraSustainEase = boostCameraSustain;
   const frame = getStageFrame(player.position.z);
-  const centerWorld = toWorldPosition(new THREE.Vector3(0, player.position.y, player.position.z));
+  const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
+  const speedBasedFollowRatio = THREE.MathUtils.lerp(
+    cameraLateralIdleFollowRatio,
+    cameraLateralRunFollowRatio,
+    speedRatio,
+  );
+  const boostedFollowRatio = THREE.MathUtils.lerp(
+    speedBasedFollowRatio,
+    cameraLateralBoostFollowRatio,
+    boostCameraSustainEase,
+  );
+  const lateralFollowRatio = quickStepTimer > 0
+    ? Math.min(boostedFollowRatio, cameraLateralQuickStepFollowRatio)
+    : boostedFollowRatio;
+  const lateralFollowRate = quickStepTimer > 0
+    ? cameraLateralQuickStepFollowRate
+    : THREE.MathUtils.lerp(cameraLateralIdleFollowRate, cameraLateralRunFollowRate, speedRatio);
+  const lateralTargetX = player.position.x * lateralFollowRatio;
+  cameraLateralFocusX = THREE.MathUtils.lerp(
+    cameraLateralFocusX,
+    lateralTargetX,
+    1 - Math.exp(-lateralFollowRate * dt),
+  );
+  const centerWorld = toWorldPosition(new THREE.Vector3(cameraLateralFocusX, player.position.y, player.position.z));
   const cameraBack = runCameraPreset.back
     + boostCameraKickPreset.back * boostCameraKickEase
     + boostCameraHoldPreset.back * boostCameraSustainEase;
@@ -9269,11 +9318,10 @@ function normalizeGraphicsSettings(source = {}) {
     mobileRenderScale: isValidGraphicsValue(settings.mobileRenderScale, ["0.75", "1", "1.25", "1.5", "1.75", "2"]) ? settings.mobileRenderScale : graphicsDefaults.mobileRenderScale,
     shadowQuality: isValidGraphicsValue(settings.shadowQuality, Object.keys(shadowQualityConfig)) ? settings.shadowQuality : graphicsDefaults.shadowQuality,
     shadowSoftness: isValidGraphicsValue(settings.shadowSoftness, ["hard", "soft"]) ? settings.shadowSoftness : graphicsDefaults.shadowSoftness,
-    shadowDistance: isValidGraphicsValue(settings.shadowDistance, Object.keys(shadowDistanceConfig)) ? settings.shadowDistance : graphicsDefaults.shadowDistance,
     motionBlur: isValidGraphicsValue(settings.motionBlur, Object.keys(motionBlurStrengthConfig)) ? settings.motionBlur : graphicsDefaults.motionBlur,
     textureQuality: isValidGraphicsValue(settings.textureQuality, Object.keys(asphaltTextureQualityConfig)) ? settings.textureQuality : graphicsDefaults.textureQuality,
     waterQuality: isValidGraphicsValue(settings.waterQuality, Object.keys(waterQualityConfig)) ? settings.waterQuality : graphicsDefaults.waterQuality,
-    viewDistance: isValidGraphicsValue(settings.viewDistance, Object.keys(viewDistanceConfig)) ? settings.viewDistance : graphicsDefaults.viewDistance,
+    viewDistance: isValidGraphicsValue(settings.viewDistance, Object.keys(distanceQualityConfig)) ? settings.viewDistance : graphicsDefaults.viewDistance,
     lighting: isValidGraphicsValue(settings.lighting, Object.keys(lightingConfig)) ? settings.lighting : graphicsDefaults.lighting,
     frameCap: isValidGraphicsValue(settings.frameCap, ["30", "60", "120", "unlimited"]) ? settings.frameCap : graphicsDefaults.frameCap,
   };
@@ -9585,7 +9633,7 @@ function getEffectiveRenderScale() {
 
 function applyShadowSettings() {
   const config = shadowQualityConfig[graphicsSettings.shadowQuality] ?? shadowQualityConfig.high;
-  const distanceConfig = shadowDistanceConfig[graphicsSettings.shadowDistance] ?? shadowDistanceConfig.far;
+  const distanceConfig = getDistanceQualityConfig();
   renderer.shadowMap.enabled = config.enabled;
   renderer.shadowMap.type = graphicsSettings.shadowSoftness === "soft"
     ? THREE.PCFSoftShadowMap
@@ -9594,11 +9642,11 @@ function applyShadowSettings() {
   if (sunLight) {
     sunLight.castShadow = config.enabled;
     sunLight.shadow.mapSize.set(config.size, config.size);
-    sunLight.shadow.camera.far = distanceConfig.far;
-    sunLight.shadow.camera.left = -distanceConfig.bounds;
-    sunLight.shadow.camera.right = distanceConfig.bounds;
-    sunLight.shadow.camera.top = distanceConfig.bounds;
-    sunLight.shadow.camera.bottom = -distanceConfig.bounds;
+    sunLight.shadow.camera.far = distanceConfig.shadowFar;
+    sunLight.shadow.camera.left = -distanceConfig.shadowBounds;
+    sunLight.shadow.camera.right = distanceConfig.shadowBounds;
+    sunLight.shadow.camera.top = distanceConfig.shadowBounds;
+    sunLight.shadow.camera.bottom = -distanceConfig.shadowBounds;
     sunLight.shadow.camera.updateProjectionMatrix();
     if (sunLight.shadow.map) {
       sunLight.shadow.map.dispose();
@@ -9622,11 +9670,15 @@ function applyShadowSettings() {
 }
 
 function applyViewDistanceSettings() {
-  const config = viewDistanceConfig[graphicsSettings.viewDistance] ?? viewDistanceConfig.high;
+  const config = getDistanceQualityConfig();
   camera.far = config.cameraFar;
   scene.fog.near = config.fogNear;
   scene.fog.far = config.fogFar;
   camera.updateProjectionMatrix();
+}
+
+function getDistanceQualityConfig(quality = graphicsSettings.viewDistance) {
+  return distanceQualityConfig[quality] ?? distanceQualityConfig.high;
 }
 
 function applyLightingSettings() {
@@ -9818,6 +9870,7 @@ function warpToGoalProgress(progress) {
   boostCameraKick = 0;
   boostCameraSustain = 0;
   boostCameraWasActive = false;
+  cameraLateralFocusX = 0;
   materials.jetEnergy.opacity = 0;
   boostMotionBlurMaterial.uniforms.uStrength.value = 0;
   if (touchControlsEnabled) resetTouchRunState();
@@ -9865,6 +9918,7 @@ function resetGame(options = {}) {
   boostCameraKick = 0;
   boostCameraSustain = 0;
   boostCameraWasActive = false;
+  cameraLateralFocusX = 0;
   materials.jetEnergy.opacity = 0;
   boostMotionBlurMaterial.uniforms.uStrength.value = 0;
   resetCameraView();
