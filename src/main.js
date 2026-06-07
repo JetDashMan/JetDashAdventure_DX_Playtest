@@ -8197,6 +8197,8 @@ function handleTouchControlDown(event) {
     touchInput.boost = !touchInput.boost;
   } else if (control === "brake") {
     touchInput.brake = true;
+    touchInput.autoForward = false;
+    touchInput.boost = false;
   } else if (control === "forward") {
     toggleTouchAutoForward();
   }
