@@ -62,6 +62,7 @@ const debugControls = {
   infiniteJump: document.querySelector("#debug-infinite-jump"),
   mouseObject: document.querySelector("#debug-mouse-object"),
   performanceHud: document.querySelector("#debug-performance-hud"),
+  unlimitedCameraOrbit: document.querySelector("#debug-unlimited-camera-orbit"),
 };
 
 const scene = new THREE.Scene();
@@ -274,6 +275,7 @@ const debugDefaults = {
   infiniteJump: false,
   mouseObject: false,
   performanceHud: false,
+  unlimitedCameraOrbit: false,
 };
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
@@ -474,6 +476,8 @@ const dashPadSpeedGain = 100 / speedDisplayScale;
 const dashPadFadeDuration = 3;
 const hitStunDuration = 1;
 const groundSnapDistance = 1.35;
+const jetModelBaseY = 1.14;
+const jetFootGroundClearance = 0.015;
 const dashPadPlacements = currentStage.dashPads;
 const obstaclePlacements = currentStage.obstacles;
 const storedStageScore = Number(window.sessionStorage.getItem("dx-speed-stage-score"));
@@ -488,6 +492,10 @@ const looseDnaItems = [];
 const quickStepAfterimages = [];
 const staticStageFrameCache = new Map();
 const staticStageSceneryFrameCache = new Map();
+const jetFootContactBox = new THREE.Box3();
+const jetFootContactInverse = new THREE.Matrix4();
+const jetFootContactMatrix = new THREE.Matrix4();
+const jetFootContactCorner = new THREE.Vector3();
 let waterMesh;
 let waterMaterial;
 let waterTime = 0;
@@ -501,6 +509,7 @@ let jumpImpact = 0;
 let hitCooldown = 0;
 let hitStun = 0;
 let runPhase = 0;
+let jetFootContactOffsetY = 0;
 let quickStepQueued = 0;
 let quickStepDirection = 0;
 let quickStepTimer = 0;
@@ -720,23 +729,28 @@ const materials = {
     roughness: 0.42,
   }),
   jetHoodie: new THREE.MeshStandardMaterial({
-    color: 0xf1f3f4,
-    roughness: 0.54,
-    metalness: 0.02,
+    color: 0xd7dce0,
+    roughness: 0.5,
+    metalness: 0.04,
   }),
   jetHoodieShadow: new THREE.MeshStandardMaterial({
-    color: 0xc9cdd0,
-    roughness: 0.6,
-    metalness: 0.02,
+    color: 0x707983,
+    roughness: 0.54,
+    metalness: 0.08,
   }),
   jetPants: new THREE.MeshStandardMaterial({
-    color: 0xbb2024,
-    roughness: 0.48,
-    metalness: 0.02,
+    color: 0x171c23,
+    roughness: 0.5,
+    metalness: 0.04,
   }),
   jetPantsTrim: new THREE.MeshStandardMaterial({
-    color: 0xf4f6f8,
+    color: 0xbfc6cc,
     roughness: 0.45,
+  }),
+  jetJacketHighlight: new THREE.MeshStandardMaterial({
+    color: 0xf0f3f5,
+    roughness: 0.48,
+    metalness: 0.03,
   }),
   jetHarness: new THREE.MeshStandardMaterial({
     color: 0x15191f,
@@ -744,9 +758,19 @@ const materials = {
     metalness: 0.08,
   }),
   jetHarnessPlate: new THREE.MeshStandardMaterial({
-    color: 0x4a525b,
+    color: 0x4f5963,
+    roughness: 0.32,
+    metalness: 0.38,
+  }),
+  jetMechanicalSilver: new THREE.MeshStandardMaterial({
+    color: 0xb9c3c9,
+    roughness: 0.27,
+    metalness: 0.62,
+  }),
+  jetMechanicalDark: new THREE.MeshStandardMaterial({
+    color: 0x222a32,
     roughness: 0.34,
-    metalness: 0.28,
+    metalness: 0.48,
   }),
   jetHair: new THREE.MeshStandardMaterial({
     color: 0x2b1f1a,
@@ -763,8 +787,9 @@ const materials = {
     roughness: 0.28,
   }),
   jetShoeWhite: new THREE.MeshStandardMaterial({
-    color: 0xf7f8f6,
-    roughness: 0.38,
+    color: 0xaeb8bf,
+    roughness: 0.32,
+    metalness: 0.42,
   }),
   jetShoeSole: new THREE.MeshStandardMaterial({
     color: 0x20252b,
@@ -773,6 +798,18 @@ const materials = {
   jetAccentRed: new THREE.MeshStandardMaterial({
     color: 0xd0262c,
     roughness: 0.4,
+  }),
+  jetCautionYellow: new THREE.MeshStandardMaterial({
+    color: 0xdca321,
+    roughness: 0.38,
+    metalness: 0.08,
+  }),
+  jetEnergyIdle: new THREE.MeshBasicMaterial({
+    color: 0x18bfff,
+    transparent: true,
+    opacity: 0.32,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   }),
   jetEnergy: new THREE.MeshBasicMaterial({
     color: 0x24d9ff,
@@ -1206,13 +1243,17 @@ bindRealtimeMaterialTexture(materials.jetHoodie, "jet_white_fabric", { normalSca
 bindRealtimeMaterialTexture(materials.jetHoodieShadow, "jet_white_fabric", { normalScale: 0.34, aoMapIntensity: 0.36 });
 bindRealtimeMaterialTexture(materials.jetPants, "jet_red_fabric", { normalScale: 0.42, aoMapIntensity: 0.36 });
 bindRealtimeMaterialTexture(materials.jetPantsTrim, "jet_white_fabric", { normalScale: 0.34, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.jetJacketHighlight, "jet_white_fabric", { normalScale: 0.28, aoMapIntensity: 0.26 });
 bindRealtimeMaterialTexture(materials.jetHarness, "jet_black_leather", { normalScale: 0.45, aoMapIntensity: 0.46 });
 bindRealtimeMaterialTexture(materials.jetHarnessPlate, "painted_bridge_metal", { normalScale: 0.32, aoMapIntensity: 0.32 });
+bindRealtimeMaterialTexture(materials.jetMechanicalSilver, "painted_bridge_metal", { normalScale: 0.34, aoMapIntensity: 0.34 });
+bindRealtimeMaterialTexture(materials.jetMechanicalDark, "painted_bridge_metal", { normalScale: 0.36, aoMapIntensity: 0.38 });
 bindRealtimeMaterialTexture(materials.jetHair, "hair_dark", { normalScale: 0.42, aoMapIntensity: 0.3 });
 bindRealtimeMaterialTexture(materials.jetSkin, "skin_subtle", { normalScale: 0.14, aoMapIntensity: 0.18 });
 bindRealtimeMaterialTexture(materials.jetShoeWhite, "shoe_white_leather", { normalScale: 0.42, aoMapIntensity: 0.36 });
 bindRealtimeMaterialTexture(materials.jetShoeSole, "black_rubber_tire", { normalScale: 0.42, aoMapIntensity: 0.4 });
 bindRealtimeMaterialTexture(materials.jetAccentRed, "hazard_red_paint", { normalScale: 0.32, aoMapIntensity: 0.3 });
+bindRealtimeMaterialTexture(materials.jetCautionYellow, "hazard_yellow_paint", { normalScale: 0.28, aoMapIntensity: 0.28 });
 
 bindRealtimeMaterialTexture(materials.harborDock, "concrete_dock", { repeat: [2, 2], normalScale: 0.42, aoMapIntensity: 0.42 });
 bindRealtimeMaterialTexture(materials.harborDockDark, "concrete_dock", { repeat: [2, 2], normalScale: 0.4, aoMapIntensity: 0.48 });
@@ -7646,63 +7687,92 @@ function addGoal() {
 function addPlayer() {
   const group = new THREE.Group();
   const model = new THREE.Group();
-  model.position.y = 0.1;
+  model.position.y = jetModelBaseY;
   group.add(model);
   const energyLines = [];
 
-  addBox(model, 0.68, 0.78, 0.42, materials.jetHoodie, 0, 0.13, 0);
-  addBox(model, 0.74, 0.12, 0.48, materials.jetHoodieShadow, 0, -0.31, 0);
-  addBox(model, 0.03, 0.68, 0.024, materials.jetHarness, 0, 0.15, -0.226);
-  addBox(model, 0.04, 0.52, 0.028, materials.jetAccentRed, -0.36, -0.02, -0.16);
-  addBox(model, 0.04, 0.52, 0.028, materials.jetAccentRed, 0.36, -0.02, -0.16);
+  addCylinder(model, 0.25, 0.32, 0.46, materials.jetHoodie, 0, 0.27, -0.01, 0, 0, 0, 1.18, 1, 0.58, 12);
+  addCylinder(model, 0.27, 0.29, 0.25, materials.jetHoodie, 0, -0.08, -0.01, 0, 0, 0, 1.03, 1, 0.54, 12);
+  addBox(model, 0.52, 0.1, 0.26, materials.jetHoodieShadow, 0, 0.48, -0.02);
+  addBox(model, 0.34, 0.52, 0.03, materials.jetJacketHighlight, -0.1, 0.17, -0.235, 0, 0, -0.05);
+  addBox(model, 0.34, 0.52, 0.03, materials.jetJacketHighlight, 0.1, 0.17, -0.235, 0, 0, 0.05);
+  addBox(model, 0.034, 0.63, 0.035, materials.jetHarness, 0, 0.15, -0.274);
+  addJetIdleEnergyLine(model, 0.035, 0.52, 0.032, -0.16, 0.12, -0.284, 0, 0, -0.08);
+  addJetIdleEnergyLine(model, 0.035, 0.52, 0.032, 0.16, 0.12, -0.284, 0, 0, 0.08);
+  addBox(model, 0.072, 0.52, 0.035, materials.jetHoodieShadow, -0.31, 0.09, -0.17, 0, 0, -0.11);
+  addBox(model, 0.072, 0.52, 0.035, materials.jetHoodieShadow, 0.31, 0.09, -0.17, 0, 0, 0.11);
+  addBox(model, 0.58, 0.075, 0.4, materials.jetHarness, 0, -0.27, -0.01);
+  addBox(model, 0.54, 0.1, 0.38, materials.jetPants, 0, -0.36, -0.01);
+  addBox(model, 0.14, 0.12, 0.07, materials.jetHarnessPlate, -0.33, -0.25, -0.08, 0, 0, -0.05);
+  addBox(model, 0.14, 0.12, 0.07, materials.jetHarnessPlate, 0.33, -0.25, -0.08, 0, 0, 0.05);
+  addBox(model, 0.045, 0.075, 0.04, materials.jetCautionYellow, -0.4, -0.22, -0.13);
+  addBox(model, 0.045, 0.075, 0.04, materials.jetCautionYellow, 0.4, -0.22, -0.13);
 
-  const hoodBack = new THREE.Mesh(new THREE.SphereGeometry(0.36, 24, 16), materials.jetHoodie);
-  hoodBack.scale.set(1.08, 0.56, 0.72);
-  hoodBack.position.set(0, 0.56, 0.2);
-  model.add(hoodBack);
+  const standCollar = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.03, 8, 32), materials.jetHoodieShadow);
+  standCollar.position.set(0, 0.58, -0.04);
+  standCollar.rotation.x = Math.PI / 2;
+  standCollar.scale.set(1.04, 0.52, 1);
+  model.add(standCollar);
 
-  const hoodCollar = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.055, 10, 32), materials.jetHoodieShadow);
-  hoodCollar.position.set(0, 0.55, -0.02);
-  hoodCollar.rotation.x = Math.PI / 2;
-  hoodCollar.scale.set(1.12, 0.76, 1);
-  model.add(hoodCollar);
-
-  const innerCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.18, 16), materials.jetHarness);
-  innerCollar.position.set(0, 0.51, -0.04);
+  const innerCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.14, 16), materials.jetHarness);
+  innerCollar.position.set(0, 0.55, -0.04);
+  innerCollar.scale.z = 0.72;
   model.add(innerCollar);
 
   addJetHarness(model, energyLines);
 
+  const neck = addCylinder(model, 0.072, 0.105, 0.23, materials.jetSkin, 0, 0.67, -0.065, 0, 0, 0, 0.88, 1, 0.7, 14);
+  const neckBase = addCylinder(model, 0.12, 0.16, 0.1, materials.jetSkin, 0, 0.55, -0.055, 0, 0, 0, 1.1, 1, 0.52, 14);
+
   const head = new THREE.Group();
-  head.position.set(0, 0.89, -0.12);
+  head.position.set(0, 0.93, -0.12);
   model.add(head);
 
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.26, 32, 20), materials.jetSkin);
-  face.scale.set(0.84, 1.06, 0.78);
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.23, 32, 20), materials.jetSkin);
+  face.scale.set(0.74, 1.02, 0.72);
   head.add(face);
 
-  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.28, 28, 16), materials.jetHair);
-  hairCap.scale.set(0.96, 0.66, 0.9);
+  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.155, 18, 10), materials.jetSkin);
+  jaw.scale.set(0.78, 0.42, 0.68);
+  jaw.position.set(0, -0.155, -0.025);
+  head.add(jaw);
+
+  const chin = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 8), materials.jetSkin);
+  chin.scale.set(1.0, 0.55, 0.72);
+  chin.position.set(0, -0.195, -0.085);
+  head.add(chin);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.08, 8), materials.jetSkin);
+  nose.position.set(0, -0.015, -0.19);
+  nose.rotation.x = Math.PI / 2;
+  nose.scale.set(0.8, 1.2, 0.7);
+  head.add(nose);
+
+  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.245, 28, 16), materials.jetHair);
+  hairCap.scale.set(0.96, 0.62, 0.9);
   hairCap.position.set(0, 0.12, 0.01);
   head.add(hairCap);
 
   addJetHair(head);
 
   for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 10), materials.eyeWhite);
-    eye.scale.set(1.45, 0.72, 0.22);
-    eye.position.set(side * 0.085, 0.03, -0.205);
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.043, 12, 8), materials.jetSkin);
+    ear.scale.set(0.58, 0.9, 0.5);
+    ear.position.set(side * 0.17, -0.005, -0.018);
+    head.add(ear);
+
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.038, 16, 10), materials.eyeWhite);
+    eye.scale.set(1.55, 0.62, 0.2);
+    eye.position.set(side * 0.075, 0.035, -0.182);
     head.add(eye);
 
-    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 8), materials.jetEyeBlue);
-    iris.scale.set(0.9, 1.05, 0.28);
-    iris.position.set(side * 0.085, 0.025, -0.224);
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 8), materials.jetEyeBlue);
+    iris.scale.set(0.85, 1.0, 0.24);
+    iris.position.set(side * 0.075, 0.03, -0.202);
     head.add(iris);
-  }
 
-  const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.18, 6, 10), materials.jetSkin);
-  neck.position.set(0, 0.52, -0.06);
-  model.add(neck);
+    addBox(head, 0.075, 0.018, 0.016, materials.jetHair, side * 0.075, 0.095, -0.196, 0, 0, side * 0.14);
+  }
 
   const armLeft = createArm(-1, energyLines);
   const armRight = createArm(1, energyLines);
@@ -7711,6 +7781,10 @@ function addPlayer() {
   model.add(armLeft, armRight, legLeft, legRight);
 
   addJetEnergyLine(energyLines, model, 0.56, 0.024, 0.02, 0, 0.61, -0.285);
+  addJetIdleEnergyLine(model, 0.024, 0.34, 0.018, -0.3, 0.18, -0.225, 0, 0, -0.16);
+  addJetIdleEnergyLine(model, 0.024, 0.34, 0.018, 0.3, 0.18, -0.225, 0, 0, 0.16);
+  addJetEnergyLine(energyLines, model, 0.03, 0.42, 0.018, -0.31, 0.12, -0.238, 0, 0, -0.18);
+  addJetEnergyLine(energyLines, model, 0.03, 0.42, 0.018, 0.31, 0.12, -0.238, 0, 0, 0.18);
 
   model.traverse((child) => {
     if (child.isMesh) {
@@ -7726,6 +7800,8 @@ function addPlayer() {
     arms: [armLeft, armRight],
     legs: [legLeft, legRight],
     head,
+    neck,
+    neckBase,
     energyLines,
   };
 }
@@ -7738,26 +7814,61 @@ function addBox(parent, width, height, depth, material, x, y, z, rx = 0, ry = 0,
   return mesh;
 }
 
-function addJetHarness(parent, energyLines) {
-  addBox(parent, 0.075, 0.78, 0.052, materials.jetHarness, -0.24, 0.18, -0.254, 0, 0, -0.08);
-  addBox(parent, 0.075, 0.78, 0.052, materials.jetHarness, 0.24, 0.18, -0.254, 0, 0, 0.08);
-  addBox(parent, 0.66, 0.085, 0.062, materials.jetHarness, 0, 0.16, -0.286);
-  addBox(parent, 0.18, 0.12, 0.075, materials.jetHarnessPlate, 0, 0.16, -0.325);
+function addCapsule(parent, radius, length, material, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1, radialSegments = 14) {
+  const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 6, radialSegments), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.scale.set(sx, sy, sz);
+  parent.add(mesh);
+  return mesh;
+}
 
-  addBox(parent, 0.08, 0.76, 0.056, materials.jetHarness, -0.22, 0.2, 0.248, 0, 0, 0.36);
-  addBox(parent, 0.08, 0.76, 0.056, materials.jetHarness, 0.22, 0.2, 0.248, 0, 0, -0.36);
-  addBox(parent, 0.26, 0.34, 0.08, materials.jetHarnessPlate, 0, 0.24, 0.31);
-  addJetEnergyLine(energyLines, parent, 0.05, 0.24, 0.014, 0, 0.24, 0.36);
+function addCylinder(parent, radiusTop, radiusBottom, height, material, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1, radialSegments = 12) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.scale.set(sx, sy, sz);
+  parent.add(mesh);
+  return mesh;
+}
+
+function addJetHarness(parent, energyLines) {
+  addBox(parent, 0.065, 0.74, 0.05, materials.jetHarness, -0.23, 0.2, -0.29, 0, 0, -0.08);
+  addBox(parent, 0.065, 0.74, 0.05, materials.jetHarness, 0.23, 0.2, -0.29, 0, 0, 0.08);
+  addBox(parent, 0.52, 0.055, 0.05, materials.jetHarness, 0, 0.19, -0.31);
+  addBox(parent, 0.16, 0.1, 0.07, materials.jetHarnessPlate, 0, 0.18, -0.35);
+
+  addBox(parent, 0.07, 0.78, 0.055, materials.jetHarness, -0.24, 0.23, 0.27, 0, 0, 0.36);
+  addBox(parent, 0.07, 0.78, 0.055, materials.jetHarness, 0.24, 0.23, 0.27, 0, 0, -0.36);
+  addBox(parent, 0.09, 0.64, 0.05, materials.jetHarnessPlate, -0.05, 0.15, 0.305, 0, 0, -0.28);
+  addBox(parent, 0.09, 0.64, 0.05, materials.jetHarnessPlate, 0.05, 0.15, 0.305, 0, 0, 0.28);
+
+  const backCore = addCylinder(parent, 0.16, 0.16, 0.065, materials.jetMechanicalDark, 0, 0.25, 0.36, Math.PI / 2, 0, 0, 1, 1, 1, 24);
+  backCore.userData.jetBackCore = true;
+  const backCoreRing = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.018, 8, 32), materials.jetMechanicalSilver);
+  backCoreRing.position.set(0, 0.25, 0.398);
+  backCoreRing.rotation.x = Math.PI / 2;
+  parent.add(backCoreRing);
+  const backCoreGlow = addCylinder(parent, 0.082, 0.082, 0.072, materials.jetEnergyIdle, 0, 0.25, 0.405, Math.PI / 2, 0, 0, 1, 1, 1, 20);
+  backCoreGlow.userData.energyLine = true;
+  addJetEnergyLine(energyLines, parent, 0.08, 0.28, 0.018, 0, 0.25, 0.45);
+
+  addBox(parent, 0.12, 0.16, 0.08, materials.jetHarnessPlate, -0.43, 0.08, 0.18, 0, 0, -0.12);
+  addBox(parent, 0.12, 0.16, 0.08, materials.jetHarnessPlate, 0.43, 0.08, 0.18, 0, 0, 0.12);
+  addBox(parent, 0.055, 0.1, 0.04, materials.jetCautionYellow, -0.45, 0.09, 0.12);
+  addBox(parent, 0.055, 0.1, 0.04, materials.jetCautionYellow, 0.45, 0.09, 0.12);
 }
 
 function addJetHair(head) {
-  addHairSpike(head, -0.18, 0.18, -0.04, 0.075, 0.28, -0.55, 0.08, -0.55);
-  addHairSpike(head, -0.08, 0.22, -0.09, 0.08, 0.34, -0.78, -0.1, -0.22);
-  addHairSpike(head, 0.06, 0.23, -0.1, 0.085, 0.36, -0.84, 0.08, 0.18);
-  addHairSpike(head, 0.18, 0.17, -0.04, 0.075, 0.28, -0.58, -0.08, 0.48);
-  addHairSpike(head, -0.24, 0.08, 0.02, 0.07, 0.24, -0.15, 0.1, -0.82);
-  addHairSpike(head, 0.24, 0.08, 0.02, 0.07, 0.24, -0.15, -0.1, 0.82);
-  addHairSpike(head, 0, 0.23, 0.08, 0.075, 0.26, 0.3, 0, 0);
+  addHairSpike(head, -0.13, 0.16, -0.1, 0.045, 0.18, -0.72, 0.08, -0.34);
+  addHairSpike(head, -0.04, 0.19, -0.12, 0.05, 0.2, -0.86, -0.02, -0.08);
+  addHairSpike(head, 0.05, 0.19, -0.12, 0.05, 0.2, -0.84, 0.05, 0.1);
+  addHairSpike(head, 0.14, 0.15, -0.09, 0.044, 0.17, -0.66, -0.05, 0.34);
+  addHairSpike(head, -0.19, 0.08, -0.015, 0.04, 0.15, -0.18, 0.06, -0.72);
+  addHairSpike(head, 0.19, 0.08, -0.015, 0.04, 0.15, -0.18, -0.06, 0.72);
+  addHairSpike(head, -0.08, 0.19, 0.05, 0.044, 0.16, 0.18, -0.12, -0.2);
+  addHairSpike(head, 0.08, 0.19, 0.05, 0.044, 0.16, 0.18, 0.12, 0.2);
+  addHairSpike(head, 0, 0.23, 0.06, 0.045, 0.15, 0.18, 0, 0);
 }
 
 function addHairSpike(parent, x, y, z, radius, length, rx, ry, rz) {
@@ -7776,61 +7887,129 @@ function addJetEnergyLine(lines, parent, width, height, depth, x, y, z, rx = 0, 
   return line;
 }
 
+function addJetIdleEnergyLine(parent, width, height, depth, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const line = addBox(parent, width, height, depth, materials.jetEnergyIdle, x, y, z, rx, ry, rz);
+  line.userData.energyLine = true;
+  return line;
+}
+
 function createArm(side, energyLines) {
   const arm = new THREE.Group();
-  arm.position.set(side * 0.45, 0.36, -0.02);
-  arm.rotation.z = side * 0.2;
+  arm.position.set(side * 0.4, 0.46, -0.02);
+  arm.rotation.z = side * 0.18;
 
-  const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, 0.46, 6, 12), materials.jetHoodie);
-  sleeve.position.y = -0.23;
-  sleeve.rotation.z = side * 0.06;
-  arm.add(sleeve);
+  addCylinder(arm, 0.095, 0.078, 0.12, materials.jetHoodieShadow, 0, 0.02, -0.01, 0, 0, side * 0.1, 1.1, 1, 0.8, 10);
 
-  addBox(arm, 0.18, 0.1, 0.16, materials.jetHarness, 0, -0.48, -0.01);
-  addJetEnergyLine(energyLines, arm, 0.024, 0.24, 0.018, side * 0.062, -0.28, -0.095, 0, 0, side * 0.16);
+  const upper = new THREE.Group();
+  arm.add(upper);
+  arm.upper = upper;
 
-  const glove = new THREE.Mesh(new THREE.SphereGeometry(0.13, 18, 12), materials.jetHarness);
-  glove.scale.set(1.08, 0.88, 0.9);
-  glove.position.set(0, -0.61, -0.035);
-  arm.add(glove);
+  const sleeve = addCapsule(upper, 0.073, 0.38, materials.jetHoodie, 0, -0.2, -0.01, 0, 0, side * 0.08, 0.92, 1.0, 0.78, 14);
+  sleeve.userData.jetArmPart = true;
+  addBox(upper, 0.13, 0.055, 0.12, materials.jetHarness, 0, -0.38, -0.012);
 
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 8), materials.jetSkin);
-  palm.scale.set(1.05, 0.72, 0.5);
-  palm.position.set(0, -0.62, -0.09);
-  arm.add(palm);
+  const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.082, 16, 10), materials.jetHarness);
+  elbow.scale.set(0.9, 0.72, 0.78);
+  elbow.position.set(0, -0.44, -0.012);
+  upper.add(elbow);
+
+  const forearm = new THREE.Group();
+  forearm.position.set(0, -0.44, -0.012);
+  upper.add(forearm);
+  arm.forearm = forearm;
+
+  addCylinder(forearm, 0.066, 0.06, 0.36, materials.jetJacketHighlight, 0, -0.19, 0, 0, 0, side * 0.04, 0.8, 1.0, 0.68, 12);
+  addBox(forearm, 0.13, 0.062, 0.12, materials.jetHarness, 0, -0.385, 0);
+  addJetIdleEnergyLine(forearm, 0.02, 0.34, 0.016, side * 0.058, -0.195, -0.085, 0, 0, side * 0.12);
+  addJetEnergyLine(energyLines, forearm, 0.024, 0.38, 0.018, side * 0.064, -0.2, -0.1, 0, 0, side * 0.14);
+
+  const hand = new THREE.Group();
+  hand.position.set(0, -0.45, -0.02);
+  forearm.add(hand);
+  arm.hand = hand;
+
+  const glove = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 12), materials.jetHarness);
+  glove.scale.set(1.08, 0.76, 0.86);
+  glove.position.set(0, 0, 0);
+  hand.add(glove);
+
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 8), materials.jetSkin);
+  palm.scale.set(1.05, 0.62, 0.48);
+  palm.position.set(0, -0.005, -0.07);
+  hand.add(palm);
+  for (let i = -1; i <= 1; i += 1) {
+    addBox(hand, 0.024, 0.075, 0.024, materials.jetHarness, side * i * 0.023, -0.06, -0.055, 0.15, 0, 0);
+  }
 
   return arm;
 }
 
 function createLeg(side, energyLines) {
   const leg = new THREE.Group();
-  leg.position.set(side * 0.2, -0.34, 0.01);
+  leg.position.set(side * 0.22, -0.28, 0.015);
 
-  const pants = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, 0.52, 6, 12), materials.jetPants);
-  pants.position.y = -0.25;
-  pants.rotation.z = side * 0.04;
-  leg.add(pants);
+  const upperLeg = new THREE.Group();
+  leg.add(upperLeg);
+  leg.upper = upperLeg;
 
-  addBox(leg, 0.04, 0.42, 0.018, materials.jetPantsTrim, side * 0.086, -0.25, -0.03, 0, 0, side * -0.08);
-  addBox(leg, 0.16, 0.08, 0.16, materials.jetHarness, 0, -0.55, -0.02);
+  addCapsule(upperLeg, 0.096, 0.66, materials.jetPants, 0, -0.31, -0.005, 0, 0, side * 0.035, 0.88, 1.0, 0.72, 14);
+  addBox(upperLeg, 0.17, 0.18, 0.15, materials.jetPantsTrim, 0, -0.42, -0.105, 0, 0, side * 0.03);
+  addBox(upperLeg, 0.15, 0.18, 0.13, materials.jetHarness, side * 0.035, -0.46, 0.07, 0, 0, side * 0.04);
+
+  const knee = new THREE.Mesh(new THREE.SphereGeometry(0.098, 16, 10), materials.jetSkin);
+  knee.scale.set(0.88, 0.62, 0.74);
+  knee.position.set(0, -0.7, -0.02);
+  upperLeg.add(knee);
+
+  const lower = new THREE.Group();
+  lower.position.set(0, -0.77, -0.02);
+  upperLeg.add(lower);
+  leg.lower = lower;
+
+  const anchorRing = new THREE.Mesh(new THREE.TorusGeometry(0.142, 0.026, 8, 32), materials.jetHarness);
+  anchorRing.position.set(0, 0, 0);
+  anchorRing.rotation.x = Math.PI / 2;
+  anchorRing.scale.set(1.16, 0.84, 1);
+  lower.add(anchorRing);
+  addJetIdleEnergyLine(lower, 0.22, 0.026, 0.02, 0, 0, -0.128);
+  addJetEnergyLine(energyLines, lower, 0.26, 0.038, 0.022, 0, 0, -0.142);
+
+  addCapsule(lower, 0.052, 0.72, materials.jetMechanicalDark, 0, -0.33, 0.005, side * 0.015, 0, side * -0.02, 0.9, 1.0, 0.7, 12);
+  addBox(lower, 0.15, 0.68, 0.066, materials.jetMechanicalSilver, 0, -0.33, -0.092, side * 0.025, 0, side * -0.04);
+  addBox(lower, 0.14, 0.74, 0.058, materials.jetMechanicalSilver, 0, -0.33, 0.2, side * 0.02, 0, side * -0.02);
+  addCapsule(lower, 0.026, 0.78, materials.jetMechanicalSilver, side * 0.15, -0.33, -0.005, 0, 0, side * -0.05, 1.0, 1.0, 0.72, 10);
+  addCapsule(lower, 0.022, 0.68, materials.jetMechanicalDark, side * -0.1, -0.34, 0.0, 0, 0, side * 0.035, 1.0, 1.0, 0.76, 10);
+  addCapsule(lower, 0.022, 0.7, materials.jetHarnessPlate, side * 0.1, -0.34, 0.18, 0, 0, side * -0.035, 1.0, 1.0, 0.72, 10);
+  addCylinder(lower, 0.058, 0.058, 0.032, materials.jetMechanicalDark, 0, -0.14, -0.14, Math.PI / 2, 0, 0, 1, 1, 1, 18);
+  addCylinder(lower, 0.066, 0.066, 0.034, materials.jetMechanicalSilver, 0, -0.55, -0.14, Math.PI / 2, 0, 0, 1, 1, 1, 18);
+  addCylinder(lower, 0.054, 0.054, 0.03, materials.jetMechanicalDark, side * 0.115, -0.34, 0.245, Math.PI / 2, 0, 0, 1, 1, 1, 16);
+  addBox(lower, 0.036, 0.13, 0.05, materials.jetCautionYellow, side * 0.17, -0.2, -0.048, 0, 0, side * -0.06);
+  addJetIdleEnergyLine(lower, 0.03, 0.68, 0.022, side * 0.184, -0.33, -0.058, 0, 0, side * -0.08);
+  addJetIdleEnergyLine(lower, 0.03, 0.72, 0.02, side * 0.047, -0.33, 0.245, 0, 0, side * -0.025);
+  addJetEnergyLine(energyLines, lower, 0.036, 0.78, 0.026, side * 0.19, -0.33, -0.074, 0, 0, side * -0.08);
+  addJetEnergyLine(energyLines, lower, 0.036, 0.8, 0.022, side * 0.052, -0.33, 0.262, 0, 0, side * -0.025);
 
   const shoe = new THREE.Group();
-  shoe.position.set(0, -0.46, -0.12);
+  shoe.position.set(0, -0.72, -0.1);
 
-  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.11, 0.66), materials.jetShoeSole);
-  sole.position.set(0, -0.07, 0.03);
+  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.58), materials.jetShoeSole);
+  sole.position.set(0, -0.04, 0.03);
   shoe.add(sole);
 
-  const top = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.2, 0.58), materials.jetShoeWhite);
-  top.position.set(0, 0.02, -0.03);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.13, 0.48), materials.jetMechanicalSilver);
+  top.position.set(0, 0.025, -0.04);
   shoe.add(top);
 
-  addBox(shoe, 0.34, 0.07, 0.12, materials.jetHoodieShadow, 0, 0.16, -0.12);
-  addBox(shoe, 0.07, 0.1, 0.24, materials.jetAccentRed, side * 0.17, 0.02, -0.02, 0, 0.16 * side, 0);
-  addBox(shoe, 0.24, 0.04, 0.34, materials.jetHarnessPlate, 0, 0.03, -0.13, 0, 0, side * 0.12);
-  addJetEnergyLine(energyLines, shoe, 0.028, 0.042, 0.38, side * 0.21, 0.06, -0.04, 0, 0.08 * side, 0);
+  addBox(shoe, 0.24, 0.055, 0.13, materials.jetMechanicalDark, 0, 0.105, -0.11);
+  addBox(shoe, 0.055, 0.09, 0.22, materials.jetCautionYellow, side * 0.14, 0.025, -0.02, 0, 0.16 * side, 0);
+  addBox(shoe, 0.22, 0.04, 0.32, materials.jetHarnessPlate, 0, 0.03, -0.13, 0, 0, side * 0.12);
+  addBox(shoe, 0.14, 0.19, 0.22, materials.jetMechanicalDark, 0, 0.035, 0.34);
+  addCylinder(shoe, 0.062, 0.074, 0.11, materials.jetHarnessPlate, 0, 0.04, 0.48, Math.PI / 2, 0, 0, 1, 1, 1, 14);
+  addJetIdleEnergyLine(shoe, 0.028, 0.04, 0.3, side * 0.17, 0.065, -0.04, 0, 0.08 * side, 0);
+  addJetEnergyLine(energyLines, shoe, 0.032, 0.044, 0.34, side * 0.17, 0.065, -0.04, 0, 0.08 * side, 0);
+  addJetEnergyLine(energyLines, shoe, 0.14, 0.07, 0.09, 0, 0.045, 0.49);
 
-  leg.add(shoe);
+  lower.add(shoe);
   leg.shoe = shoe;
   return leg;
 }
@@ -8973,19 +9152,37 @@ function animatePlayerModel(dt) {
   const speed = getHorizontalSpeed();
   const moving = speed > 2;
   const runAmount = THREE.MathUtils.clamp(speed / 54, 0, 1.8);
-  runPhase += speed * dt * 0.18;
+  const cappedCadenceSpeed = Math.min(speed, runTopSpeed * 1.25);
+  runPhase += cappedCadenceSpeed * dt * 0.4;
 
-  const swing = Math.sin(runPhase) * 0.82 * runAmount;
-  const counterSwing = Math.sin(runPhase + Math.PI) * 0.82 * runAmount;
-  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.30;
+  const runStrength = Math.min(runAmount, 1.72);
+  const sprintAmount = moving && player.grounded ? THREE.MathUtils.clamp(speed / runTopSpeed, 0, 1) : 0;
+  const boostPoseAmount = moving && player.grounded && playerBoostEffectActive
+    ? THREE.MathUtils.clamp((speed - runTopSpeed * 0.75) / (boostTopSpeed - runTopSpeed * 0.75), 0, 1)
+    : 0;
+  const boostStartFlare = boostPoseAmount > 0
+    ? THREE.MathUtils.smoothstep(boostCameraKick, 0, 1)
+    : 0;
+  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.08;
   const airborne = !player.grounded;
+  const limbBlend = 1 - Math.exp(-15 * dt);
+  const runBodyBob = moving && player.grounded ? Math.abs(Math.sin(runPhase * 2)) * 0.005 : 0;
 
-  player.parts.model.position.y = 0.1
-    + (moving && player.grounded ? Math.abs(Math.sin(runPhase * 2)) * 0.008 : 0)
+  if (airborne) {
+    jetFootContactOffsetY = THREE.MathUtils.lerp(
+      jetFootContactOffsetY,
+      0,
+      1 - Math.exp(-7 * dt),
+    );
+  }
+
+  player.parts.model.position.y = jetModelBaseY
+    + jetFootContactOffsetY
+    + runBodyBob
     + (airborne ? 0.04 : 0);
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
     player.parts.model.rotation.x,
-    airborne ? -0.12 : -THREE.MathUtils.clamp(speed * 0.004, 0, 0.28),
+    airborne ? -0.18 : THREE.MathUtils.lerp(-THREE.MathUtils.lerp(0, 0.58, sprintAmount), -0.82, boostPoseAmount),
     1 - Math.exp(-9 * dt),
   );
   player.parts.model.rotation.z = THREE.MathUtils.lerp(
@@ -8997,24 +9194,128 @@ function animatePlayerModel(dt) {
   const [armLeft, armRight] = player.parts.arms;
   const [legLeft, legRight] = player.parts.legs;
 
-  if (airborne) {
-    armLeft.rotation.x = THREE.MathUtils.lerp(armLeft.rotation.x, -0.65, 1 - Math.exp(-10 * dt));
-    armRight.rotation.x = THREE.MathUtils.lerp(armRight.rotation.x, -0.65, 1 - Math.exp(-10 * dt));
-    legLeft.rotation.x = THREE.MathUtils.lerp(legLeft.rotation.x, 0.5, 1 - Math.exp(-10 * dt));
-    legRight.rotation.x = THREE.MathUtils.lerp(legRight.rotation.x, -0.25, 1 - Math.exp(-10 * dt));
+  const applyArmPose = (arm, phase, side) => {
+    if (!arm) return;
+    if (airborne) {
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, -0.72, limbBlend);
+      arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, side * 0.28, limbBlend);
+      if (arm.forearm) arm.forearm.rotation.x = THREE.MathUtils.lerp(arm.forearm.rotation.x, 1.12, limbBlend);
+      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, 0.12, limbBlend);
+      return;
+    }
+
+    if (!moving) {
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, -0.08, limbBlend);
+      arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, side * 0.18, limbBlend);
+      if (arm.forearm) arm.forearm.rotation.x = THREE.MathUtils.lerp(arm.forearm.rotation.x, 0.42, limbBlend);
+      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, 0, limbBlend);
+      return;
+    }
+
+    const wave = Math.sin(phase);
+    const elbowDrive = Math.max(0, -wave);
+    const forwardDrive = Math.max(0, wave);
+    const runArmX = wave * 1.12 * runStrength - 0.18;
+    const runArmZ = side * (0.28 + elbowDrive * 0.18);
+    const boostArmX = -1.1 - boostStartFlare * 0.18;
+    const boostArmZ = side * (0.62 + boostStartFlare * 0.16);
+    arm.rotation.x = THREE.MathUtils.lerp(
+      arm.rotation.x,
+      THREE.MathUtils.lerp(runArmX, boostArmX, boostPoseAmount),
+      limbBlend,
+    );
+    arm.rotation.z = THREE.MathUtils.lerp(
+      arm.rotation.z,
+      THREE.MathUtils.lerp(runArmZ, boostArmZ, boostPoseAmount),
+      limbBlend,
+    );
+    if (arm.forearm) {
+      const runForearmX = 0.78 + elbowDrive * 0.78 * runStrength + forwardDrive * 0.16;
+      const boostForearmX = 0.18 + boostStartFlare * 0.18;
+      arm.forearm.rotation.x = THREE.MathUtils.lerp(
+        arm.forearm.rotation.x,
+        THREE.MathUtils.lerp(runForearmX, boostForearmX, boostPoseAmount),
+        limbBlend,
+      );
+    }
+    if (arm.hand) {
+      const runHandX = 0.1 + elbowDrive * 0.24;
+      const boostHandX = -0.04 + boostStartFlare * 0.08;
+      arm.hand.rotation.x = THREE.MathUtils.lerp(
+        arm.hand.rotation.x,
+        THREE.MathUtils.lerp(runHandX, boostHandX, boostPoseAmount),
+        limbBlend,
+      );
+    }
+  };
+
+  const applyLegPose = (leg, phase) => {
+    if (!leg) return;
+    if (airborne) {
+      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.5, limbBlend);
+      if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.8, limbBlend);
+      if (leg.shoe) leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0.18, limbBlend);
+      if (leg.shoe) leg.shoe.scale.setScalar(1);
+      return;
+    }
+
+    if (!moving) {
+      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.02, limbBlend);
+      if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.08, limbBlend);
+      if (leg.shoe) {
+        leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0, limbBlend);
+        leg.shoe.scale.setScalar(1);
+      }
+      return;
+    }
+
+    const wave = Math.sin(phase);
+    const lift = Math.max(0, wave);
+    const push = Math.max(0, -wave);
+    const runKneeFlex = -(0.28 + lift * 1.24 * runStrength + push * 0.48 * runStrength);
+    const boostForwardReach = lift * 1.32 * runStrength;
+    const boostGroundKick = push * 1.04 * runStrength;
+    const boostKneeFlex = -(0.18 + lift * 0.58 * runStrength + push * 0.72 * runStrength);
+    const runLegX = wave * 1.14 * runStrength;
+    const boostLegX = boostForwardReach - boostGroundKick;
+    leg.rotation.x = THREE.MathUtils.lerp(
+      leg.rotation.x,
+      THREE.MathUtils.lerp(runLegX, boostLegX, boostPoseAmount),
+      limbBlend,
+    );
+    if (leg.lower) {
+      leg.lower.rotation.x = THREE.MathUtils.lerp(
+        leg.lower.rotation.x,
+        THREE.MathUtils.lerp(runKneeFlex, boostKneeFlex, boostPoseAmount),
+        limbBlend,
+      );
+    }
+    if (leg.shoe) {
+      const runShoeX = 0.2 + lift * 0.34 - push * 0.25;
+      const boostShoeX = 0.14 + lift * 0.42 - push * 0.3;
+      leg.shoe.rotation.x = THREE.MathUtils.lerp(
+        leg.shoe.rotation.x,
+        THREE.MathUtils.lerp(runShoeX, boostShoeX, boostPoseAmount),
+        limbBlend,
+      );
+      leg.shoe.scale.set(1, 1, moving ? shoePulse : 1);
+    }
+  };
+
+  if (airborne || moving) {
+    applyArmPose(armLeft, runPhase, -1);
+    applyArmPose(armRight, runPhase + Math.PI, 1);
+    applyLegPose(legLeft, runPhase + Math.PI);
+    applyLegPose(legRight, runPhase);
   } else {
-    armLeft.rotation.x = swing;
-    armRight.rotation.x = counterSwing;
-    legLeft.rotation.x = counterSwing;
-    legRight.rotation.x = swing;
+    applyArmPose(armLeft, runPhase, -1);
+    applyArmPose(armRight, runPhase + Math.PI, 1);
+    applyLegPose(legLeft, runPhase + Math.PI);
+    applyLegPose(legRight, runPhase);
   }
 
-  armLeft.rotation.z = -0.32;
-  armRight.rotation.z = 0.32;
-  legLeft.shoe.rotation.x = moving ? -0.18 + Math.sin(runPhase + Math.PI) * 0.18 : 0;
-  legRight.shoe.rotation.x = moving ? -0.18 + Math.sin(runPhase) * 0.18 : 0;
-  legLeft.shoe.scale.set(1, 1, moving ? shoePulse : 1);
-  legRight.shoe.scale.set(1, 1, moving ? shoePulse : 1);
+  alignJetFootContactToGround(dt, moving);
+
   player.parts.head.rotation.y = THREE.MathUtils.lerp(
     player.parts.head.rotation.y,
     THREE.MathUtils.clamp(player.velocity.x * 0.018, -0.2, 0.2),
@@ -9032,6 +9333,65 @@ function animatePlayerModel(dt) {
       : 1;
     line.scale.setScalar(pulse);
   }
+}
+
+function alignJetFootContactToGround(dt, moving) {
+  if (!player.grounded || !player.mesh || !player.parts?.model) return;
+
+  const footBottomY = getJetFootBottomLocalY();
+  if (!Number.isFinite(footBottomY)) return;
+
+  const targetBottomY = -player.radius + jetFootGroundClearance;
+  const correction = targetBottomY - footBottomY;
+  const followRate = moving ? 8 : 24;
+  const contactBlend = 1 - Math.exp(-followRate * dt);
+  const frameScale = THREE.MathUtils.clamp(dt * 60, 0.5, 1.5);
+  const maxCorrectionStep = (moving ? 0.018 : 0.05) * frameScale;
+  const previousOffsetY = jetFootContactOffsetY;
+  const nextOffsetY = jetFootContactOffsetY + THREE.MathUtils.clamp(
+    correction * contactBlend,
+    -maxCorrectionStep,
+    maxCorrectionStep,
+  );
+
+  jetFootContactOffsetY = THREE.MathUtils.clamp(nextOffsetY, -0.45, 0.45);
+  player.parts.model.position.y += jetFootContactOffsetY - previousOffsetY;
+}
+
+function getJetFootBottomLocalY() {
+  player.mesh.updateMatrixWorld(true);
+  jetFootContactInverse.copy(player.mesh.matrixWorld).invert();
+
+  let minY = Infinity;
+  for (const leg of player.parts.legs ?? []) {
+    const shoe = leg?.shoe;
+    if (!shoe) continue;
+
+    shoe.traverse((object) => {
+      if (!object.isMesh || !object.geometry) return;
+      if (!object.geometry.boundingBox) {
+        object.geometry.computeBoundingBox();
+      }
+      jetFootContactBox.copy(object.geometry.boundingBox);
+      if (jetFootContactBox.isEmpty()) return;
+
+      jetFootContactMatrix.multiplyMatrices(jetFootContactInverse, object.matrixWorld);
+      for (let ix = 0; ix <= 1; ix += 1) {
+        for (let iy = 0; iy <= 1; iy += 1) {
+          for (let iz = 0; iz <= 1; iz += 1) {
+            jetFootContactCorner.set(
+              ix === 0 ? jetFootContactBox.min.x : jetFootContactBox.max.x,
+              iy === 0 ? jetFootContactBox.min.y : jetFootContactBox.max.y,
+              iz === 0 ? jetFootContactBox.min.z : jetFootContactBox.max.z,
+            ).applyMatrix4(jetFootContactMatrix);
+            minY = Math.min(minY, jetFootContactCorner.y);
+          }
+        }
+      }
+    });
+  }
+
+  return minY;
 }
 
 const runCameraPreset = Object.freeze({
@@ -9150,17 +9510,24 @@ function updateManualCameraInput(dt) {
   const pitchSpeed = 0.92;
   const yawInput = (isDown("KeyJ") ? 1 : 0) - (isDown("KeyL") ? 1 : 0);
   const pitchInput = (isDown("KeyI") ? 1 : 0) - (isDown("KeyK") ? 1 : 0);
+  const nextYawOffset = cameraYawOffset + yawInput * yawSpeed * dt;
+  const nextPitchOffset = cameraPitchOffset + pitchInput * pitchSpeed * dt;
 
-  cameraYawOffset = THREE.MathUtils.clamp(
-    cameraYawOffset + yawInput * yawSpeed * dt,
-    -THREE.MathUtils.degToRad(78),
-    THREE.MathUtils.degToRad(78),
-  );
-  cameraPitchOffset = THREE.MathUtils.clamp(
-    cameraPitchOffset + pitchInput * pitchSpeed * dt,
-    -THREE.MathUtils.degToRad(34),
-    THREE.MathUtils.degToRad(42),
-  );
+  if (debugSettings.unlimitedCameraOrbit) {
+    cameraYawOffset = nextYawOffset;
+    cameraPitchOffset = nextPitchOffset;
+  } else {
+    cameraYawOffset = THREE.MathUtils.clamp(
+      nextYawOffset,
+      -THREE.MathUtils.degToRad(78),
+      THREE.MathUtils.degToRad(78),
+    );
+    cameraPitchOffset = THREE.MathUtils.clamp(
+      nextPitchOffset,
+      -THREE.MathUtils.degToRad(34),
+      THREE.MathUtils.degToRad(42),
+    );
+  }
 }
 
 function resetCameraView() {
@@ -9301,7 +9668,7 @@ function updateMusicButton() {
 }
 
 function loadGraphicsSettings() {
-  if (isGraphicsRecoveryRequested()) {
+  if (isGraphicsResetRequested()) {
     const safeSettings = getSafeGraphicsSettings();
     try {
       window.localStorage.removeItem(graphicsStorageKey);
@@ -9312,6 +9679,10 @@ function loadGraphicsSettings() {
     return safeSettings;
   }
 
+  if (isGraphicsSafeModeRequested()) {
+    return getSafeGraphicsSettings();
+  }
+
   try {
     const stored = JSON.parse(window.localStorage.getItem(graphicsStorageKey));
     return normalizeGraphicsSettings(stored);
@@ -9320,16 +9691,21 @@ function loadGraphicsSettings() {
   }
 }
 
-function isGraphicsRecoveryRequested() {
+function isGraphicsResetRequested() {
   const params = new URLSearchParams(window.location.search);
   const resetGraphics = params.get("resetGraphics");
-  const safeGraphics = params.get("safeGraphics");
   const graphicsMode = params.get("graphics");
   return resetGraphics === "1"
     || resetGraphics === "true"
-    || safeGraphics === "1"
+    || graphicsMode === "reset";
+}
+
+function isGraphicsSafeModeRequested() {
+  const params = new URLSearchParams(window.location.search);
+  const safeGraphics = params.get("safeGraphics");
+  const graphicsMode = params.get("graphics");
+  return safeGraphics === "1"
     || safeGraphics === "true"
-    || graphicsMode === "reset"
     || graphicsMode === "safe"
     || graphicsMode === "low";
 }
@@ -9376,6 +9752,9 @@ function normalizeDebugSettings(source = {}) {
     infiniteJump: typeof source.infiniteJump === "boolean" ? source.infiniteJump : debugDefaults.infiniteJump,
     mouseObject: typeof source.mouseObject === "boolean" ? source.mouseObject : debugDefaults.mouseObject,
     performanceHud: typeof source.performanceHud === "boolean" ? source.performanceHud : debugDefaults.performanceHud,
+    unlimitedCameraOrbit: typeof source.unlimitedCameraOrbit === "boolean"
+      ? source.unlimitedCameraOrbit
+      : debugDefaults.unlimitedCameraOrbit,
   };
 }
 
@@ -9923,6 +10302,7 @@ function warpToGoalProgress(progress) {
   quickStepQueued = 0;
   quickStepTimer = 0;
   quickStepCooldown = 0;
+  jetFootContactOffsetY = 0;
   clearQuickStepAfterimages();
   dashPadBoostRemaining = 0;
   boostMotionBlurTarget = 0;
@@ -9964,6 +10344,7 @@ function resetGame(options = {}) {
   hitCooldown = 0;
   hitStun = 0;
   runPhase = 0;
+  jetFootContactOffsetY = 0;
   quickStepQueued = 0;
   quickStepDirection = 0;
   quickStepTimer = 0;
@@ -10015,11 +10396,16 @@ function resetGame(options = {}) {
     setStageObjectTransform(player.mesh, player.position);
   }
   if (player.parts) {
-    player.parts.model.position.y = 0.1;
+    player.parts.model.position.y = jetModelBaseY;
     player.parts.model.rotation.set(0, 0, 0);
-    for (const arm of player.parts.arms) arm.rotation.set(0, 0, 0);
+    for (const arm of player.parts.arms) {
+      arm.rotation.set(0, 0, 0);
+      if (arm.forearm) arm.forearm.rotation.set(0, 0, 0);
+      if (arm.hand) arm.hand.rotation.set(0, 0, 0);
+    }
     for (const leg of player.parts.legs) {
       leg.rotation.set(0, 0, 0);
+      if (leg.lower) leg.lower.rotation.set(0, 0, 0);
       leg.shoe.rotation.set(0, 0, 0);
       leg.shoe.scale.set(1, 1, 1);
     }
