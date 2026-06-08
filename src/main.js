@@ -287,8 +287,8 @@ let debugSettings = loadDebugSettings();
 let lastFrameTime = 0;
 const quickStepAfterimageCount = 9;
 const quickStepAfterimageRevealLead = 0.08;
-const quickStepAfterimageBlurRadius = 12;
-const quickStepAfterimageBlurIntensity = 1.35;
+const quickStepAfterimageBlurRadius = 14;
+const quickStepAfterimageBlurIntensity = 0.82;
 const selectiveBloomLayer = 1;
 const playerMotionMaskLayer = 2;
 const velocityMotionBlurMaxPixels = 150;
@@ -8179,6 +8179,7 @@ function addJetEnergyLine(lines, parent, width, height, depth, x, y, z, rx = 0, 
   line.visible = false;
   line.layers.enable(selectiveBloomLayer);
   line.userData.energyLine = true;
+  line.userData.isJetEnergyLine = true;
   line.userData.phase = lines.length * 0.73;
   lines.push(line);
   return line;
@@ -8333,6 +8334,13 @@ function addQuickStepAfterimages() {
 
       if (!cloneObject.isMesh) continue;
 
+      const energyLine = isQuickStepAfterimageEnergyLine(sourceObject);
+      cloneObject.userData.quickStepAfterimageEnergyLine = energyLine;
+      if (!energyLine) {
+        cloneObject.visible = false;
+        continue;
+      }
+
       if (Array.isArray(cloneObject.material)) {
         cloneObject.material = cloneObject.material.map((material) => {
           const afterimageMaterial = createQuickStepAfterimageMaterial(material);
@@ -8371,7 +8379,8 @@ function addQuickStepAfterimages() {
 
 function createQuickStepAfterimageMaterial(sourceMaterial) {
   const source = Array.isArray(sourceMaterial) ? sourceMaterial[0] : sourceMaterial;
-  const color = source?.color?.clone?.() ?? new THREE.Color(0xffffff);
+  const color = source?.color?.clone?.() ?? new THREE.Color(0x24d9ff);
+  color.lerp(new THREE.Color(0xb8f7ff), 0.28);
   const material = new THREE.MeshBasicMaterial({
     color,
     transparent: true,
@@ -8387,6 +8396,16 @@ function createQuickStepAfterimageMaterial(sourceMaterial) {
   return material;
 }
 
+function isQuickStepAfterimageEnergyLine(object) {
+  if (!object?.isMesh) return false;
+  if (object.userData?.isJetEnergyLine) return true;
+  if (object.material === materials.jetEnergy) return true;
+  if (Array.isArray(object.material)) {
+    return object.material.some((material) => material === materials.jetEnergy);
+  }
+  return false;
+}
+
 function syncQuickStepAfterimagePose(afterimage) {
   for (let i = 1; i < afterimage.cloneObjects.length; i += 1) {
     const sourceObject = afterimage.sourceObjects[i];
@@ -8396,7 +8415,9 @@ function syncQuickStepAfterimagePose(afterimage) {
     cloneObject.position.copy(sourceObject.position);
     cloneObject.quaternion.copy(sourceObject.quaternion);
     cloneObject.scale.copy(sourceObject.scale);
-    cloneObject.visible = sourceObject.visible;
+    cloneObject.visible = cloneObject.isMesh
+      ? Boolean(cloneObject.userData.quickStepAfterimageEnergyLine)
+      : sourceObject.visible;
   }
 }
 
@@ -8416,6 +8437,7 @@ function applyQuickStepAfterimageTransform(afterimage) {
 function spawnQuickStepAfterimages(direction) {
   const laneDirection = Math.sign(direction);
   if (laneDirection === 0) return;
+  if (!playerBoostEffectActive) return;
 
   for (let i = 0; i < quickStepAfterimages.length; i += 1) {
     const afterimage = quickStepAfterimages[i];
@@ -8423,9 +8445,9 @@ function spawnQuickStepAfterimages(direction) {
     const centerWeight = 1 - Math.abs(progress - 0.5) * 1.55;
     const clampedCenterWeight = THREE.MathUtils.clamp(centerWeight, 0, 1);
     const x = THREE.MathUtils.lerp(quickStepStartX, quickStepTargetX, progress);
-    const opacity = 0.34 + clampedCenterWeight * 0.24;
-    const scaleX = 1.0 + clampedCenterWeight * 1.45;
-    const scaleY = 0.92 + clampedCenterWeight * 0.1;
+    const opacity = 0.3 + clampedCenterWeight * 0.2;
+    const scaleX = 1.0 + clampedCenterWeight * 0.72;
+    const scaleY = 0.95 + clampedCenterWeight * 0.08;
     const z = 0.08 - progress * 0.04;
 
     syncQuickStepAfterimagePose(afterimage);
@@ -8448,6 +8470,7 @@ function spawnQuickStepAfterimages(direction) {
 
 function updateQuickStepAfterimages() {
   const quickStepActive = quickStepTimer > 0;
+  const allowAfterimages = quickStepActive && playerBoostEffectActive;
   const quickStepRawProgress = quickStepActive ? 1 - quickStepTimer / quickStepDuration : 1;
   const quickStepProgress = 1 - Math.pow(
     1 - THREE.MathUtils.clamp(quickStepRawProgress, 0, 1),
@@ -8456,7 +8479,7 @@ function updateQuickStepAfterimages() {
   const revealProgress = Math.min(1, quickStepProgress + quickStepAfterimageRevealLead);
 
   for (const afterimage of quickStepAfterimages) {
-    if (!quickStepActive) {
+    if (!allowAfterimages) {
       afterimage.life = 0;
       afterimage.revealed = false;
       afterimage.mesh.visible = false;
@@ -9555,7 +9578,11 @@ function updateTutorialPrompt() {
 
 function renderGame(dt) {
   if (player.mesh) {
-    const quickStepLean = quickStepTimer > 0 ? -quickStepDirection * 0.18 : 0;
+    const quickStepProgress = quickStepTimer > 0
+      ? THREE.MathUtils.clamp(1 - quickStepTimer / quickStepDuration, 0, 1)
+      : 0;
+    const quickStepLeanPulse = quickStepTimer > 0 ? Math.sin(quickStepProgress * Math.PI) : 0;
+    const quickStepLean = -quickStepDirection * quickStepLeanPulse * 0.34;
     const lean = -player.velocity.x * 0.014 + quickStepLean;
     setStageObjectTransform(player.mesh, player.position);
     player.mesh.rotateY(player.yaw);
@@ -9814,6 +9841,15 @@ function animatePlayerModel(dt) {
 
   const speed = getHorizontalSpeed();
   const moving = speed > 2;
+  const quickStepActive = quickStepTimer > 0;
+  const quickStepProgress = quickStepActive
+    ? THREE.MathUtils.clamp(1 - quickStepTimer / quickStepDuration, 0, 1)
+    : 0;
+  const quickStepPulse = quickStepActive ? Math.sin(quickStepProgress * Math.PI) : 0;
+  const stationaryQuickStepAmount = quickStepActive && player.grounded && speed < 18
+    ? quickStepPulse
+    : 0;
+  const sideStepDirection = quickStepDirection === 0 ? 1 : quickStepDirection;
   const runAmount = THREE.MathUtils.clamp(speed / 54, 0, 1.8);
   const cappedCadenceSpeed = Math.min(speed, runTopSpeed * 1.25);
   runPhase += cappedCadenceSpeed * dt * 0.4;
@@ -9842,6 +9878,7 @@ function animatePlayerModel(dt) {
   player.parts.model.position.y = jetModelBaseY
     + jetFootContactOffsetY
     + runBodyBob
+    + stationaryQuickStepAmount * 0.08
     + (airborne ? 0.04 : 0);
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
     player.parts.model.rotation.x,
@@ -9850,7 +9887,7 @@ function animatePlayerModel(dt) {
   );
   player.parts.model.rotation.z = THREE.MathUtils.lerp(
     player.parts.model.rotation.z,
-    -player.velocity.x * 0.01,
+    -player.velocity.x * 0.01 - sideStepDirection * stationaryQuickStepAmount * 0.1,
     1 - Math.exp(-8 * dt),
   );
 
@@ -9864,6 +9901,25 @@ function animatePlayerModel(dt) {
       arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, side * 0.28, limbBlend);
       if (arm.forearm) arm.forearm.rotation.x = THREE.MathUtils.lerp(arm.forearm.rotation.x, 1.12, limbBlend);
       if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, 0.12, limbBlend);
+      return;
+    }
+
+    if (stationaryQuickStepAmount > 0) {
+      const counterSide = side === sideStepDirection ? 0.18 : -0.32;
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, -0.18 - stationaryQuickStepAmount * 0.3, limbBlend);
+      arm.rotation.z = THREE.MathUtils.lerp(
+        arm.rotation.z,
+        side * 0.2 + counterSide * stationaryQuickStepAmount,
+        limbBlend,
+      );
+      if (arm.forearm) {
+        arm.forearm.rotation.x = THREE.MathUtils.lerp(
+          arm.forearm.rotation.x,
+          0.5 + stationaryQuickStepAmount * 0.34,
+          limbBlend,
+        );
+      }
+      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, 0.04, limbBlend);
       return;
     }
 
@@ -9912,18 +9968,51 @@ function animatePlayerModel(dt) {
     }
   };
 
-  const applyLegPose = (leg, phase) => {
+  const applyLegPose = (leg, phase, side) => {
     if (!leg) return;
     if (airborne) {
       leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.5, limbBlend);
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, limbBlend);
       if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.8, limbBlend);
       if (leg.shoe) leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0.18, limbBlend);
       if (leg.shoe) leg.shoe.scale.setScalar(1);
       return;
     }
 
+    if (stationaryQuickStepAmount > 0) {
+      const leadLeg = side === sideStepDirection;
+      const legAmount = stationaryQuickStepAmount;
+      leg.rotation.x = THREE.MathUtils.lerp(
+        leg.rotation.x,
+        leadLeg ? 0.16 * legAmount : -0.42 * legAmount,
+        limbBlend,
+      );
+      leg.rotation.z = THREE.MathUtils.lerp(
+        leg.rotation.z,
+        side * (leadLeg ? 0.24 : -0.14) * legAmount,
+        limbBlend,
+      );
+      if (leg.lower) {
+        leg.lower.rotation.x = THREE.MathUtils.lerp(
+          leg.lower.rotation.x,
+          leadLeg ? -0.42 - legAmount * 0.14 : -0.72 - legAmount * 0.16,
+          limbBlend,
+        );
+      }
+      if (leg.shoe) {
+        leg.shoe.rotation.x = THREE.MathUtils.lerp(
+          leg.shoe.rotation.x,
+          leadLeg ? 0.16 : 0.28,
+          limbBlend,
+        );
+        leg.shoe.scale.setScalar(1);
+      }
+      return;
+    }
+
     if (!moving) {
       leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.02, limbBlend);
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, limbBlend);
       if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.08, limbBlend);
       if (leg.shoe) {
         leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0, limbBlend);
@@ -9946,6 +10035,7 @@ function animatePlayerModel(dt) {
       THREE.MathUtils.lerp(runLegX, boostLegX, boostPoseAmount),
       limbBlend,
     );
+    leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, limbBlend);
     if (leg.lower) {
       leg.lower.rotation.x = THREE.MathUtils.lerp(
         leg.lower.rotation.x,
@@ -9968,16 +10058,16 @@ function animatePlayerModel(dt) {
   if (airborne || moving) {
     applyArmPose(armLeft, runPhase, -1);
     applyArmPose(armRight, runPhase + Math.PI, 1);
-    applyLegPose(legLeft, runPhase + Math.PI);
-    applyLegPose(legRight, runPhase);
+    applyLegPose(legLeft, runPhase + Math.PI, -1);
+    applyLegPose(legRight, runPhase, 1);
   } else {
     applyArmPose(armLeft, runPhase, -1);
     applyArmPose(armRight, runPhase + Math.PI, 1);
-    applyLegPose(legLeft, runPhase + Math.PI);
-    applyLegPose(legRight, runPhase);
+    applyLegPose(legLeft, runPhase + Math.PI, -1);
+    applyLegPose(legRight, runPhase, 1);
   }
 
-  alignJetFootContactToGround(dt, moving);
+  alignJetFootContactToGround(dt, moving || stationaryQuickStepAmount > 0);
 
   player.parts.head.rotation.y = THREE.MathUtils.lerp(
     player.parts.head.rotation.y,
