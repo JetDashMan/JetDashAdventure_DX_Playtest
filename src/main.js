@@ -20,6 +20,7 @@ const graphicsButton = document.querySelector("#graphics-toggle");
 const graphicsPanel = document.querySelector("#graphics-panel");
 const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
+const debugRenderPathEl = document.querySelector("#debug-render-path");
 const mouseObjectLabelEl = document.querySelector("#mouse-object-label");
 const performanceHudEl = document.querySelector("#performance-hud");
 const helpButton = document.querySelector("#help-toggle");
@@ -77,6 +78,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.info.autoReset = false;
+const renderCompatibility = createRenderCompatibilityProfile();
 
 const graphicsStorageKey = "jetdash-graphics-settings";
 const graphicsPresets = {
@@ -298,7 +300,8 @@ const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   samples: 0,
 });
 sceneRenderTarget.texture.name = "VelocitySceneColorTarget";
-const velocityMotionBlurSupported = renderer.capabilities.isWebGL2 || renderer.extensions.has("WEBGL_depth_texture");
+const velocityMotionBlurSupported = renderCompatibility.path === "velocity"
+  && (renderer.capabilities.isWebGL2 || renderer.extensions.has("WEBGL_depth_texture"));
 const fallbackDepthTexture = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
 fallbackDepthTexture.name = "VelocityMotionBlurFallbackDepthTexture";
 fallbackDepthTexture.needsUpdate = true;
@@ -9382,6 +9385,11 @@ function renderFrame() {
   updateSkyDome();
   updateVelocityMotionMatrices();
 
+  if (renderCompatibility.path === "direct") {
+    renderDirectSafeFrame();
+    return;
+  }
+
   velocityMotionBlurMaterial.uniforms.uStrength.value = velocityMotionBlurStrength;
   velocityMotionBlurMaterial.uniforms.tDiffuse.value = sceneRenderTarget.texture;
   velocityMotionBlurMaterial.uniforms.tMotionVector.value = velocityMotionVectorTarget.texture;
@@ -9424,6 +9432,13 @@ function renderFrame() {
   renderer.setClearColor(clearColor, clearAlpha);
   renderer.setRenderTarget(null);
   renderer.render(postScene, postCamera);
+  commitVelocityMotionHistory();
+}
+
+function renderDirectSafeFrame() {
+  renderer.info.reset();
+  renderer.setRenderTarget(null);
+  renderer.render(scene, camera);
   commitVelocityMotionHistory();
 }
 
@@ -10265,6 +10280,7 @@ function syncDebugControls() {
     if (!control) continue;
     control.checked = Boolean(debugSettings[key]);
   }
+  updateDebugRenderPath();
   if (!debugSettings.mouseObject) {
     hideMouseObjectLabel();
   }
@@ -10420,6 +10436,13 @@ function updatePerformanceHud() {
   renderPerformanceHud(performanceHudState.fps);
 }
 
+function updateDebugRenderPath() {
+  if (!debugRenderPathEl) return;
+
+  debugRenderPathEl.textContent = renderCompatibility.label;
+  debugRenderPathEl.title = renderCompatibility.detail;
+}
+
 function renderPerformanceHud(fps) {
   if (!performanceHudEl) return;
 
@@ -10437,6 +10460,7 @@ function renderPerformanceHud(fps) {
     formatPerformanceHudRow("Canvas", `${canvasWidth}x${canvasHeight}`),
     formatPerformanceHudRow("View", graphicsSettings.viewDistance),
     formatPerformanceHudRow("Water", graphicsSettings.waterQuality),
+    formatPerformanceHudRow("Path", renderCompatibility.shortLabel),
   ].join("");
 }
 
@@ -10581,6 +10605,7 @@ function setDebugPanelOpen(open) {
   debugPanel.classList.toggle("hidden", !open);
   debugButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
+    updateDebugRenderPath();
     setMainMenuOpen(false);
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
@@ -10889,6 +10914,169 @@ function moveToward(current, target, maxDelta) {
     return target;
   }
   return current + Math.sign(target - current) * maxDelta;
+}
+
+function createRenderCompatibilityProfile() {
+  const requestedPath = getRenderPathOverride();
+  const depthTextureAvailable = renderer.capabilities.isWebGL2 || renderer.extensions.has("WEBGL_depth_texture");
+  const probe = probeVelocityCompositeCompatibility(depthTextureAvailable);
+
+  if (requestedPath === "direct") {
+    return {
+      path: "direct",
+      shortLabel: "direct",
+      label: "Direct Safe (forced)",
+      detail: "renderPath=direct forced direct scene rendering. Velocity postprocess is bypassed.",
+      depthTextureAvailable,
+      probe,
+    };
+  }
+
+  if (requestedPath === "velocity") {
+    return {
+      path: "velocity",
+      shortLabel: "velocity",
+      label: "Velocity No-MSAA (forced)",
+      detail: `renderPath=velocity forced velocity postprocess. Probe: ${probe.reason}`,
+      depthTextureAvailable,
+      probe,
+    };
+  }
+
+  if (depthTextureAvailable && probe.passed) {
+    return {
+      path: "velocity",
+      shortLabel: "velocity",
+      label: "Velocity No-MSAA (auto)",
+      detail: `Runtime probe passed. ${probe.reason}`,
+      depthTextureAvailable,
+      probe,
+    };
+  }
+
+  return {
+    path: "direct",
+    shortLabel: "direct",
+    label: "Direct Safe (auto)",
+    detail: `Runtime probe failed. ${probe.reason}`,
+    depthTextureAvailable,
+    probe,
+  };
+}
+
+function getRenderPathOverride() {
+  const value = new URLSearchParams(window.location.search).get("renderPath");
+  if (value === "direct" || value === "safe") return "direct";
+  if (value === "velocity" || value === "advanced") return "velocity";
+  return "auto";
+}
+
+function probeVelocityCompositeCompatibility(depthTextureAvailable) {
+  if (!depthTextureAvailable) {
+    return { passed: false, reason: "depth texture unavailable" };
+  }
+
+  const previousTarget = renderer.getRenderTarget();
+  const previousClearColor = renderer.getClearColor(new THREE.Color());
+  const previousClearAlpha = renderer.getClearAlpha();
+
+  const testScene = new THREE.Scene();
+  const compositeScene = new THREE.Scene();
+  const testCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+  const quadGeometry = new THREE.PlaneGeometry(2, 2);
+  const colorMaterial = new THREE.ShaderMaterial({
+    name: "RenderCompatibilityColorProbe",
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+    vertexShader: `
+      void main() {
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      void main() {
+        gl_FragColor = vec4(0.08, 0.72, 0.22, 1.0);
+      }
+    `,
+  });
+  const depthTexture = new THREE.DepthTexture(4, 4, THREE.UnsignedShortType);
+  const colorTarget = new THREE.WebGLRenderTarget(4, 4, {
+    depthBuffer: true,
+    stencilBuffer: false,
+    samples: 0,
+  });
+  const outputTarget = new THREE.WebGLRenderTarget(4, 4, {
+    depthBuffer: false,
+    stencilBuffer: false,
+    samples: 0,
+  });
+  colorTarget.depthTexture = depthTexture;
+  const compositeMaterial = new THREE.ShaderMaterial({
+    name: "RenderCompatibilityCompositeProbe",
+    uniforms: {
+      tDiffuse: { value: colorTarget.texture },
+      tDepth: { value: depthTexture },
+    },
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform sampler2D tDepth;
+      varying vec2 vUv;
+      void main() {
+        vec4 color = texture2D(tDiffuse, vUv);
+        float depth = texture2D(tDepth, vUv).x;
+        gl_FragColor = vec4(color.rgb + vec3(depth * 0.0), 1.0);
+      }
+    `,
+  });
+
+  try {
+    testScene.add(new THREE.Mesh(quadGeometry, colorMaterial));
+    compositeScene.add(new THREE.Mesh(quadGeometry, compositeMaterial));
+
+    renderer.setClearColor(0x000000, 1);
+    renderer.setRenderTarget(colorTarget);
+    renderer.clear(true, true, true);
+    renderer.render(testScene, testCamera);
+
+    renderer.setRenderTarget(outputTarget);
+    renderer.clear(true, true, true);
+    renderer.render(compositeScene, testCamera);
+
+    const pixels = new Uint8Array(4);
+    renderer.readRenderTargetPixels(outputTarget, 2, 2, 1, 1, pixels);
+    const passed = pixels[1] > 80 && pixels[3] > 0;
+    return {
+      passed,
+      reason: passed
+        ? `color/depth composite probe passed (${pixels[0]},${pixels[1]},${pixels[2]},${pixels[3]})`
+        : `color/depth composite probe returned dark pixels (${pixels[0]},${pixels[1]},${pixels[2]},${pixels[3]})`,
+    };
+  } catch (error) {
+    return {
+      passed: false,
+      reason: `probe error: ${error?.message || "unknown"}`,
+    };
+  } finally {
+    renderer.setRenderTarget(previousTarget);
+    renderer.setClearColor(previousClearColor, previousClearAlpha);
+    colorMaterial.dispose();
+    compositeMaterial.dispose();
+    quadGeometry.dispose();
+    colorTarget.dispose();
+    outputTarget.dispose();
+    depthTexture.dispose();
+  }
 }
 
 function resize() {

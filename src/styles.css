@@ -563,6 +563,19 @@ body.game-paused .help-panel {
   color: rgba(241, 249, 255, 0.78);
 }
 
+.debug-status output {
+  display: block;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid rgba(120, 214, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.38);
+  color: #effaff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .debug-progress-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
