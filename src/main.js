@@ -37,6 +37,7 @@ const stageSelectButtons = document.querySelectorAll("[data-stage-select]");
 const tutorialPromptEl = document.querySelector("#tutorial-prompt");
 const rotatePromptEl = document.querySelector("#rotate-prompt");
 const mobileStartEl = document.querySelector("#mobile-start");
+const mobileStartTitleEl = document.querySelector("#mobile-start-title");
 const mobileStartFullscreenButton = document.querySelector("#mobile-start-fullscreen");
 const mobileStartWindowedButton = document.querySelector("#mobile-start-windowed");
 const touchControlsEl = document.querySelector("#touch-controls");
@@ -82,6 +83,7 @@ renderer.info.autoReset = false;
 const renderCompatibility = createRenderCompatibilityProfile();
 
 const graphicsStorageKey = "jetdash-graphics-settings";
+const fullscreenPreferenceStorageKey = "jetdash-mobile-fullscreen-preferred";
 const graphicsPresets = {
   low: {
     renderScale: "0.75",
@@ -803,6 +805,8 @@ let isPaused = false;
 let pauseStartedAt = 0;
 let musicWasPlayingBeforePause = false;
 let mobileStartDismissed = false;
+let mobileFullscreenPreferred = false;
+let mobileFullscreenRecoveryActive = false;
 let hemiLight;
 let sunLight;
 let sunTarget;
@@ -815,6 +819,7 @@ const touchControlsEnabled = Boolean(
       || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     ),
 );
+mobileFullscreenPreferred = touchControlsEnabled && loadMobileFullscreenPreference();
 const touchInput = {
   activePointers: new Map(),
   autoForward: false,
@@ -1831,6 +1836,7 @@ function init() {
   syncDebugControls();
   resize();
   resetGame({ scoreOverride: carriedStageScore });
+  activateInitialMobileFullscreenRecovery();
 }
 
 function addLights() {
@@ -8529,8 +8535,7 @@ function bindInput() {
   document.querySelector("[data-close-panel='debug']")?.addEventListener("click", () => setDebugPanelOpen(false));
   document.querySelector("[data-close-panel='help']")?.addEventListener("click", () => setHelpPanelOpen(false));
   fullscreenButton?.addEventListener("click", toggleFullscreen);
-  document.addEventListener("fullscreenchange", updateFullscreenButton);
-  document.addEventListener("fullscreenchange", updateMobileStartPrompt);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("visibilitychange", handleVisibilityPause);
   window.addEventListener("pagehide", handleVisibilityPause);
   window.addEventListener("blur", handleWindowBlurPause);
@@ -8584,30 +8589,105 @@ function setupMobileStartPrompt() {
 
 async function handleMobileStartFullscreen(event) {
   event.preventDefault();
+  const recovery = mobileFullscreenRecoveryActive;
+  mobileFullscreenPreferred = true;
+  saveMobileFullscreenPreference(true);
   mobileStartDismissed = true;
-  await requestGameFullscreen();
+  mobileFullscreenRecoveryActive = false;
+  const fullscreenGranted = await requestGameFullscreen();
   await tryLockLandscape();
   if (musicWanted) startMusic();
+  const fullscreenActive = fullscreenGranted || isFullscreenLike();
+  if (recovery && fullscreenActive) {
+    setPaused(false, "manual");
+  } else if (recovery) {
+    mobileFullscreenRecoveryActive = true;
+    mobileStartDismissed = false;
+  } else if (!fullscreenActive) {
+    mobileStartDismissed = false;
+  }
   updateMobileStartPrompt();
 }
 
 async function handleMobileStartWindowed(event) {
   event.preventDefault();
+  const recovery = mobileFullscreenRecoveryActive;
+  mobileFullscreenPreferred = false;
+  saveMobileFullscreenPreference(false);
   mobileStartDismissed = true;
+  mobileFullscreenRecoveryActive = false;
   await tryLockLandscape();
   if (musicWanted) startMusic();
+  if (recovery) {
+    setPaused(false, "manual");
+  }
+  updateMobileStartPrompt();
+}
+
+function handleFullscreenChange() {
+  updateFullscreenButton();
+
+  if (touchControlsEnabled && mobileFullscreenPreferred && !isFullscreenLike() && !finished) {
+    mobileFullscreenRecoveryActive = true;
+    mobileStartDismissed = false;
+    setPaused(true, "system");
+  } else if (isFullscreenLike()) {
+    mobileFullscreenRecoveryActive = false;
+    if (mobileFullscreenPreferred) {
+      mobileStartDismissed = true;
+    }
+  }
+
+  updateMobileStartPrompt();
+}
+
+function activateInitialMobileFullscreenRecovery() {
+  if (!touchControlsEnabled || !mobileFullscreenPreferred || isFullscreenLike() || finished) return;
+
+  mobileFullscreenRecoveryActive = true;
+  mobileStartDismissed = false;
+  setPaused(true, "system");
   updateMobileStartPrompt();
 }
 
 function updateMobileStartPrompt() {
   if (!touchControlsEnabled || !mobileStartEl) return;
 
-  const fullscreenLike = Boolean(document.fullscreenElement)
-    || window.matchMedia?.("(display-mode: fullscreen)").matches
-    || window.matchMedia?.("(display-mode: standalone)").matches;
-  const showPrompt = !mobileStartDismissed && !fullscreenLike;
+  const fullscreenLike = isFullscreenLike();
+  const showPrompt = (!mobileStartDismissed || mobileFullscreenRecoveryActive) && !fullscreenLike;
+  if (mobileStartTitleEl) {
+    mobileStartTitleEl.textContent = mobileFullscreenRecoveryActive ? "RESUME" : "FULLSCREEN";
+  }
+  if (mobileStartFullscreenButton) {
+    mobileStartFullscreenButton.textContent = mobileFullscreenRecoveryActive ? "Resume Fullscreen" : "Start Fullscreen";
+  }
+  if (mobileStartWindowedButton) {
+    mobileStartWindowedButton.textContent = mobileFullscreenRecoveryActive ? "Continue Windowed" : "Play Windowed";
+  }
   mobileStartEl.classList.toggle("hidden", !showPrompt);
   mobileStartEl.setAttribute("aria-hidden", showPrompt ? "false" : "true");
+}
+
+function isFullscreenLike() {
+  return Boolean(document.fullscreenElement)
+    || window.matchMedia?.("(display-mode: fullscreen)").matches
+    || window.matchMedia?.("(display-mode: standalone)").matches;
+}
+
+function loadMobileFullscreenPreference() {
+  try {
+    return window.localStorage.getItem(fullscreenPreferenceStorageKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function saveMobileFullscreenPreference(preferred) {
+  try {
+    window.localStorage.setItem(fullscreenPreferenceStorageKey, preferred ? "true" : "false");
+  } catch {
+    // Ignore storage failures; the current in-memory preference still applies.
+  }
 }
 
 function updateTouchOrientationState() {
@@ -10196,10 +10276,6 @@ function bindGraphicsControls() {
   graphicsControls.preset.addEventListener("change", () => {
     const preset = graphicsControls.preset.value;
     if (graphicsPresets[preset]) {
-      if (shouldConfirmMobileUltraPreset(preset) && !confirmMobileUltraGraphicsChange()) {
-        syncGraphicsControls();
-        return;
-      }
       graphicsSettings = normalizeGraphicsSettings({ preset, ...graphicsPresets[preset] });
       applyGraphicsSettings();
       syncGraphicsControls();
@@ -10209,10 +10285,6 @@ function bindGraphicsControls() {
   for (const [key, control] of Object.entries(graphicsControls)) {
     if (!control || key === "preset") continue;
     control.addEventListener("change", () => {
-      if (shouldConfirmMobileUltraControl(key, control.value) && !confirmMobileUltraGraphicsChange()) {
-        syncGraphicsControls();
-        return;
-      }
       graphicsSettings = normalizeGraphicsSettings({
         ...graphicsSettings,
         preset: "custom",
@@ -10222,24 +10294,6 @@ function bindGraphicsControls() {
       syncGraphicsControls();
     });
   }
-}
-
-function shouldConfirmMobileUltraPreset(preset) {
-  return touchControlsEnabled && preset === "ultra";
-}
-
-function shouldConfirmMobileUltraControl(key, value) {
-  return touchControlsEnabled
-    && String(value) === "ultra"
-    && ["shadowQuality", "motionBlur", "textureQuality", "waterQuality", "viewDistance"].includes(key);
-}
-
-function confirmMobileUltraGraphicsChange() {
-  return window.confirm(
-    "Ultra 洹몃옒?쎌? ?쇰? 紐⑤컮??湲곌린?먯꽌 Chrome??媛뺤젣 醫낅즺?????덉뒿?덈떎.\n\n"
-    + "?뚯뒪??紐⑹쟻???꾨땲?쇰㈃ Low ?먮뒗 Medium??沅뚯옣?⑸땲??\n"
-    + "洹몃옒??Ultra ?ㅼ젙???곸슜?좉퉴??"
-  );
 }
 
 function bindDebugControls() {
@@ -10641,6 +10695,12 @@ async function toggleFullscreen() {
   }
 
   if (document.fullscreenElement) {
+    if (touchControlsEnabled) {
+      mobileFullscreenPreferred = false;
+      mobileFullscreenRecoveryActive = false;
+      mobileStartDismissed = true;
+      saveMobileFullscreenPreference(false);
+    }
     try {
       await document.exitFullscreen();
     } catch (error) {
@@ -10651,6 +10711,10 @@ async function toggleFullscreen() {
     return;
   }
 
+  if (touchControlsEnabled) {
+    mobileFullscreenPreferred = true;
+    saveMobileFullscreenPreference(true);
+  }
   await requestGameFullscreen();
   await tryLockLandscape();
 }
