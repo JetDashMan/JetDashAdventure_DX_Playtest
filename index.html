@@ -18,7 +18,7 @@
     <canvas id="game"></canvas>
     <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
     <div id="performance-hud" class="performance-hud hidden" aria-live="off" aria-label="Performance debug"></div>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-056C: 런타임 렌더링 호환성 검사와 DEBUG 경로 표시를 추가합니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-057: 렌더타깃 samples를 자동 선택해 품질과 호환성을 함께 테스트합니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -222,6 +222,10 @@
       <div class="debug-block debug-status">
         <span>Render Path</span>
         <output id="debug-render-path">Checking</output>
+      </div>
+      <div class="debug-block debug-status">
+        <span>Render Samples</span>
+        <output id="debug-render-samples">Checking</output>
       </div>
       <label class="debug-check">
         <span>U Super Boost</span>

@@ -21,6 +21,7 @@ const graphicsPanel = document.querySelector("#graphics-panel");
 const debugButton = document.querySelector("#debug-toggle");
 const debugPanel = document.querySelector("#debug-panel");
 const debugRenderPathEl = document.querySelector("#debug-render-path");
+const debugRenderSamplesEl = document.querySelector("#debug-render-samples");
 const mouseObjectLabelEl = document.querySelector("#mouse-object-label");
 const performanceHudEl = document.querySelector("#performance-hud");
 const helpButton = document.querySelector("#help-toggle");
@@ -297,7 +298,7 @@ const jetEnergyBloomSoftScale = 0.25;
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
   stencilBuffer: false,
-  samples: 0,
+  samples: renderCompatibility.samples,
 });
 sceneRenderTarget.texture.name = "VelocitySceneColorTarget";
 const velocityMotionBlurSupported = renderCompatibility.path === "velocity"
@@ -10437,10 +10438,14 @@ function updatePerformanceHud() {
 }
 
 function updateDebugRenderPath() {
-  if (!debugRenderPathEl) return;
-
-  debugRenderPathEl.textContent = renderCompatibility.label;
-  debugRenderPathEl.title = renderCompatibility.detail;
+  if (debugRenderPathEl) {
+    debugRenderPathEl.textContent = renderCompatibility.label;
+    debugRenderPathEl.title = renderCompatibility.detail;
+  }
+  if (debugRenderSamplesEl) {
+    debugRenderSamplesEl.textContent = renderCompatibility.samplesLabel;
+    debugRenderSamplesEl.title = renderCompatibility.samplesDetail;
+  }
 }
 
 function renderPerformanceHud(fps) {
@@ -10461,6 +10466,7 @@ function renderPerformanceHud(fps) {
     formatPerformanceHudRow("View", graphicsSettings.viewDistance),
     formatPerformanceHudRow("Water", graphicsSettings.waterQuality),
     formatPerformanceHudRow("Path", renderCompatibility.shortLabel),
+    formatPerformanceHudRow("Samples", renderCompatibility.samplesShortLabel),
   ].join("");
 }
 
@@ -10918,15 +10924,22 @@ function moveToward(current, target, maxDelta) {
 
 function createRenderCompatibilityProfile() {
   const requestedPath = getRenderPathOverride();
+  const requestedSamples = getRenderSamplesOverride();
   const depthTextureAvailable = renderer.capabilities.isWebGL2 || renderer.extensions.has("WEBGL_depth_texture");
-  const probe = probeVelocityCompositeCompatibility(depthTextureAvailable);
+  const sampleSelection = selectRenderTargetSamples(depthTextureAvailable, requestedSamples);
+  const probe = sampleSelection.probe;
+  const canUseVelocityPath = depthTextureAvailable && sampleSelection.passed;
 
   if (requestedPath === "direct") {
     return {
       path: "direct",
       shortLabel: "direct",
       label: "Direct Safe (forced)",
-      detail: "renderPath=direct forced direct scene rendering. Velocity postprocess is bypassed.",
+      samples: sampleSelection.samples,
+      samplesShortLabel: "direct",
+      samplesLabel: "N/A (direct)",
+      samplesDetail: sampleSelection.detail,
+      detail: `renderPath=direct forced direct scene rendering. Velocity postprocess is bypassed. ${sampleSelection.detail}`,
       depthTextureAvailable,
       probe,
     };
@@ -10935,20 +10948,28 @@ function createRenderCompatibilityProfile() {
   if (requestedPath === "velocity") {
     return {
       path: "velocity",
-      shortLabel: "velocity",
-      label: "Velocity No-MSAA (forced)",
-      detail: `renderPath=velocity forced velocity postprocess. Probe: ${probe.reason}`,
+      shortLabel: `velocity ${formatRenderSamples(sampleSelection.samples)}`,
+      label: `Velocity ${formatRenderSamples(sampleSelection.samples)} (forced)`,
+      samples: sampleSelection.samples,
+      samplesShortLabel: formatRenderSamples(sampleSelection.samples),
+      samplesLabel: sampleSelection.label,
+      samplesDetail: sampleSelection.detail,
+      detail: `renderPath=velocity forced velocity postprocess. ${sampleSelection.detail}`,
       depthTextureAvailable,
       probe,
     };
   }
 
-  if (depthTextureAvailable && probe.passed) {
+  if (canUseVelocityPath) {
     return {
       path: "velocity",
-      shortLabel: "velocity",
-      label: "Velocity No-MSAA (auto)",
-      detail: `Runtime probe passed. ${probe.reason}`,
+      shortLabel: `velocity ${formatRenderSamples(sampleSelection.samples)}`,
+      label: `Velocity ${formatRenderSamples(sampleSelection.samples)} (${sampleSelection.pathMode})`,
+      samples: sampleSelection.samples,
+      samplesShortLabel: formatRenderSamples(sampleSelection.samples),
+      samplesLabel: sampleSelection.label,
+      samplesDetail: sampleSelection.detail,
+      detail: `Runtime probe passed. ${sampleSelection.detail}`,
       depthTextureAvailable,
       probe,
     };
@@ -10958,7 +10979,11 @@ function createRenderCompatibilityProfile() {
     path: "direct",
     shortLabel: "direct",
     label: "Direct Safe (auto)",
-    detail: `Runtime probe failed. ${probe.reason}`,
+    samples: sampleSelection.samples,
+    samplesShortLabel: "direct",
+    samplesLabel: "N/A (direct)",
+    samplesDetail: sampleSelection.detail,
+    detail: `Runtime probe failed. ${sampleSelection.detail}`,
     depthTextureAvailable,
     probe,
   };
@@ -10971,7 +10996,83 @@ function getRenderPathOverride() {
   return "auto";
 }
 
-function probeVelocityCompositeCompatibility(depthTextureAvailable) {
+function getRenderSamplesOverride() {
+  const value = new URLSearchParams(window.location.search).get("renderSamples");
+  if (value === "0" || value === "off") return 0;
+  if (value === "2" || value === "2x" || value === "on") return 2;
+  return "auto";
+}
+
+function selectRenderTargetSamples(depthTextureAvailable, requestedSamples) {
+  const supportsMsaaRenderTarget = renderer.capabilities.isWebGL2;
+
+  if (requestedSamples === 0) {
+    const probe = probeVelocityCompositeCompatibility(depthTextureAvailable, 0);
+    return {
+      samples: 0,
+      passed: probe.passed,
+      probe,
+      pathMode: "forced",
+      label: "0x (forced)",
+      detail: `renderSamples=0 forced. ${probe.reason}`,
+    };
+  }
+
+  if (requestedSamples === 2) {
+    const probe = supportsMsaaRenderTarget
+      ? probeVelocityCompositeCompatibility(depthTextureAvailable, 2)
+      : { passed: false, reason: "2x render target samples require WebGL2" };
+    return {
+      samples: supportsMsaaRenderTarget ? 2 : 0,
+      passed: supportsMsaaRenderTarget && probe.passed,
+      probe,
+      pathMode: "forced",
+      label: supportsMsaaRenderTarget ? "2x (forced)" : "0x (2x unavailable)",
+      detail: `renderSamples=2 forced. ${probe.reason}`,
+    };
+  }
+
+  const msaaProbe = supportsMsaaRenderTarget
+    ? probeVelocityCompositeCompatibility(depthTextureAvailable, 2)
+    : { passed: false, reason: "2x render target samples require WebGL2" };
+  if (msaaProbe.passed) {
+    return {
+      samples: 2,
+      passed: true,
+      probe: msaaProbe,
+      pathMode: "auto",
+      label: "2x (auto)",
+      detail: `renderSamples=auto selected 2x. ${msaaProbe.reason}`,
+    };
+  }
+
+  const noMsaaProbe = probeVelocityCompositeCompatibility(depthTextureAvailable, 0);
+  if (noMsaaProbe.passed) {
+    return {
+      samples: 0,
+      passed: true,
+      probe: noMsaaProbe,
+      pathMode: "auto fallback",
+      label: "0x (auto fallback)",
+      detail: `renderSamples=auto fell back to 0x. 2x: ${msaaProbe.reason}; 0x: ${noMsaaProbe.reason}`,
+    };
+  }
+
+  return {
+    samples: 0,
+    passed: false,
+    probe: noMsaaProbe,
+    pathMode: "auto failed",
+    label: "0x (probe failed)",
+    detail: `renderSamples=auto failed. 2x: ${msaaProbe.reason}; 0x: ${noMsaaProbe.reason}`,
+  };
+}
+
+function formatRenderSamples(samples) {
+  return samples > 0 ? `${samples}x` : "0x";
+}
+
+function probeVelocityCompositeCompatibility(depthTextureAvailable, samples = 0) {
   if (!depthTextureAvailable) {
     return { passed: false, reason: "depth texture unavailable" };
   }
@@ -11004,7 +11105,7 @@ function probeVelocityCompositeCompatibility(depthTextureAvailable) {
   const colorTarget = new THREE.WebGLRenderTarget(4, 4, {
     depthBuffer: true,
     stencilBuffer: false,
-    samples: 0,
+    samples,
   });
   const outputTarget = new THREE.WebGLRenderTarget(4, 4, {
     depthBuffer: false,
@@ -11059,13 +11160,13 @@ function probeVelocityCompositeCompatibility(depthTextureAvailable) {
     return {
       passed,
       reason: passed
-        ? `color/depth composite probe passed (${pixels[0]},${pixels[1]},${pixels[2]},${pixels[3]})`
-        : `color/depth composite probe returned dark pixels (${pixels[0]},${pixels[1]},${pixels[2]},${pixels[3]})`,
+        ? `${formatRenderSamples(samples)} color/depth composite probe passed (${pixels[0]},${pixels[1]},${pixels[2]},${pixels[3]})`
+        : `${formatRenderSamples(samples)} color/depth composite probe returned dark pixels (${pixels[0]},${pixels[1]},${pixels[2]},${pixels[3]})`,
     };
   } catch (error) {
     return {
       passed: false,
-      reason: `probe error: ${error?.message || "unknown"}`,
+      reason: `${formatRenderSamples(samples)} probe error: ${error?.message || "unknown"}`,
     };
   } finally {
     renderer.setRenderTarget(previousTarget);
