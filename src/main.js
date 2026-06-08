@@ -296,6 +296,10 @@ const jetEnergyBloomRenderScale = 1.0;
 const jetEnergyBloomBlurRadius = 2.8;
 const jetEnergyBloomWideScale = 0.5;
 const jetEnergyBloomSoftScale = 0.25;
+const jetBoostLightColor = 0x42dfff;
+const jetBoostLightMaxIntensity = 0.72;
+const jetBoostLightDistance = 5.2;
+const jetBoostLightDecay = 2.0;
 
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
@@ -810,6 +814,7 @@ let mobileFullscreenRecoveryActive = false;
 let hemiLight;
 let sunLight;
 let sunTarget;
+let jetBoostLight;
 
 const keys = new Set();
 const touchControlsEnabled = Boolean(
@@ -8051,6 +8056,17 @@ function addPlayer() {
   addJetIdleEnergyLine(model, 0.024, 0.34, 0.018, 0.3, 0.18, -0.225, 0, 0, 0.16);
   addJetEnergyLine(energyLines, model, 0.03, 0.42, 0.018, -0.31, 0.12, -0.238, 0, 0, -0.18);
   addJetEnergyLine(energyLines, model, 0.03, 0.42, 0.018, 0.31, 0.12, -0.238, 0, 0, 0.18);
+  jetBoostLight = new THREE.PointLight(
+    jetBoostLightColor,
+    0,
+    jetBoostLightDistance,
+    jetBoostLightDecay,
+  );
+  jetBoostLight.position.set(0, 0.28, 0.5);
+  jetBoostLight.castShadow = false;
+  jetBoostLight.visible = false;
+  jetBoostLight.userData.debugName = "JET Boost Light";
+  model.add(jetBoostLight);
 
   model.traverse((child) => {
     child.layers.enable(playerMotionMaskLayer);
@@ -9430,6 +9446,7 @@ function renderGame(dt) {
   updateSunShadow();
   updateVelocityMotionBlur(dt);
   updateJetEnergyBloom(dt);
+  updateJetBoostLight();
   renderFrame();
   updatePerformanceHud();
 }
@@ -9460,6 +9477,23 @@ function updateJetEnergyBloom(dt) {
   if (target <= 0 && jetEnergyBloomStrength < 0.02) {
     jetEnergyBloomStrength = 0;
   }
+}
+
+function updateJetBoostLight() {
+  if (!jetBoostLight) return;
+
+  const intensity = playerBoostEffectActive
+    ? THREE.MathUtils.clamp(jetEnergyBloomStrength * 0.32, 0, jetBoostLightMaxIntensity)
+    : 0;
+  jetBoostLight.intensity = intensity;
+  jetBoostLight.visible = intensity > 0.02;
+}
+
+function resetJetBoostLight() {
+  if (!jetBoostLight) return;
+
+  jetBoostLight.intensity = 0;
+  jetBoostLight.visible = false;
 }
 
 function renderFrame() {
@@ -10819,6 +10853,7 @@ function warpToGoalProgress(progress) {
   materials.jetEnergy.opacity = 0;
   velocityMotionBlurMaterial.uniforms.uStrength.value = 0;
   velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = 0;
+  resetJetBoostLight();
   if (touchControlsEnabled) resetTouchRunState();
   player.position.set(0, sample.y + player.radius, targetZ);
   player.velocity.set(0, 0, 0);
@@ -10871,6 +10906,7 @@ function resetGame(options = {}) {
   materials.jetEnergy.opacity = 0;
   velocityMotionBlurMaterial.uniforms.uStrength.value = 0;
   velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = 0;
+  resetJetBoostLight();
   resetCameraView();
   resetVelocityMotionHistory();
   dashPadBoostStartSpeed = 0;
