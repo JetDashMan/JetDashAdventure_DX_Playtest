@@ -297,7 +297,7 @@ const jetEnergyBloomBlurRadius = 2.8;
 const jetEnergyBloomWideScale = 0.5;
 const jetEnergyBloomSoftScale = 0.25;
 const jetBoostLightColor = 0x42dfff;
-const jetBoostLightMaxIntensity = 2.4;
+const jetBoostLightMaxIntensity = 50;
 const jetBoostLightDistance = 7.5;
 const jetBoostLightDecay = 2.0;
 
@@ -832,6 +832,18 @@ const touchInput = {
   brake: false,
   boost: false,
   jump: false,
+};
+const touchQuickStepFlickMinDistance = 44;
+const touchQuickStepFlickMaxMs = 260;
+const touchQuickStepTapMaxDistance = 26;
+const touchQuickStepTapMaxMs = 260;
+const touchQuickStepGesture = {
+  active: false,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  startAt: 0,
+  handled: false,
 };
 const player = {
   radius: 0.82,
@@ -8585,7 +8597,11 @@ function bindTouchControls() {
   window.addEventListener("resize", updateTouchOrientationState);
   window.addEventListener("orientationchange", updateTouchOrientationState);
   touchControlsEl.addEventListener("contextmenu", (event) => event.preventDefault());
-  canvas.addEventListener("pointerdown", handleTouchQuickStepTap);
+  canvas.addEventListener("pointerdown", handleTouchQuickStepPointerDown);
+  canvas.addEventListener("pointermove", handleTouchQuickStepPointerMove);
+  canvas.addEventListener("pointerup", handleTouchQuickStepPointerEnd);
+  canvas.addEventListener("pointercancel", handleTouchQuickStepPointerCancel);
+  canvas.addEventListener("lostpointercapture", handleTouchQuickStepPointerCancel);
 
   touchControlButtons.forEach((button) => {
     button.addEventListener("pointerdown", handleTouchControlDown);
@@ -8762,15 +8778,99 @@ function handleTouchControlUp(event) {
   syncTouchControls();
 }
 
-function handleTouchQuickStepTap(event) {
-  if (!touchControlsEnabled || document.body.classList.contains("portrait-touch") || finished || isPaused) return;
-  if (event.pointerType === "mouse") return;
-  if (event.target !== canvas) return;
+function canUseTouchQuickStep(event) {
+  return touchControlsEnabled
+    && !document.body.classList.contains("portrait-touch")
+    && !finished
+    && !isPaused
+    && event.pointerType !== "mouse";
+}
+
+function handleTouchQuickStepPointerDown(event) {
+  if (!canUseTouchQuickStep(event) || event.target !== canvas) return;
 
   event.preventDefault();
   tryLockLandscape();
   if (musicWanted) startMusic();
-  quickStepQueued = event.clientX < window.innerWidth * 0.5 ? -1 : 1;
+
+  touchQuickStepGesture.active = true;
+  touchQuickStepGesture.pointerId = event.pointerId;
+  touchQuickStepGesture.startX = event.clientX;
+  touchQuickStepGesture.startY = event.clientY;
+  touchQuickStepGesture.startAt = performance.now();
+  touchQuickStepGesture.handled = false;
+  captureTouchQuickStepPointer(event.pointerId);
+}
+
+function handleTouchQuickStepPointerMove(event) {
+  if (!touchQuickStepGesture.active || touchQuickStepGesture.pointerId !== event.pointerId) return;
+  if (touchQuickStepGesture.handled) return;
+
+  event.preventDefault();
+  const dx = event.clientX - touchQuickStepGesture.startX;
+  const dy = event.clientY - touchQuickStepGesture.startY;
+  const elapsed = performance.now() - touchQuickStepGesture.startAt;
+  const horizontal = Math.abs(dx);
+  const vertical = Math.abs(dy);
+  const isFlick = elapsed <= touchQuickStepFlickMaxMs
+    && horizontal >= touchQuickStepFlickMinDistance
+    && horizontal >= vertical * 1.35;
+
+  if (!isFlick) return;
+
+  queueTouchQuickStep(dx < 0 ? -1 : 1);
+  touchQuickStepGesture.handled = true;
+}
+
+function handleTouchQuickStepPointerEnd(event) {
+  if (!touchQuickStepGesture.active || touchQuickStepGesture.pointerId !== event.pointerId) return;
+
+  event.preventDefault();
+  const dx = event.clientX - touchQuickStepGesture.startX;
+  const dy = event.clientY - touchQuickStepGesture.startY;
+  const elapsed = performance.now() - touchQuickStepGesture.startAt;
+  const movement = Math.hypot(dx, dy);
+
+  if (!touchQuickStepGesture.handled && elapsed <= touchQuickStepTapMaxMs && movement <= touchQuickStepTapMaxDistance) {
+    queueTouchQuickStep(touchQuickStepGesture.startX < window.innerWidth * 0.5 ? -1 : 1);
+  }
+
+  resetTouchQuickStepGesture(event.pointerId);
+}
+
+function handleTouchQuickStepPointerCancel(event) {
+  if (!touchQuickStepGesture.active || touchQuickStepGesture.pointerId !== event.pointerId) return;
+
+  resetTouchQuickStepGesture(event.pointerId);
+}
+
+function queueTouchQuickStep(direction) {
+  quickStepQueued = direction < 0 ? -1 : 1;
+}
+
+function captureTouchQuickStepPointer(pointerId) {
+  try {
+    canvas.setPointerCapture?.(pointerId);
+  } catch {
+    // Some browsers reject pointer capture on transient touch events.
+  }
+}
+
+function releaseTouchQuickStepPointer(pointerId) {
+  if (pointerId == null) return;
+
+  try {
+    canvas.releasePointerCapture?.(pointerId);
+  } catch {
+    // Capture may already be released by the browser.
+  }
+}
+
+function resetTouchQuickStepGesture(pointerId = touchQuickStepGesture.pointerId) {
+  releaseTouchQuickStepPointer(pointerId);
+  touchQuickStepGesture.active = false;
+  touchQuickStepGesture.pointerId = null;
+  touchQuickStepGesture.handled = false;
 }
 
 function toggleTouchAutoForward() {
@@ -8791,6 +8891,7 @@ function resetTouchRunState() {
   touchInput.brake = false;
   touchInput.boost = false;
   touchInput.jump = false;
+  resetTouchQuickStepGesture();
   syncTouchControls();
 }
 
@@ -9482,9 +9583,13 @@ function updateJetEnergyBloom(dt) {
 function updateJetBoostLight() {
   if (!jetBoostLight) return;
 
-  const intensity = playerBoostEffectActive
-    ? THREE.MathUtils.clamp(jetEnergyBloomStrength * 0.9, 0, jetBoostLightMaxIntensity)
-    : 0;
+  const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
+  const boostLightRatio = playerBoostEffectActive ? 0.12 + speedRatio * 0.88 : 0;
+  const intensity = THREE.MathUtils.clamp(
+    boostLightRatio * jetBoostLightMaxIntensity,
+    0,
+    jetBoostLightMaxIntensity,
+  );
   jetBoostLight.intensity = intensity;
   jetBoostLight.visible = intensity > 0.02;
 }
@@ -10091,6 +10196,7 @@ function setPaused(paused, reason = "manual") {
       touchInput.activePointers.clear();
       touchInput.brake = false;
       touchInput.jump = false;
+      resetTouchQuickStepGesture();
       syncTouchControls();
     }
     setMainMenuOpen(false);
