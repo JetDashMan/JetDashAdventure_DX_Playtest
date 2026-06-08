@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 
 const canvas = document.querySelector("#game");
 const dnaEl = document.querySelector("#dna");
@@ -226,10 +226,10 @@ const lightingConfig = {
 };
 const motionBlurStrengthConfig = {
   off: 0,
-  low: 0.42,
-  medium: 1,
-  high: 1.45,
-  ultra: 1.8,
+  low: 0.55,
+  medium: 0.9,
+  high: 1.25,
+  ultra: 1.7,
 };
 const waterQualityConfig = {
   low: {
@@ -285,6 +285,8 @@ const quickStepAfterimageRevealLead = 0.08;
 const quickStepAfterimageBlurRadius = 12;
 const quickStepAfterimageBlurIntensity = 1.35;
 const selectiveBloomLayer = 1;
+const playerMotionMaskLayer = 2;
+const velocityMotionBlurMaxPixels = 150;
 const jetEnergyBloomRenderScale = 1.0;
 const jetEnergyBloomBlurRadius = 2.8;
 const jetEnergyBloomWideScale = 0.5;
@@ -295,7 +297,18 @@ const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   stencilBuffer: false,
   samples: renderer.capabilities.isWebGL2 ? 2 : 0,
 });
-sceneRenderTarget.texture.name = "BoostMotionBlurTarget";
+sceneRenderTarget.texture.name = "VelocitySceneColorTarget";
+const velocityMotionBlurSupported = renderer.capabilities.isWebGL2 || renderer.extensions.has("WEBGL_depth_texture");
+const fallbackDepthTexture = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+fallbackDepthTexture.name = "VelocityMotionBlurFallbackDepthTexture";
+fallbackDepthTexture.needsUpdate = true;
+const sceneDepthTexture = velocityMotionBlurSupported
+  ? new THREE.DepthTexture(1, 1, THREE.UnsignedShortType)
+  : fallbackDepthTexture;
+sceneDepthTexture.name = velocityMotionBlurSupported ? "VelocityMotionBlurDepthTexture" : sceneDepthTexture.name;
+if (velocityMotionBlurSupported) {
+  sceneRenderTarget.depthTexture = sceneDepthTexture;
+}
 const quickStepAfterimageRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
   stencilBuffer: false,
@@ -306,6 +319,16 @@ const quickStepAfterimageBlurTarget = new THREE.WebGLRenderTarget(1, 1, {
   stencilBuffer: false,
 });
 quickStepAfterimageBlurTarget.texture.name = "QuickStepAfterimageLinearBlurTarget";
+const velocityMotionVectorTarget = new THREE.WebGLRenderTarget(1, 1, {
+  depthBuffer: false,
+  stencilBuffer: false,
+});
+velocityMotionVectorTarget.texture.name = "VelocityMotionVectorTarget";
+const playerMotionBlurMaskTarget = new THREE.WebGLRenderTarget(1, 1, {
+  depthBuffer: false,
+  stencilBuffer: false,
+});
+playerMotionBlurMaskTarget.texture.name = "PlayerMotionBlurMaskTarget";
 const jetEnergyBloomTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: false,
   stencilBuffer: false,
@@ -337,6 +360,14 @@ const jetEnergyBloomSize = {
   wide: new THREE.Vector2(1, 1),
   soft: new THREE.Vector2(1, 1),
 };
+const currentViewProjectionMatrix = new THREE.Matrix4();
+const currentInverseViewProjectionMatrix = new THREE.Matrix4();
+const previousViewProjectionMatrix = new THREE.Matrix4();
+let velocityMotionHistoryReady = false;
+const playerMotionBlurMaskMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  toneMapped: false,
+});
 
 const postScene = new THREE.Scene();
 const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
@@ -479,17 +510,74 @@ const jetEnergyBloomMipQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), jetE
 jetEnergyBloomMipQuad.frustumCulled = false;
 jetEnergyBloomMipScene.add(jetEnergyBloomMipQuad);
 
-const boostMotionBlurMaterial = new THREE.ShaderMaterial({
-  name: "BoostMotionBlurMaterial",
+const velocityMotionVectorScene = new THREE.Scene();
+const velocityMotionVectorMaterial = new THREE.ShaderMaterial({
+  name: "VelocityMotionVectorMaterial",
+  uniforms: {
+    tDepth: { value: sceneDepthTexture },
+    uCurrentInverseViewProjection: { value: currentInverseViewProjectionMatrix },
+    uPreviousViewProjection: { value: previousViewProjectionMatrix },
+    uMotionVectorEnabled: { value: velocityMotionBlurSupported ? 1 : 0 },
+  },
+  depthTest: false,
+  depthWrite: false,
+  toneMapped: false,
+  vertexShader: `
+    varying vec2 vUv;
+
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDepth;
+    uniform mat4 uCurrentInverseViewProjection;
+    uniform mat4 uPreviousViewProjection;
+    uniform float uMotionVectorEnabled;
+
+    varying vec2 vUv;
+
+    void main() {
+      float depth = texture2D(tDepth, vUv).x;
+      if (uMotionVectorEnabled < 0.5 || depth >= 0.99999) {
+        gl_FragColor = vec4(0.5, 0.5, 0.0, 0.0);
+        return;
+      }
+
+      vec4 currentClip = vec4(vUv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+      vec4 worldPosition = uCurrentInverseViewProjection * currentClip;
+      worldPosition /= max(worldPosition.w, 0.000001);
+
+      vec4 previousClip = uPreviousViewProjection * worldPosition;
+      if (previousClip.w <= 0.000001) {
+        gl_FragColor = vec4(0.5, 0.5, 0.0, 0.0);
+        return;
+      }
+
+      vec2 previousUv = (previousClip.xy / previousClip.w) * 0.5 + 0.5;
+      vec2 velocity = vUv - previousUv;
+      gl_FragColor = vec4(clamp(velocity * 0.5 + 0.5, 0.0, 1.0), 0.0, 1.0);
+    }
+  `,
+});
+const velocityMotionVectorQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), velocityMotionVectorMaterial);
+velocityMotionVectorQuad.frustumCulled = false;
+velocityMotionVectorScene.add(velocityMotionVectorQuad);
+
+const velocityMotionBlurMaterial = new THREE.ShaderMaterial({
+  name: "VelocityMotionBlurCompositeMaterial",
   uniforms: {
     tDiffuse: { value: sceneRenderTarget.texture },
+    tMotionVector: { value: velocityMotionVectorTarget.texture },
+    tPlayerMotionMask: { value: playerMotionBlurMaskTarget.texture },
     tAfterimage: { value: quickStepAfterimageBlurTarget.texture },
     tEnergyBloom: { value: jetEnergyBloomTarget.texture },
     tEnergyBloomWide: { value: jetEnergyBloomWideTarget.texture },
     tEnergyBloomSoft: { value: jetEnergyBloomSoftTarget.texture },
     uStrength: { value: 0 },
-    uAspect: { value: 1 },
-    uCenter: { value: new THREE.Vector2(0.5, 0.54) },
+    uResolution: { value: new THREE.Vector2(1, 1) },
+    uMaxBlurPixels: { value: velocityMotionBlurMaxPixels },
     uAfterimageIntensity: { value: quickStepAfterimageBlurIntensity },
     uEnergyBloomIntensity: { value: 0 },
     uEnergyBloomTexelSize: { value: new THREE.Vector2(1, 1) },
@@ -507,15 +595,17 @@ const boostMotionBlurMaterial = new THREE.ShaderMaterial({
   `,
   fragmentShader: `
     uniform sampler2D tDiffuse;
+    uniform sampler2D tMotionVector;
+    uniform sampler2D tPlayerMotionMask;
     uniform sampler2D tAfterimage;
     uniform sampler2D tEnergyBloom;
     uniform sampler2D tEnergyBloomWide;
     uniform sampler2D tEnergyBloomSoft;
     uniform float uStrength;
-    uniform float uAspect;
+    uniform vec2 uResolution;
+    uniform float uMaxBlurPixels;
     uniform float uAfterimageIntensity;
     uniform float uEnergyBloomIntensity;
-    uniform vec2 uCenter;
     uniform vec2 uEnergyBloomTexelSize;
 
     varying vec2 vUv;
@@ -537,32 +627,40 @@ const boostMotionBlurMaterial = new THREE.ShaderMaterial({
       return (glow * 0.7 + wideGlow * 1.15 + softGlow * 1.85) * uEnergyBloomIntensity * 0.9;
     }
 
+    vec2 sampleVelocity(vec2 uv) {
+      vec4 encoded = texture2D(tMotionVector, uv);
+      if (encoded.a <= 0.001) {
+        return vec2(0.0);
+      }
+      return (encoded.xy * 2.0 - 1.0) * uStrength;
+    }
+
     void main() {
       vec4 baseColor = texture2D(tDiffuse, vUv);
       vec4 afterimageColor = texture2D(tAfterimage, vUv);
       vec3 energyBloom = sampleEnergyBloom(vUv);
-      if (uStrength <= 0.001) {
+      float playerMask = texture2D(tPlayerMotionMask, vUv).r;
+      vec2 velocity = sampleVelocity(vUv);
+      float pixelSpeed = length(velocity * uResolution);
+
+      if (uStrength <= 0.001 || pixelSpeed < 0.35 || playerMask > 0.05) {
         gl_FragColor = vec4(baseColor.rgb + afterimageColor.rgb * uAfterimageIntensity + energyBloom, baseColor.a);
         #include <colorspace_fragment>
         return;
       }
 
-      vec2 radial = vUv - uCenter;
-      vec2 aspectRadial = vec2(radial.x * uAspect, radial.y);
-      float edgeAmount = smoothstep(0.14, 0.78, length(aspectRadial));
-      float blurAmount = uStrength * (0.0025 + edgeAmount * 0.02);
+      float cappedPixelSpeed = min(pixelSpeed, uMaxBlurPixels);
+      velocity *= cappedPixelSpeed / max(pixelSpeed, 0.0001);
 
-      vec4 blurredColor = vec4(0.0);
-      blurredColor += baseColor * 0.22;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 0.35) * 0.18;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 0.75) * 0.17;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 1.15) * 0.14;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 1.65) * 0.11;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 2.25) * 0.08;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 2.95) * 0.06;
-      blurredColor += texture2D(tDiffuse, vUv - radial * blurAmount * 3.75) * 0.04;
+      vec4 blurredColor = baseColor * 0.24;
+      blurredColor += texture2D(tDiffuse, vUv - velocity * 0.5) * 0.11;
+      blurredColor += texture2D(tDiffuse, vUv - velocity * 0.34) * 0.13;
+      blurredColor += texture2D(tDiffuse, vUv - velocity * 0.18) * 0.14;
+      blurredColor += texture2D(tDiffuse, vUv + velocity * 0.18) * 0.14;
+      blurredColor += texture2D(tDiffuse, vUv + velocity * 0.34) * 0.13;
+      blurredColor += texture2D(tDiffuse, vUv + velocity * 0.5) * 0.11;
 
-      float blurMix = edgeAmount * clamp(uStrength * 0.34, 0.0, 0.68);
+      float blurMix = clamp(cappedPixelSpeed / max(uMaxBlurPixels, 0.001), 0.0, 1.0) * clamp(uStrength * 0.58, 0.0, 0.82);
       vec4 color = vec4(mix(baseColor.rgb, blurredColor.rgb, blurMix), baseColor.a);
       color.rgb += afterimageColor.rgb * uAfterimageIntensity;
       color.rgb += energyBloom;
@@ -572,10 +670,9 @@ const boostMotionBlurMaterial = new THREE.ShaderMaterial({
     }
   `,
 });
-const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), boostMotionBlurMaterial);
+const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), velocityMotionBlurMaterial);
 postQuad.frustumCulled = false;
 postScene.add(postQuad);
-
 const clock = new THREE.Clock();
 const mouseObjectRaycaster = new THREE.Raycaster();
 const mouseObjectPointer = new THREE.Vector2();
@@ -675,8 +772,8 @@ let quickStepStartX = 0;
 let quickStepTargetX = 0;
 let quickStepFlash = 0;
 let boostGauge = boostGaugeMax;
-let boostMotionBlurTarget = 0;
-let boostMotionBlurStrength = 0;
+let velocityMotionBlurTarget = 0;
+let velocityMotionBlurStrength = 0;
 let jetEnergyBloomStrength = 0;
 let playerBoostEffectActive = false;
 let boostCameraKick = 0;
@@ -752,6 +849,7 @@ function scheduleHideLoadingScreen() {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => hideLoadingScreen());
   });
+  window.setTimeout(() => hideLoadingScreen(), 650);
 }
 
 const textureLoader = new THREE.TextureLoader(loadingManager);
@@ -5347,13 +5445,13 @@ function addShinseondaeVariableMessageSign(z) {
 
   const message = new THREE.Mesh(
     new THREE.PlaneGeometry(17.8, 2.05),
-    createCanvasMultilineLabelMaterial(["전조등을 켜시오"], 1024, 220, "#b8ff7a", "rgba(0, 0, 0, 0)"),
+    createCanvasMultilineLabelMaterial(["SMART TRAFFIC SYSTEM"], 1024, 220, "#b8ff7a", "rgba(0, 0, 0, 0)"),
   );
   message.position.set(0, 6.8, 0.32);
   group.add(message);
 
-  addOverheadSmallSign(group, -5.5, 8.92, "구간단속지점");
-  addOverheadSmallSign(group, 5.5, 8.92, "지점고속단속중");
+  addOverheadSmallSign(group, -5.5, 8.92, "SECTION SPEED");
+  addOverheadSmallSign(group, 5.5, 8.92, "AUTO CONTROL");
 
   for (const x of [-2.2, 2.2]) {
     const cameraBox = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.38, 0.52), materials.gwangalliBridgeCable);
@@ -5390,7 +5488,7 @@ function addTunnelEntranceBrickLines(group) {
 }
 
 function addTunnelEntranceLetterSigns(group) {
-  const letters = ["지", "하", "차", "도"];
+  const letters = ["B", "U", "S", "AN"];
   letters.forEach((letter, index) => {
     const panel = new THREE.Mesh(
       new THREE.BoxGeometry(3.25, 1.78, 0.12),
@@ -5439,7 +5537,7 @@ function addShinseondaeWarningSignStack(group, side) {
 
   const sideNotice = new THREE.Mesh(
     new THREE.BoxGeometry(1.28, 1.02, 0.12),
-    createCanvasMultilineLabelMaterial(["진입", "금지"], 180, 160, "#183043", "#f5f7fb"),
+    createCanvasMultilineLabelMaterial(["吏꾩엯", "湲덉?"], 180, 160, "#183043", "#f5f7fb"),
   );
   sideNotice.position.set(x, 6.86, 0.46);
   group.add(sideNotice);
@@ -7945,11 +8043,13 @@ function addPlayer() {
   addJetEnergyLine(energyLines, model, 0.03, 0.42, 0.018, 0.31, 0.12, -0.238, 0, 0, 0.18);
 
   model.traverse((child) => {
+    child.layers.enable(playerMotionMaskLayer);
     if (child.isMesh) {
       child.castShadow = !child.userData.energyLine;
       child.receiveShadow = !child.userData.energyLine;
     }
   });
+  group.layers.enable(playerMotionMaskLayer);
 
   scene.add(group);
   player.mesh = group;
@@ -8654,7 +8754,7 @@ function updateGame(dt) {
   jumpImpact = Math.max(0, jumpImpact - dt * 4.8);
   quickStepCooldown = Math.max(0, quickStepCooldown - dt);
   quickStepFlash = Math.max(0, quickStepFlash - dt * 5.5);
-  boostMotionBlurTarget = 0;
+  velocityMotionBlurTarget = 0;
   playerBoostEffectActive = false;
 
   if (!finished) {
@@ -8785,7 +8885,7 @@ function updatePlayer(dt) {
   checkObstacleCollision();
 
   player.yaw = THREE.MathUtils.lerp(player.yaw, THREE.MathUtils.clamp(player.velocity.x * 0.035, -0.48, 0.48), 1 - Math.exp(-8 * dt));
-  boostMotionBlurTarget = boosting || debugSuperBoostActive
+  velocityMotionBlurTarget = boosting || debugSuperBoostActive
     ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.55, 1) * getMotionBlurScale()
     : 0;
 }
@@ -9244,22 +9344,22 @@ function renderGame(dt) {
   }
   updateCamera(dt);
   updateSunShadow();
-  updateBoostMotionBlur(dt);
+  updateVelocityMotionBlur(dt);
   updateJetEnergyBloom(dt);
   renderFrame();
   updatePerformanceHud();
 }
 
-function updateBoostMotionBlur(dt) {
-  const fadeRate = boostMotionBlurTarget > boostMotionBlurStrength ? 9.5 : 18;
-  boostMotionBlurStrength = THREE.MathUtils.lerp(
-    boostMotionBlurStrength,
-    boostMotionBlurTarget,
+function updateVelocityMotionBlur(dt) {
+  const fadeRate = velocityMotionBlurTarget > velocityMotionBlurStrength ? 9.5 : 18;
+  velocityMotionBlurStrength = THREE.MathUtils.lerp(
+    velocityMotionBlurStrength,
+    velocityMotionBlurTarget,
     1 - Math.exp(-fadeRate * dt),
   );
 
-  if (boostMotionBlurTarget <= 0 && boostMotionBlurStrength < 0.014) {
-    boostMotionBlurStrength = 0;
+  if (velocityMotionBlurTarget <= 0 && velocityMotionBlurStrength < 0.014) {
+    velocityMotionBlurStrength = 0;
   }
 }
 
@@ -9280,14 +9380,22 @@ function updateJetEnergyBloom(dt) {
 
 function renderFrame() {
   updateSkyDome();
-  boostMotionBlurMaterial.uniforms.uStrength.value = boostMotionBlurStrength;
-  boostMotionBlurMaterial.uniforms.tDiffuse.value = sceneRenderTarget.texture;
-  boostMotionBlurMaterial.uniforms.tAfterimage.value = quickStepAfterimageBlurTarget.texture;
-  boostMotionBlurMaterial.uniforms.tEnergyBloom.value = jetEnergyBloomBlurTarget.texture;
-  boostMotionBlurMaterial.uniforms.tEnergyBloomWide.value = jetEnergyBloomWideTarget.texture;
-  boostMotionBlurMaterial.uniforms.tEnergyBloomSoft.value = jetEnergyBloomSoftTarget.texture;
-  boostMotionBlurMaterial.uniforms.uAfterimageIntensity.value = quickStepAfterimageBlurIntensity;
-  boostMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = jetEnergyBloomStrength;
+  updateVelocityMotionMatrices();
+
+  velocityMotionBlurMaterial.uniforms.uStrength.value = velocityMotionBlurStrength;
+  velocityMotionBlurMaterial.uniforms.tDiffuse.value = sceneRenderTarget.texture;
+  velocityMotionBlurMaterial.uniforms.tMotionVector.value = velocityMotionVectorTarget.texture;
+  velocityMotionBlurMaterial.uniforms.tPlayerMotionMask.value = playerMotionBlurMaskTarget.texture;
+  velocityMotionBlurMaterial.uniforms.tAfterimage.value = quickStepAfterimageBlurTarget.texture;
+  velocityMotionBlurMaterial.uniforms.tEnergyBloom.value = jetEnergyBloomBlurTarget.texture;
+  velocityMotionBlurMaterial.uniforms.tEnergyBloomWide.value = jetEnergyBloomWideTarget.texture;
+  velocityMotionBlurMaterial.uniforms.tEnergyBloomSoft.value = jetEnergyBloomSoftTarget.texture;
+  velocityMotionBlurMaterial.uniforms.uAfterimageIntensity.value = quickStepAfterimageBlurIntensity;
+  velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = jetEnergyBloomStrength;
+  velocityMotionVectorMaterial.uniforms.tDepth.value = sceneDepthTexture;
+  velocityMotionVectorMaterial.uniforms.uCurrentInverseViewProjection.value.copy(currentInverseViewProjectionMatrix);
+  velocityMotionVectorMaterial.uniforms.uPreviousViewProjection.value.copy(previousViewProjectionMatrix);
+  velocityMotionVectorMaterial.uniforms.uMotionVectorEnabled.value = velocityMotionBlurSupported ? 1 : 0;
   quickStepAfterimageBlurMaterial.uniforms.tDiffuse.value = quickStepAfterimageRenderTarget.texture;
   quickStepAfterimageBlurMaterial.uniforms.uRadius.value = quickStepAfterimageBlurRadius;
   jetEnergyBloomBlurMaterial.uniforms.uRadius.value = jetEnergyBloomBlurRadius;
@@ -9299,6 +9407,8 @@ function renderFrame() {
   renderer.setRenderTarget(sceneRenderTarget);
   renderer.render(scene, camera);
 
+  renderVelocityMotionVectorTarget();
+  renderPlayerMotionBlurMaskTarget();
   renderJetEnergyBloomTarget();
   renderJetEnergyBloomBlurTargets();
 
@@ -9314,6 +9424,60 @@ function renderFrame() {
   renderer.setClearColor(clearColor, clearAlpha);
   renderer.setRenderTarget(null);
   renderer.render(postScene, postCamera);
+  commitVelocityMotionHistory();
+}
+
+function renderPlayerMotionBlurMaskTarget() {
+  const previousBackground = scene.background;
+  const previousFog = scene.fog;
+  const previousOverrideMaterial = scene.overrideMaterial;
+  const previousCameraLayerMask = camera.layers.mask;
+  const clearColor = renderer.getClearColor(renderClearColorScratch);
+  const clearAlpha = renderer.getClearAlpha();
+
+  try {
+    scene.background = null;
+    scene.fog = null;
+    scene.overrideMaterial = playerMotionBlurMaskMaterial;
+    camera.layers.set(playerMotionMaskLayer);
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(playerMotionBlurMaskTarget);
+    renderer.clear(true, false, false);
+    if (player.mesh && player.mesh.visible) {
+      renderer.render(scene, camera);
+    }
+  } finally {
+    scene.background = previousBackground;
+    scene.fog = previousFog;
+    scene.overrideMaterial = previousOverrideMaterial;
+    camera.layers.mask = previousCameraLayerMask;
+    renderer.setClearColor(clearColor, clearAlpha);
+  }
+}
+
+function updateVelocityMotionMatrices() {
+  camera.updateMatrixWorld(true);
+  currentViewProjectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  if (!velocityMotionHistoryReady) {
+    previousViewProjectionMatrix.copy(currentViewProjectionMatrix);
+    velocityMotionHistoryReady = true;
+  }
+  currentInverseViewProjectionMatrix.copy(currentViewProjectionMatrix).invert();
+}
+
+function renderVelocityMotionVectorTarget() {
+  renderer.setClearColor(0x808000, 0);
+  renderer.setRenderTarget(velocityMotionVectorTarget);
+  renderer.clear(true, false, false);
+  renderer.render(velocityMotionVectorScene, postCamera);
+}
+
+function commitVelocityMotionHistory() {
+  previousViewProjectionMatrix.copy(currentViewProjectionMatrix);
+}
+
+function resetVelocityMotionHistory() {
+  velocityMotionHistoryReady = false;
 }
 
 function renderJetEnergyBloomTarget() {
@@ -10056,9 +10220,9 @@ function shouldConfirmMobileUltraControl(key, value) {
 
 function confirmMobileUltraGraphicsChange() {
   return window.confirm(
-    "Ultra 그래픽은 일부 모바일 기기에서 Chrome이 강제 종료될 수 있습니다.\n\n"
-    + "테스트 목적이 아니라면 Low 또는 Medium을 권장합니다.\n"
-    + "그래도 Ultra 설정을 적용할까요?"
+    "Ultra 洹몃옒?쎌? ?쇰? 紐⑤컮??湲곌린?먯꽌 Chrome??媛뺤젣 醫낅즺?????덉뒿?덈떎.\n\n"
+    + "?뚯뒪??紐⑹쟻???꾨땲?쇰㈃ Low ?먮뒗 Medium??沅뚯옣?⑸땲??\n"
+    + "洹몃옒??Ultra ?ㅼ젙???곸슜?좉퉴??"
   );
 }
 
@@ -10298,7 +10462,7 @@ function applyGraphicsSettings(save = true) {
   applySkyTextureSettings();
   applyLightingSettings();
   applyWaterSettings();
-  boostMotionBlurMaterial.uniforms.uStrength.value = boostMotionBlurStrength;
+  velocityMotionBlurMaterial.uniforms.uStrength.value = velocityMotionBlurStrength;
   resize();
 
   if (save) {
@@ -10549,8 +10713,8 @@ function warpToGoalProgress(progress) {
   jetFootContactOffsetY = 0;
   clearQuickStepAfterimages();
   dashPadBoostRemaining = 0;
-  boostMotionBlurTarget = 0;
-  boostMotionBlurStrength = 0;
+  velocityMotionBlurTarget = 0;
+  velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
   playerBoostEffectActive = false;
   boostCameraKick = 0;
@@ -10558,13 +10722,14 @@ function warpToGoalProgress(progress) {
   boostCameraWasActive = false;
   cameraLateralFocusX = 0;
   materials.jetEnergy.opacity = 0;
-  boostMotionBlurMaterial.uniforms.uStrength.value = 0;
-  boostMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = 0;
+  velocityMotionBlurMaterial.uniforms.uStrength.value = 0;
+  velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = 0;
   if (touchControlsEnabled) resetTouchRunState();
   player.position.set(0, sample.y + player.radius, targetZ);
   player.velocity.set(0, 0, 0);
   player.grounded = true;
   resetCameraView();
+  resetVelocityMotionHistory();
   updateHarborVisibility(true);
   clearLooseDnaItems();
   finishEl.classList.add("hidden");
@@ -10600,8 +10765,8 @@ function resetGame(options = {}) {
   quickStepFlash = 0;
   clearQuickStepAfterimages();
   boostGauge = boostGaugeMax;
-  boostMotionBlurTarget = 0;
-  boostMotionBlurStrength = 0;
+  velocityMotionBlurTarget = 0;
+  velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
   playerBoostEffectActive = false;
   boostCameraKick = 0;
@@ -10609,9 +10774,10 @@ function resetGame(options = {}) {
   boostCameraWasActive = false;
   cameraLateralFocusX = 0;
   materials.jetEnergy.opacity = 0;
-  boostMotionBlurMaterial.uniforms.uStrength.value = 0;
-  boostMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = 0;
+  velocityMotionBlurMaterial.uniforms.uStrength.value = 0;
+  velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = 0;
   resetCameraView();
+  resetVelocityMotionHistory();
   dashPadBoostStartSpeed = 0;
   dashPadBoostRemaining = 0;
   debugSuperBoostActive = false;
@@ -10737,6 +10903,8 @@ function resize() {
   sceneRenderTarget.setSize(targetWidth, targetHeight);
   quickStepAfterimageRenderTarget.setSize(targetWidth, targetHeight);
   quickStepAfterimageBlurTarget.setSize(targetWidth, targetHeight);
+  velocityMotionVectorTarget.setSize(targetWidth, targetHeight);
+  playerMotionBlurMaskTarget.setSize(targetWidth, targetHeight);
   const bloomWidth = Math.max(1, Math.floor(targetWidth * jetEnergyBloomRenderScale));
   const bloomHeight = Math.max(1, Math.floor(targetHeight * jetEnergyBloomRenderScale));
   const bloomWideWidth = Math.max(1, Math.floor(bloomWidth * jetEnergyBloomWideScale));
@@ -10753,6 +10921,7 @@ function resize() {
   jetEnergyBloomSize.soft.set(bloomSoftWidth, bloomSoftHeight);
   quickStepAfterimageBlurMaterial.uniforms.uTexelSize.value.set(1 / targetWidth, 1 / targetHeight);
   jetEnergyBloomBlurMaterial.uniforms.uTexelSize.value.set(1 / bloomWidth, 1 / bloomHeight);
-  boostMotionBlurMaterial.uniforms.uEnergyBloomTexelSize.value.set(1 / bloomWidth, 1 / bloomHeight);
-  boostMotionBlurMaterial.uniforms.uAspect.value = camera.aspect;
+  velocityMotionBlurMaterial.uniforms.uResolution.value.set(targetWidth, targetHeight);
+  velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = velocityMotionBlurMaxPixels;
+  velocityMotionBlurMaterial.uniforms.uEnergyBloomTexelSize.value.set(1 / bloomWidth, 1 / bloomHeight);
 }
