@@ -295,7 +295,7 @@ const jetEnergyBloomSoftScale = 0.25;
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
   stencilBuffer: false,
-  samples: renderer.capabilities.isWebGL2 ? 2 : 0,
+  samples: 0,
 });
 sceneRenderTarget.texture.name = "VelocitySceneColorTarget";
 const velocityMotionBlurSupported = renderer.capabilities.isWebGL2 || renderer.extensions.has("WEBGL_depth_texture");
