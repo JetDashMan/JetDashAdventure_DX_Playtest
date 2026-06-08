@@ -832,11 +832,11 @@ const touchInput = {
   brake: false,
   boost: false,
   jump: false,
+  lateral: 0,
+  lateralPointerId: null,
 };
 const touchQuickStepFlickMinDistance = 44;
 const touchQuickStepFlickMaxMs = 260;
-const touchQuickStepTapMaxDistance = 26;
-const touchQuickStepTapMaxMs = 260;
 const touchQuickStepGesture = {
   active: false,
   pointerId: null,
@@ -8793,6 +8793,7 @@ function handleTouchQuickStepPointerDown(event) {
   tryLockLandscape();
   if (musicWanted) startMusic();
 
+  startTouchLateralMove(event);
   touchQuickStepGesture.active = true;
   touchQuickStepGesture.pointerId = event.pointerId;
   touchQuickStepGesture.startX = event.clientX;
@@ -8804,6 +8805,7 @@ function handleTouchQuickStepPointerDown(event) {
 
 function handleTouchQuickStepPointerMove(event) {
   if (!touchQuickStepGesture.active || touchQuickStepGesture.pointerId !== event.pointerId) return;
+  updateTouchLateralMove(event);
   if (touchQuickStepGesture.handled) return;
 
   event.preventDefault();
@@ -8826,26 +8828,41 @@ function handleTouchQuickStepPointerEnd(event) {
   if (!touchQuickStepGesture.active || touchQuickStepGesture.pointerId !== event.pointerId) return;
 
   event.preventDefault();
-  const dx = event.clientX - touchQuickStepGesture.startX;
-  const dy = event.clientY - touchQuickStepGesture.startY;
-  const elapsed = performance.now() - touchQuickStepGesture.startAt;
-  const movement = Math.hypot(dx, dy);
-
-  if (!touchQuickStepGesture.handled && elapsed <= touchQuickStepTapMaxMs && movement <= touchQuickStepTapMaxDistance) {
-    queueTouchQuickStep(touchQuickStepGesture.startX < window.innerWidth * 0.5 ? -1 : 1);
-  }
-
+  stopTouchLateralMove(event.pointerId);
   resetTouchQuickStepGesture(event.pointerId);
 }
 
 function handleTouchQuickStepPointerCancel(event) {
   if (!touchQuickStepGesture.active || touchQuickStepGesture.pointerId !== event.pointerId) return;
 
+  stopTouchLateralMove(event.pointerId);
   resetTouchQuickStepGesture(event.pointerId);
 }
 
 function queueTouchQuickStep(direction) {
   quickStepQueued = direction < 0 ? -1 : 1;
+}
+
+function getTouchLateralDirection(clientX) {
+  return clientX < window.innerWidth * 0.5 ? -1 : 1;
+}
+
+function startTouchLateralMove(event) {
+  touchInput.lateralPointerId = event.pointerId;
+  touchInput.lateral = getTouchLateralDirection(event.clientX);
+}
+
+function updateTouchLateralMove(event) {
+  if (touchInput.lateralPointerId !== event.pointerId) return;
+
+  touchInput.lateral = getTouchLateralDirection(event.clientX);
+}
+
+function stopTouchLateralMove(pointerId = touchInput.lateralPointerId) {
+  if (touchInput.lateralPointerId !== pointerId) return;
+
+  touchInput.lateralPointerId = null;
+  touchInput.lateral = 0;
 }
 
 function captureTouchQuickStepPointer(pointerId) {
@@ -8891,6 +8908,7 @@ function resetTouchRunState() {
   touchInput.brake = false;
   touchInput.boost = false;
   touchInput.jump = false;
+  stopTouchLateralMove();
   resetTouchQuickStepGesture();
   syncTouchControls();
 }
@@ -8989,7 +9007,9 @@ function updatePlayer(dt) {
   const boosting = !stunned && !brakingInput && (keyboardBoost || touchBoost) && boostGauge > 0;
   playerBoostEffectActive = boosting || debugSuperBoostActive;
   updateBoostCameraState(playerBoostEffectActive, dt);
-  const strafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
+  const keyboardStrafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
+  const touchStrafeInput = touchControlsEnabled ? touchInput.lateral : 0;
+  const strafeInput = THREE.MathUtils.clamp(keyboardStrafeInput + touchStrafeInput, -1, 1);
   const speedLimit = debugSuperBoostActive ? debugSuperBoostSpeed : maxHorizontalSpeed;
 
   if (boosting) {
@@ -10196,6 +10216,7 @@ function setPaused(paused, reason = "manual") {
       touchInput.activePointers.clear();
       touchInput.brake = false;
       touchInput.jump = false;
+      stopTouchLateralMove();
       resetTouchQuickStepGesture();
       syncTouchControls();
     }
