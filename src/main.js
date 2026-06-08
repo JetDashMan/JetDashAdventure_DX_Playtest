@@ -297,8 +297,8 @@ const jetEnergyBloomBlurRadius = 2.8;
 const jetEnergyBloomWideScale = 0.5;
 const jetEnergyBloomSoftScale = 0.25;
 const jetBoostLightColor = 0x42dfff;
-const jetBoostLightMaxIntensity = 0.72;
-const jetBoostLightDistance = 5.2;
+const jetBoostLightMaxIntensity = 2.4;
+const jetBoostLightDistance = 7.5;
 const jetBoostLightDecay = 2.0;
 
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
@@ -9483,7 +9483,7 @@ function updateJetBoostLight() {
   if (!jetBoostLight) return;
 
   const intensity = playerBoostEffectActive
-    ? THREE.MathUtils.clamp(jetEnergyBloomStrength * 0.32, 0, jetBoostLightMaxIntensity)
+    ? THREE.MathUtils.clamp(jetEnergyBloomStrength * 0.9, 0, jetBoostLightMaxIntensity)
     : 0;
   jetBoostLight.intensity = intensity;
   jetBoostLight.visible = intensity > 0.02;
