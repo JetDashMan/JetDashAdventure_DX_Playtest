@@ -66,7 +66,10 @@ const debugControls = {
   mouseObject: document.querySelector("#debug-mouse-object"),
   performanceHud: document.querySelector("#debug-performance-hud"),
   unlimitedCameraOrbit: document.querySelector("#debug-unlimited-camera-orbit"),
+  characterInspect: document.querySelector("#debug-character-inspect"),
 };
+const debugCharacterInspectTargetSelect = document.querySelector("#debug-character-inspect-target");
+const debugCharacterInspectAngleSelect = document.querySelector("#debug-character-inspect-angle");
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x75cbef);
@@ -275,12 +278,28 @@ const waterQualityConfig = {
   },
 };
 const debugStorageKey = "jetdash-debug-settings";
+const characterInspectTargets = ["full", "face", "upper", "lower", "foot"];
+const characterInspectAngles = [
+  "front",
+  "back",
+  "left",
+  "right",
+  "frontLeft",
+  "frontRight",
+  "backLeft",
+  "backRight",
+  "high",
+  "low",
+];
 const debugDefaults = {
   superBoost: false,
   infiniteJump: false,
   mouseObject: false,
   performanceHud: false,
   unlimitedCameraOrbit: false,
+  characterInspect: false,
+  characterInspectTarget: "full",
+  characterInspectAngle: "back",
 };
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
@@ -293,7 +312,7 @@ const selectiveBloomLayer = 1;
 const playerMotionMaskLayer = 2;
 const velocityMotionBlurMaxPixels = 150;
 const jetEnergyBloomRenderScale = 1.0;
-const jetEnergyBloomBlurRadius = 2.8;
+const jetEnergyBloomBlurRadius = 2.2;
 const jetEnergyBloomWideScale = 0.5;
 const jetEnergyBloomSoftScale = 0.25;
 const jetBoostLightColor = 0x42dfff;
@@ -702,9 +721,9 @@ const worldUp = new THREE.Vector3(0, 1, 0);
 const sunFollowOffset = new THREE.Vector3(-28, 46, 24);
 const playerStart = new THREE.Vector3(0, 2.2, 20);
 const lanes = [-4.2, 0, 4.2];
-const stageRoutes = ["1", "2"];
+const stageRoutes = ["1", "2", "test-room"];
 const defaultStageRoute = "1";
-const stageCount = stageRoutes.length;
+const playableStageCount = 2;
 const urlParams = new URLSearchParams(window.location.search);
 const requestedStageRoute = urlParams.get("stage") || defaultStageRoute;
 const debugStartZParam = urlParams.get("debugStartZ");
@@ -960,6 +979,22 @@ const materials = {
     emissiveIntensity: 0.35,
     roughness: 0.35,
     metalness: 0.2,
+  }),
+  testRoomGlass: new THREE.MeshStandardMaterial({
+    color: 0x85e8ff,
+    emissive: 0x123a4c,
+    emissiveIntensity: 0.18,
+    roughness: 0.22,
+    metalness: 0.08,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+  }),
+  testRoomAccent: new THREE.MeshBasicMaterial({
+    color: 0x7de7ff,
+    transparent: true,
+    opacity: 0.72,
+    toneMapped: false,
   }),
   obstacle: new THREE.MeshStandardMaterial({
     color: 0xd74136,
@@ -1908,6 +1943,7 @@ function getStageIndex(stageRoute) {
   if (normalizedRoute === "1" || normalizedRoute === "stage1") return 0;
   if (normalizedRoute === "2" || normalizedRoute === "stage2") return 1;
   if (normalizedRoute === "3" || normalizedRoute === "stage3") return 1;
+  if (["test", "testroom", "test-room", "room"].includes(normalizedRoute)) return 2;
   return stageRoutes.indexOf(defaultStageRoute);
 }
 
@@ -1918,7 +1954,38 @@ function getStageRoute(stageIndex) {
 
 function createStageDefinition(stageIndex) {
   if (stageIndex === 0) return createStageTwoDefinition("STAGE 1");
-  return createStageThreeDefinition("STAGE 2");
+  if (stageIndex === 1) return createStageThreeDefinition("STAGE 2");
+  return createTestRoomDefinition();
+}
+
+function createTestRoomDefinition() {
+  const goalZ = -260;
+  return {
+      label: "TEST ROOM",
+      startZ: playerStart.z,
+      goalZ,
+      rollClearStartZ: -9999,
+      rollClearEndZ: -10000,
+      rollLiftHeight: 0,
+      rollEnabled: false,
+      testRoom: true,
+      curvePoints: [
+        [0, 0, playerStart.z],
+        [0, 0, -120],
+        [0, 0, goalZ],
+        [0, 0, goalZ - 40],
+      ],
+      trackSegments: makeTrackSegments([
+        [38, 0, 20],
+        [-120, 0, 20],
+        [goalZ - 18, 0, 20],
+      ]),
+      sidePlatforms: [],
+      dashPads: [],
+      obstacles: [],
+      dnaPlan: [],
+      tutorialPrompts: [],
+    };
 }
 
 function createTutorialStageDefinition() {
@@ -2773,6 +2840,11 @@ function createWaterMaterial() {
 }
 
 function addEnvironment() {
+  if (currentStage.testRoom) {
+    addTestRoomEnvironment();
+    return;
+  }
+
   waterMaterial = createWaterMaterial();
   waterMesh = new THREE.Mesh(createWaterGeometry(), waterMaterial);
   waterMesh.rotation.x = -Math.PI / 2;
@@ -2833,6 +2905,41 @@ function addEnvironment() {
     island.castShadow = false;
     scene.add(island);
   });
+}
+
+function addTestRoomEnvironment() {
+  const grid = new THREE.GridHelper(24, 24, 0x93edff, 0x2d6a82);
+  grid.name = "Test Room Under-Foot Grid";
+  grid.position.set(0, -0.52, -60);
+  grid.scale.z = 7.0;
+  grid.userData.ignoreMouseObject = true;
+  grid.traverse?.((object) => {
+    if (!object.material) return;
+    const materialsToUpdate = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materialsToUpdate) {
+      material.transparent = true;
+      material.opacity = 0.38;
+      material.depthWrite = false;
+      material.needsUpdate = true;
+    }
+  });
+  scene.add(grid);
+
+  const centerLine = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.035, 280), materials.testRoomAccent);
+  centerLine.name = "Test Room Center Guide";
+  centerLine.position.set(0, -0.34, -98);
+  centerLine.userData.ignoreMouseObject = true;
+  scene.add(centerLine);
+
+  for (const x of [-4.2, 4.2]) {
+    const laneLine = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.028, 260), materials.testRoomAccent);
+    laneLine.name = x < 0 ? "Test Room Left Lane Guide" : "Test Room Right Lane Guide";
+    laneLine.position.set(x, -0.36, -92);
+    laneLine.material = materials.testRoomAccent.clone();
+    laneLine.material.opacity = 0.34;
+    laneLine.userData.ignoreMouseObject = true;
+    scene.add(laneLine);
+  }
 }
 
 function isIslandClearOfStage(x, z, radius) {
@@ -7569,7 +7676,9 @@ function updateHarborVehicleTransform(vehicle) {
 function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
   let material = trackSegments.length % 2 === 0 ? materials.track : materials.trackAlt;
   const segmentMidZ = (zStart + zEnd) * 0.5;
-  if (currentStage.harborTheme) {
+  if (currentStage.testRoom) {
+    material = materials.testRoomGlass;
+  } else if (currentStage.harborTheme) {
     material = trackSegments.length % 2 === 0 ? materials.harborRoad : materials.harborRoadAlt;
   } else if (currentStage.gwangalliTheme) {
     const inTunnel = isStageZInRange(segmentMidZ, getGwangalliTunnelStartZ(), currentStage.gwangalliTunnelEndZ ?? currentStage.goalZ);
@@ -7585,6 +7694,7 @@ function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
 
   const segment = { zStart, zEnd, yStart, yEnd, width, rail: true };
   trackSegments.push(segment);
+  if (currentStage.testRoom) return;
 
   const inGwangalliTunnel = currentStage.gwangalliTheme
     && isStageZInRange(segmentMidZ, getGwangalliTunnelStartZ(), currentStage.gwangalliTunnelEndZ ?? currentStage.goalZ);
@@ -7933,8 +8043,11 @@ function createObstacle(x, z, width, height, depth) {
 }
 
 function addGoal() {
+  if (currentStage.testRoom) return;
+
   const z = goalZ;
   const sample = getGroundSample(0, z);
+  if (!sample) return;
   const y = sample.y + 5.8;
 
   const goal = new THREE.Group();
@@ -8128,6 +8241,39 @@ function addCylinder(parent, radiusTop, radiusBottom, height, material, x, y, z,
   return mesh;
 }
 
+function createTaperedBoxGeometry(frontWidth, backWidth, height, depth) {
+  const fw = frontWidth * 0.5;
+  const bw = backWidth * 0.5;
+  const h = height * 0.5;
+  const d = depth * 0.5;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array([
+      -fw, -h, -d, fw, -h, -d, fw, h, -d, -fw, h, -d,
+      -bw, -h, d, bw, -h, d, bw, h, d, -bw, h, d,
+    ]), 3),
+  );
+  geometry.setIndex([
+    0, 1, 2, 0, 2, 3,
+    5, 4, 7, 5, 7, 6,
+    4, 0, 3, 4, 3, 7,
+    1, 5, 6, 1, 6, 2,
+    3, 2, 6, 3, 6, 7,
+    4, 5, 1, 4, 1, 0,
+  ]);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addTaperedBox(parent, frontWidth, backWidth, height, depth, material, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const mesh = new THREE.Mesh(createTaperedBoxGeometry(frontWidth, backWidth, height, depth), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  parent.add(mesh);
+  return mesh;
+}
+
 function addJetHarness(parent, energyLines) {
   addBox(parent, 0.065, 0.74, 0.05, materials.jetHarness, -0.23, 0.2, -0.29, 0, 0, -0.08);
   addBox(parent, 0.065, 0.74, 0.05, materials.jetHarness, 0.23, 0.2, -0.29, 0, 0, 0.08);
@@ -8176,6 +8322,17 @@ function addHairSpike(parent, x, y, z, radius, length, rx, ry, rz) {
 
 function addJetEnergyLine(lines, parent, width, height, depth, x, y, z, rx = 0, ry = 0, rz = 0) {
   const line = addBox(parent, width, height, depth, materials.jetEnergy, x, y, z, rx, ry, rz);
+  line.visible = false;
+  line.layers.enable(selectiveBloomLayer);
+  line.userData.energyLine = true;
+  line.userData.isJetEnergyLine = true;
+  line.userData.phase = lines.length * 0.73;
+  lines.push(line);
+  return line;
+}
+
+function addJetEnergyCylinder(lines, parent, radiusTop, radiusBottom, height, x, y, z, rx = 0, ry = 0, rz = 0, radialSegments = 16) {
+  const line = addCylinder(parent, radiusTop, radiusBottom, height, materials.jetEnergy, x, y, z, rx, ry, rz, 1, 1, 1, radialSegments);
   line.visible = false;
   line.layers.enable(selectiveBloomLayer);
   line.userData.energyLine = true;
@@ -8290,22 +8447,57 @@ function createLeg(side, energyLines) {
   const shoe = new THREE.Group();
   shoe.position.set(0, -0.72, -0.1);
 
-  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.58), materials.jetShoeSole);
-  sole.position.set(0, -0.04, 0.03);
-  shoe.add(sole);
+  addTaperedBox(shoe, 0.34, 0.27, 0.068, 0.25, materials.jetShoeSole, 0, -0.058, -0.27);
+  addTaperedBox(shoe, 0.27, 0.24, 0.058, 0.24, materials.jetShoeSole, 0, -0.064, -0.02);
+  addTaperedBox(shoe, 0.27, 0.34, 0.082, 0.23, materials.jetShoeSole, 0, -0.052, 0.27);
+  addBox(shoe, 0.2, 0.028, 0.18, materials.jetMechanicalDark, 0, -0.094, -0.16);
+  addBox(shoe, 0.18, 0.028, 0.16, materials.jetMechanicalDark, 0, -0.102, 0.07);
+  addBox(shoe, 0.22, 0.032, 0.11, materials.jetMechanicalDark, 0, -0.1, 0.28);
 
-  const top = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.13, 0.48), materials.jetMechanicalSilver);
-  top.position.set(0, 0.025, -0.04);
-  shoe.add(top);
+  addTaperedBox(shoe, 0.29, 0.23, 0.088, 0.29, materials.jetMechanicalSilver, 0, 0.006, -0.235);
+  addCapsule(shoe, 0.048, 0.19, materials.jetMechanicalSilver, 0, 0.025, -0.39, 0, 0, Math.PI / 2, 1.32, 0.72, 0.72, 16);
+  addTaperedBox(shoe, 0.22, 0.18, 0.052, 0.34, materials.jetHarness, 0, 0.09, -0.055);
+  addTaperedBox(shoe, 0.2, 0.27, 0.112, 0.2, materials.jetHarnessPlate, 0, 0.034, 0.245);
 
-  addBox(shoe, 0.24, 0.055, 0.13, materials.jetMechanicalDark, 0, 0.105, -0.11);
-  addBox(shoe, 0.055, 0.09, 0.22, materials.jetCautionYellow, side * 0.14, 0.025, -0.02, 0, 0.16 * side, 0);
-  addBox(shoe, 0.22, 0.04, 0.32, materials.jetHarnessPlate, 0, 0.03, -0.13, 0, 0, side * 0.12);
-  addBox(shoe, 0.14, 0.19, 0.22, materials.jetMechanicalDark, 0, 0.035, 0.34);
-  addCylinder(shoe, 0.062, 0.074, 0.11, materials.jetHarnessPlate, 0, 0.04, 0.48, Math.PI / 2, 0, 0, 1, 1, 1, 14);
-  addJetIdleEnergyLine(shoe, 0.028, 0.04, 0.3, side * 0.17, 0.065, -0.04, 0, 0.08 * side, 0);
-  addJetEnergyLine(energyLines, shoe, 0.032, 0.044, 0.34, side * 0.17, 0.065, -0.04, 0, 0.08 * side, 0);
-  addJetEnergyLine(energyLines, shoe, 0.14, 0.07, 0.09, 0, 0.045, 0.49);
+  addJetIdleEnergyLine(shoe, 0.12, 0.024, 0.016, 0, -0.006, -0.43);
+  addJetEnergyLine(energyLines, shoe, 0.135, 0.028, 0.018, 0, -0.006, -0.438);
+
+  for (const lateral of [-1, 1]) {
+    addBox(shoe, 0.046, 0.072, 0.21, materials.jetMechanicalSilver, lateral * 0.15, 0.022, -0.19, 0, lateral * 0.14, lateral * -0.08);
+    addBox(shoe, 0.05, 0.078, 0.22, materials.jetMechanicalSilver, lateral * 0.166, 0.028, 0.12, 0, lateral * 0.1, lateral * 0.05);
+    addBox(shoe, 0.03, 0.052, 0.17, materials.jetMechanicalDark, lateral * 0.195, 0.006, -0.045, 0, lateral * 0.1, 0);
+    addJetIdleEnergyLine(shoe, 0.018, 0.03, 0.18, lateral * 0.204, 0.054, -0.18, 0, lateral * 0.1, 0);
+    addJetIdleEnergyLine(shoe, 0.018, 0.03, 0.2, lateral * 0.21, 0.056, 0.12, 0, lateral * 0.08, 0);
+    addJetEnergyLine(energyLines, shoe, 0.022, 0.034, 0.2, lateral * 0.212, 0.058, -0.18, 0, lateral * 0.1, 0);
+    addJetEnergyLine(energyLines, shoe, 0.022, 0.034, 0.22, lateral * 0.218, 0.06, 0.12, 0, lateral * 0.08, 0);
+  }
+
+  for (const strapZ of [-0.18, -0.06, 0.06]) {
+    addBox(shoe, 0.17, 0.02, 0.024, materials.jetHarnessPlate, 0, 0.126, strapZ);
+  }
+
+  const ankleCollar = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.018, 8, 32), materials.jetHarness);
+  ankleCollar.position.set(0, 0.18, 0.11);
+  ankleCollar.rotation.x = Math.PI / 2;
+  ankleCollar.scale.set(1.05, 0.56, 1);
+  shoe.add(ankleCollar);
+
+  for (const lateral of [-1, 1]) {
+    addCylinder(shoe, 0.045, 0.045, 0.028, materials.jetMechanicalSilver, lateral * 0.168, 0.178, 0.11, 0, 0, Math.PI / 2, 1, 1, 1, 18);
+    addCylinder(shoe, 0.026, 0.026, 0.032, materials.jetEnergyIdle, lateral * 0.183, 0.178, 0.11, 0, 0, Math.PI / 2, 1, 1, 1, 16);
+  }
+
+  addTaperedBox(shoe, 0.19, 0.27, 0.13, 0.17, materials.jetHarnessPlate, 0, 0.032, 0.3);
+  addBox(shoe, 0.17, 0.095, 0.11, materials.jetMechanicalDark, 0, 0.03, 0.36);
+  addCylinder(shoe, 0.078, 0.09, 0.11, materials.jetMechanicalDark, 0, 0.042, 0.455, Math.PI / 2, 0, 0, 1, 1, 1, 20);
+  addCylinder(shoe, 0.048, 0.056, 0.112, materials.jetEnergyIdle, 0, 0.042, 0.505, Math.PI / 2, 0, 0, 1, 1, 1, 20);
+  addJetEnergyCylinder(energyLines, shoe, 0.052, 0.06, 0.12, 0, 0.042, 0.515, Math.PI / 2, 0, 0, 20);
+
+  addBox(shoe, 0.17, 0.026, 0.16, materials.jetMechanicalDark, 0, -0.087, 0.15);
+  addJetIdleEnergyLine(shoe, 0.105, 0.018, 0.065, -0.065, -0.097, 0.17);
+  addJetIdleEnergyLine(shoe, 0.105, 0.018, 0.065, 0.065, -0.097, 0.17);
+  addJetEnergyLine(energyLines, shoe, 0.22, 0.024, 0.08, 0, -0.104, 0.17);
+  addBox(shoe, 0.045, 0.034, 0.07, materials.jetCautionYellow, side * 0.145, 0.01, 0.22, 0, 0.12 * side, 0);
 
   lower.add(shoe);
   leg.shoe = shoe;
@@ -9487,6 +9679,8 @@ function dropCollectedDna() {
 }
 
 function checkGoal() {
+  if (currentStage.testRoom) return;
+
   if (player.position.z < goalZ + 6 && Math.abs(player.position.x) < 9.2) {
     setPaused(false, "finish");
     finished = true;
@@ -9494,12 +9688,12 @@ function checkGoal() {
     finishKickerEl.textContent = `${currentStage.label} CLEAR`;
     finishTimeEl.textContent = `${getElapsedSeconds().toFixed(2)}s`;
     finishScoreEl.textContent = `${score}`;
-    nextStageButton.classList.toggle("hidden", currentStageIndex >= stageCount - 1);
+    nextStageButton.classList.toggle("hidden", currentStageIndex >= playableStageCount - 1);
   }
 }
 
 function goToNextStage() {
-  if (currentStageIndex >= stageCount - 1) return;
+  if (currentStageIndex >= playableStageCount - 1) return;
 
   if (currentStageIndex >= 0) {
     window.sessionStorage.setItem("dx-speed-stage-score", `${score}`);
@@ -10174,6 +10368,25 @@ const cameraLateralQuickStepFollowRatio = 0.42;
 const cameraLateralIdleFollowRate = 3.6;
 const cameraLateralRunFollowRate = 4.2;
 const cameraLateralQuickStepFollowRate = 2.4;
+const characterInspectTargetPresets = Object.freeze({
+  full: { focusLift: 0.5, distance: 3.2, heightOffset: 0.65, fov: 39 },
+  face: { focusLift: 2.02, distance: 1.35, heightOffset: 0.08, fov: 29 },
+  upper: { focusLift: 1.22, distance: 1.85, heightOffset: 0.14, fov: 32 },
+  lower: { focusLift: 0.22, distance: 2.0, heightOffset: 0.14, fov: 34 },
+  foot: { focusLift: -0.58, distance: 1.75, heightOffset: 0.16, fov: 34 },
+});
+const characterInspectAnglePresets = Object.freeze({
+  front: { tangent: 1, right: 0, up: 0, fovAdd: 0 },
+  back: { tangent: -1, right: 0, up: 0, fovAdd: 0 },
+  left: { tangent: 0, right: -1, up: 0, fovAdd: 0 },
+  right: { tangent: 0, right: 1, up: 0, fovAdd: 0 },
+  frontLeft: { tangent: 0.72, right: -0.72, up: 0, fovAdd: 1 },
+  frontRight: { tangent: 0.72, right: 0.72, up: 0, fovAdd: 1 },
+  backLeft: { tangent: -0.72, right: -0.72, up: 0, fovAdd: 1 },
+  backRight: { tangent: -0.72, right: 0.72, up: 0, fovAdd: 1 },
+  high: { tangent: -0.55, right: 0, up: 0.82, fovAdd: 3 },
+  low: { tangent: -0.92, right: 0, up: -0.22, fovAdd: 3 },
+});
 
 function updateBoostCameraState(boostActive, dt) {
   if (boostActive && !boostCameraWasActive) {
@@ -10194,9 +10407,14 @@ function updateBoostCameraState(boostActive, dt) {
 
 function updateCamera(dt) {
   updateManualCameraInput(dt);
+  const frame = getStageFrame(player.position.z);
+  if (debugSettings.characterInspect) {
+    updateCharacterInspectCamera(dt, frame);
+    return;
+  }
+
   const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
   const boostCameraSustainEase = boostCameraSustain;
-  const frame = getStageFrame(player.position.z);
   const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
   const speedBasedFollowRatio = THREE.MathUtils.lerp(
     cameraLateralIdleFollowRatio,
@@ -10501,6 +10719,18 @@ function loadDebugSettings() {
   }
 }
 
+function getLegacyCharacterInspectTarget(source = {}) {
+  if (characterInspectTargets.includes(source.characterInspectTarget)) return source.characterInspectTarget;
+  return source.characterInspectView === "foot" ? "foot" : debugDefaults.characterInspectTarget;
+}
+
+function getLegacyCharacterInspectAngle(source = {}) {
+  if (characterInspectAngles.includes(source.characterInspectAngle)) return source.characterInspectAngle;
+  if (source.characterInspectView === "front") return "front";
+  if (source.characterInspectView === "side") return "right";
+  return debugDefaults.characterInspectAngle;
+}
+
 function normalizeDebugSettings(source = {}) {
   return {
     superBoost: typeof source.superBoost === "boolean" ? source.superBoost : debugDefaults.superBoost,
@@ -10510,6 +10740,11 @@ function normalizeDebugSettings(source = {}) {
     unlimitedCameraOrbit: typeof source.unlimitedCameraOrbit === "boolean"
       ? source.unlimitedCameraOrbit
       : debugDefaults.unlimitedCameraOrbit,
+    characterInspect: typeof source.characterInspect === "boolean"
+      ? source.characterInspect
+      : debugDefaults.characterInspect,
+    characterInspectTarget: getLegacyCharacterInspectTarget(source),
+    characterInspectAngle: getLegacyCharacterInspectAngle(source),
   };
 }
 
@@ -10563,6 +10798,9 @@ function bindDebugControls() {
       });
       saveDebugSettings();
       syncDebugControls();
+      if (key === "characterInspect") {
+        resetCameraView();
+      }
       if (key === "mouseObject" && !debugSettings.mouseObject) {
         hideMouseObjectLabel();
       } else if (key === "mouseObject") {
@@ -10572,6 +10810,26 @@ function bindDebugControls() {
       }
     });
   }
+
+  debugCharacterInspectTargetSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspectTarget: debugCharacterInspectTargetSelect.value,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  debugCharacterInspectAngleSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspectAngle: debugCharacterInspectAngleSelect.value,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
 }
 
 function syncGraphicsControls() {
@@ -10585,6 +10843,14 @@ function syncDebugControls() {
   for (const [key, control] of Object.entries(debugControls)) {
     if (!control) continue;
     control.checked = Boolean(debugSettings[key]);
+  }
+  if (debugCharacterInspectTargetSelect) {
+    debugCharacterInspectTargetSelect.value = debugSettings.characterInspectTarget;
+    debugCharacterInspectTargetSelect.disabled = !debugSettings.characterInspect;
+  }
+  if (debugCharacterInspectAngleSelect) {
+    debugCharacterInspectAngleSelect.value = debugSettings.characterInspectAngle;
+    debugCharacterInspectAngleSelect.disabled = !debugSettings.characterInspect;
   }
   updateDebugRenderPath();
   if (!debugSettings.mouseObject) {
@@ -10857,6 +11123,41 @@ function applyViewDistanceSettings() {
   camera.far = config.cameraFar;
   scene.fog.near = config.fogNear;
   scene.fog.far = config.fogFar;
+  camera.updateProjectionMatrix();
+}
+
+function updateCharacterInspectCamera(dt, frame) {
+  const targetPreset = characterInspectTargetPresets[debugSettings.characterInspectTarget]
+    || characterInspectTargetPresets.full;
+  const anglePreset = characterInspectAnglePresets[debugSettings.characterInspectAngle]
+    || characterInspectAnglePresets.back;
+  const targetWorld = toWorldPosition(new THREE.Vector3(
+    player.position.x,
+    player.position.y + targetPreset.focusLift,
+    player.position.z,
+  ));
+  const horizontalDirection = frame.tangent.clone()
+    .multiplyScalar(anglePreset.tangent)
+    .addScaledVector(frame.right, anglePreset.right);
+  if (horizontalDirection.lengthSq() < 0.001) {
+    horizontalDirection.copy(frame.tangent).multiplyScalar(-1);
+  } else {
+    horizontalDirection.normalize();
+  }
+  const cameraOffset = horizontalDirection
+    .multiplyScalar(targetPreset.distance)
+    .addScaledVector(frame.up, targetPreset.heightOffset + anglePreset.up * targetPreset.distance);
+  const yawRotation = new THREE.Quaternion().setFromAxisAngle(frame.up, cameraYawOffset);
+  cameraOffset.applyQuaternion(yawRotation);
+  const pitchAxis = frame.right.clone().applyQuaternion(yawRotation).normalize();
+  cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
+
+  const desired = targetWorld.clone().add(cameraOffset);
+  camera.position.lerp(desired, 1 - Math.exp(-12 * dt));
+
+  camera.up.lerp(frame.up, 1 - Math.exp(-10 * dt)).normalize();
+  camera.lookAt(targetWorld);
+  camera.fov = THREE.MathUtils.lerp(camera.fov, targetPreset.fov + anglePreset.fovAdd, 1 - Math.exp(-8 * dt));
   camera.updateProjectionMatrix();
 }
 

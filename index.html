@@ -18,7 +18,7 @@
     <canvas id="game"></canvas>
     <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
     <div id="performance-hud" class="performance-hud hidden" aria-live="off" aria-label="Performance debug"></div>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-062A: 퀵스텝 에너지라인 잔상 수치 14/0.82를 승인 적용합니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-067A: JET 검사 카메라를 보정하고 TEST ROOM을 추가합니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -85,6 +85,7 @@
           <div id="stage-menu" class="stage-menu hidden">
             <button type="button" data-stage-select="1">STAGE 1</button>
             <button type="button" data-stage-select="2">STAGE 2</button>
+            <button type="button" data-stage-select="test-room">TEST ROOM</button>
           </div>
         </nav>
         <button id="debug-toggle" class="debug-toggle" type="button" aria-expanded="false">
@@ -246,6 +247,35 @@
       <label class="debug-check">
         <span>Unlimited Camera Orbit</span>
         <input id="debug-unlimited-camera-orbit" type="checkbox" />
+      </label>
+      <label class="debug-check">
+        <span>JET Inspect</span>
+        <input id="debug-character-inspect" type="checkbox" />
+      </label>
+      <label class="debug-select">
+        <span>Inspect Target</span>
+        <select id="debug-character-inspect-target">
+          <option value="full">Full Body</option>
+          <option value="face">Face</option>
+          <option value="upper">Upper Body</option>
+          <option value="lower">Lower Body</option>
+          <option value="foot">Foot</option>
+        </select>
+      </label>
+      <label class="debug-select">
+        <span>Inspect Angle</span>
+        <select id="debug-character-inspect-angle">
+          <option value="front">Front</option>
+          <option value="back">Back</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+          <option value="frontLeft">Front Left</option>
+          <option value="frontRight">Front Right</option>
+          <option value="backLeft">Back Left</option>
+          <option value="backRight">Back Right</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
       </label>
     </section>
 

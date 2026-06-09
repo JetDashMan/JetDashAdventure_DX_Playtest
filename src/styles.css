@@ -594,6 +594,18 @@ body.game-paused .help-panel {
   grid-template-columns: 1fr auto;
 }
 
+.debug-select {
+  grid-template-columns: 1fr minmax(128px, auto);
+}
+
+.debug-select select {
+  min-width: 128px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+}
+
 .debug-check input {
   width: 20px;
   height: 20px;
