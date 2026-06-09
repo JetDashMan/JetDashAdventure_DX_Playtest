@@ -126,6 +126,112 @@ body {
   font-weight: 900;
 }
 
+.debug-console {
+  position: fixed;
+  left: 50%;
+  bottom: max(68px, calc(env(safe-area-inset-bottom) + 62px));
+  z-index: 31;
+  display: grid;
+  gap: 8px;
+  width: min(720px, calc(100vw - 24px));
+  padding: 10px 12px 12px;
+  border: 1px solid rgba(120, 214, 255, 0.34);
+  border-radius: 8px;
+  background: rgba(4, 13, 22, 0.9);
+  color: rgba(248, 251, 255, 0.92);
+  box-shadow: 0 20px 62px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(15px);
+  transform: translateX(-50%);
+}
+
+.debug-console.hidden {
+  display: none;
+}
+
+.debug-console-title,
+.debug-console-form,
+.debug-console-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-console-title {
+  justify-content: space-between;
+  min-height: 20px;
+  color: rgba(248, 251, 255, 0.76);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.debug-console-title strong {
+  color: #7de7ff;
+  font-size: 0.72rem;
+}
+
+.debug-console-title span {
+  color: rgba(248, 251, 255, 0.48);
+  font-size: 0.62rem;
+}
+
+.debug-console-output {
+  display: grid;
+  gap: 3px;
+  max-height: min(34vh, 240px);
+  overflow: auto;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.68rem;
+  line-height: 1.28;
+}
+
+.debug-console-line {
+  min-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug-console-line.is-command {
+  color: #ffd86a;
+}
+
+.debug-console-line.is-error {
+  color: #ff8f8f;
+}
+
+.debug-console-line.is-muted {
+  color: rgba(248, 251, 255, 0.55);
+}
+
+.debug-console-form {
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid rgba(120, 214, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.debug-console-form span {
+  color: #7de7ff;
+}
+
+.debug-console-form input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f8fbff;
+  font: inherit;
+}
+
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -1108,6 +1214,22 @@ body.touch-enabled:not(.portrait-touch) .performance-hud {
   width: min(220px, 34vw);
   padding: 7px 8px;
   font-size: 0.54rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .debug-console {
+  bottom: max(8px, env(safe-area-inset-bottom));
+  width: min(520px, calc(100vw - 172px));
+  padding: 8px 9px 9px;
+}
+
+body.touch-enabled:not(.portrait-touch) .debug-console-output {
+  max-height: min(42vh, 170px);
+  font-size: 0.58rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .debug-console-form {
+  min-height: 30px;
+  font-size: 0.64rem;
 }
 
 body.touch-enabled:not(.portrait-touch) .music-toggle,

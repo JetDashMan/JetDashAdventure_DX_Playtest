@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=summary-label-001" />
+    <link rel="stylesheet" href="./src/styles.css?v=debug-console-069" />
     <script type="importmap">
       {
         "imports": {
@@ -18,7 +18,18 @@
     <canvas id="game"></canvas>
     <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
     <div id="performance-hud" class="performance-hud hidden" aria-live="off" aria-label="Performance debug"></div>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-067A: JET 검사 카메라를 보정하고 TEST ROOM을 추가합니다.</div>
+    <section id="debug-console" class="debug-console hidden" aria-label="Debug tuning console">
+      <div class="debug-console-title">
+        <strong>TUNE CONSOLE</strong>
+        <span id="debug-console-status">session only</span>
+      </div>
+      <div id="debug-console-output" class="debug-console-output" aria-live="polite"></div>
+      <form id="debug-console-form" class="debug-console-form">
+        <span aria-hidden="true">&gt;</span>
+        <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
+      </form>
+    </section>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-069A: 안전한 디버그 튜닝 콘솔을 추가합니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -275,6 +286,31 @@
           <option value="backRight">Back Right</option>
           <option value="high">High</option>
           <option value="low">Low</option>
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+        </select>
+      </label>
+      <label class="debug-select">
+        <span>Inspect Motion</span>
+        <select id="debug-character-inspect-motion">
+          <option value="live">Live</option>
+          <option value="idle">Idle</option>
+          <option value="walk">Light Run</option>
+          <option value="run">Run</option>
+          <option value="boost">Boost Run</option>
+          <option value="quickstepLeft">Quickstep Left</option>
+          <option value="quickstepRight">Quickstep Right</option>
+          <option value="jump">Jump</option>
+          <option value="landing">Landing</option>
+          <option value="hitstun">Hitstun</option>
+        </select>
+      </label>
+      <label class="debug-select">
+        <span>Motion Speed</span>
+        <select id="debug-character-inspect-motion-speed">
+          <option value="slow">Slow</option>
+          <option value="normal">Normal</option>
+          <option value="fast">Fast</option>
         </select>
       </label>
     </section>
@@ -308,6 +344,7 @@
         <dt>O</dt><dd>Reset Camera</dd>
         <dt>1</dt><dd>Fill Boost Gauge</dd>
         <dt>R</dt><dd>Restart</dd>
+        <dt>`</dt><dd>Tune Console</dd>
       </dl>
     </section>
 

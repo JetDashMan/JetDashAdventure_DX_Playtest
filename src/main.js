@@ -24,6 +24,11 @@ const debugRenderPathEl = document.querySelector("#debug-render-path");
 const debugRenderSamplesEl = document.querySelector("#debug-render-samples");
 const mouseObjectLabelEl = document.querySelector("#mouse-object-label");
 const performanceHudEl = document.querySelector("#performance-hud");
+const debugConsoleEl = document.querySelector("#debug-console");
+const debugConsoleOutputEl = document.querySelector("#debug-console-output");
+const debugConsoleForm = document.querySelector("#debug-console-form");
+const debugConsoleInputEl = document.querySelector("#debug-console-input");
+const debugConsoleStatusEl = document.querySelector("#debug-console-status");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
 const menuButton = document.querySelector("#menu-toggle");
@@ -70,6 +75,8 @@ const debugControls = {
 };
 const debugCharacterInspectTargetSelect = document.querySelector("#debug-character-inspect-target");
 const debugCharacterInspectAngleSelect = document.querySelector("#debug-character-inspect-angle");
+const debugCharacterInspectMotionSelect = document.querySelector("#debug-character-inspect-motion");
+const debugCharacterInspectMotionSpeedSelect = document.querySelector("#debug-character-inspect-motion-speed");
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x75cbef);
@@ -290,7 +297,27 @@ const characterInspectAngles = [
   "backRight",
   "high",
   "low",
+  "top",
+  "bottom",
 ];
+const characterInspectMotionModes = [
+  "live",
+  "idle",
+  "walk",
+  "run",
+  "boost",
+  "quickstepLeft",
+  "quickstepRight",
+  "jump",
+  "landing",
+  "hitstun",
+];
+const characterInspectMotionSpeeds = ["slow", "normal", "fast"];
+const characterInspectMotionSpeedScale = {
+  slow: 0.45,
+  normal: 1,
+  fast: 1.55,
+};
 const debugDefaults = {
   superBoost: false,
   infiniteJump: false,
@@ -300,6 +327,8 @@ const debugDefaults = {
   characterInspect: false,
   characterInspectTarget: "full",
   characterInspectAngle: "back",
+  characterInspectMotion: "live",
+  characterInspectMotionSpeed: "normal",
 };
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
@@ -319,6 +348,47 @@ const jetBoostLightColor = 0x42dfff;
 const jetBoostLightMaxIntensity = 50;
 const jetBoostLightDistance = 7.5;
 const jetBoostLightDecay = 2.0;
+const debugTuneDefaults = Object.freeze({
+  "camera.followLerp": 14,
+  "camera.inspectLerp": 12,
+  "camera.lateralIdleFollowRatio": 0.72,
+  "camera.lateralRunFollowRatio": 0.52,
+  "camera.lateralBoostFollowRatio": 0.34,
+  "camera.lateralQuickStepFollowRatio": 0.42,
+  "camera.lateralIdleFollowRate": 3.6,
+  "camera.lateralRunFollowRate": 4.2,
+  "camera.lateralQuickStepFollowRate": 2.4,
+  "motionBlur.maxPixels": velocityMotionBlurMaxPixels,
+  "motionBlur.low": motionBlurStrengthConfig.low,
+  "motionBlur.medium": motionBlurStrengthConfig.medium,
+  "motionBlur.high": motionBlurStrengthConfig.high,
+  "motionBlur.ultra": motionBlurStrengthConfig.ultra,
+  "quickstep.afterimageBlurRadius": quickStepAfterimageBlurRadius,
+  "quickstep.afterimageIntensity": quickStepAfterimageBlurIntensity,
+  "jet.bloomBlurRadius": jetEnergyBloomBlurRadius,
+  "jet.boostLightMaxIntensity": jetBoostLightMaxIntensity,
+});
+const debugTuneRegistry = Object.freeze({
+  "camera.followLerp": { min: 0.5, max: 40, precision: 3 },
+  "camera.inspectLerp": { min: 0.5, max: 40, precision: 3 },
+  "camera.lateralIdleFollowRatio": { min: 0, max: 1, precision: 3 },
+  "camera.lateralRunFollowRatio": { min: 0, max: 1, precision: 3 },
+  "camera.lateralBoostFollowRatio": { min: 0, max: 1, precision: 3 },
+  "camera.lateralQuickStepFollowRatio": { min: 0, max: 1, precision: 3 },
+  "camera.lateralIdleFollowRate": { min: 0.1, max: 20, precision: 3 },
+  "camera.lateralRunFollowRate": { min: 0.1, max: 20, precision: 3 },
+  "camera.lateralQuickStepFollowRate": { min: 0.1, max: 20, precision: 3 },
+  "motionBlur.maxPixels": { min: 0, max: 240, precision: 2 },
+  "motionBlur.low": { min: 0, max: 8, precision: 3 },
+  "motionBlur.medium": { min: 0, max: 8, precision: 3 },
+  "motionBlur.high": { min: 0, max: 8, precision: 3 },
+  "motionBlur.ultra": { min: 0, max: 8, precision: 3 },
+  "quickstep.afterimageBlurRadius": { min: 0, max: 60, precision: 2 },
+  "quickstep.afterimageIntensity": { min: 0, max: 3, precision: 3 },
+  "jet.bloomBlurRadius": { min: 0, max: 8, precision: 3 },
+  "jet.boostLightMaxIntensity": { min: 0, max: 100, precision: 2 },
+});
+const debugTuneValues = { ...debugTuneDefaults };
 
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
@@ -716,6 +786,12 @@ const performanceHudState = {
   frames: 0,
   lastUpdateAt: performance.now(),
   fps: 0,
+};
+const debugConsoleState = {
+  open: false,
+  lines: [],
+  history: [],
+  historyIndex: 0,
 };
 const worldUp = new THREE.Vector3(0, 1, 0);
 const sunFollowOffset = new THREE.Vector3(-28, 46, 24);
@@ -8707,8 +8783,284 @@ function clearQuickStepAfterimages() {
   }
 }
 
+function getDebugTuneValue(key) {
+  const value = debugTuneValues[key];
+  if (Number.isFinite(value)) return value;
+  return debugTuneDefaults[key] ?? 0;
+}
+
+function formatDebugTuneValue(key, value = getDebugTuneValue(key)) {
+  const precision = debugTuneRegistry[key]?.precision ?? 3;
+  return Number(value).toFixed(precision).replace(/\.?0+$/, "");
+}
+
+function resolveDebugTuneKey(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return { error: "key required" };
+  if (debugTuneRegistry[raw]) return { key: raw };
+
+  const normalized = raw.toLowerCase();
+  const matches = Object.keys(debugTuneRegistry).filter((key) => key.toLowerCase().includes(normalized));
+  if (matches.length === 1) return { key: matches[0] };
+  if (matches.length > 1) return { error: `ambiguous key: ${matches.slice(0, 6).join(", ")}` };
+  return { error: `unknown key: ${raw}` };
+}
+
+function setDebugTuneValue(key, value) {
+  const config = debugTuneRegistry[key];
+  if (!config) return { ok: false, message: `unknown key: ${key}` };
+  if (!Number.isFinite(value)) return { ok: false, message: "value must be a number" };
+  if (value < config.min || value > config.max) {
+    return {
+      ok: false,
+      message: `${key} range: ${formatDebugTuneValue(key, config.min)}..${formatDebugTuneValue(key, config.max)}`,
+    };
+  }
+
+  debugTuneValues[key] = value;
+  applyDebugTuneValue(key);
+  return { ok: true, message: `${key} = ${formatDebugTuneValue(key)}` };
+}
+
+function resetDebugTuneValue(key) {
+  if (!debugTuneRegistry[key]) return { ok: false, message: `unknown key: ${key}` };
+  debugTuneValues[key] = debugTuneDefaults[key];
+  applyDebugTuneValue(key);
+  return { ok: true, message: `${key} reset to ${formatDebugTuneValue(key)}` };
+}
+
+function resetAllDebugTuneValues() {
+  Object.assign(debugTuneValues, debugTuneDefaults);
+  applyAllDebugTuneValues();
+}
+
+function applyDebugTuneValue(key) {
+  if (key === "motionBlur.maxPixels" && velocityMotionBlurMaterial) {
+    velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = getDebugTuneValue(key);
+  }
+  if (key === "quickstep.afterimageBlurRadius" && quickStepAfterimageBlurMaterial) {
+    quickStepAfterimageBlurMaterial.uniforms.uRadius.value = getDebugTuneValue(key);
+  }
+  if (key === "quickstep.afterimageIntensity" && velocityMotionBlurMaterial) {
+    velocityMotionBlurMaterial.uniforms.uAfterimageIntensity.value = getDebugTuneValue(key);
+  }
+  if (key === "jet.bloomBlurRadius" && jetEnergyBloomBlurMaterial) {
+    jetEnergyBloomBlurMaterial.uniforms.uRadius.value = getDebugTuneValue(key);
+  }
+}
+
+function applyAllDebugTuneValues() {
+  for (const key of Object.keys(debugTuneRegistry)) {
+    applyDebugTuneValue(key);
+  }
+}
+
+function isTextEntryTarget(target) {
+  const tagName = target?.tagName;
+  return Boolean(
+    target?.isContentEditable
+      || tagName === "INPUT"
+      || tagName === "TEXTAREA"
+      || tagName === "SELECT",
+  );
+}
+
+function isDebugConsoleOpen() {
+  return debugConsoleState.open;
+}
+
+function setDebugConsoleOpen(open) {
+  if (!debugConsoleEl || !debugConsoleInputEl) return;
+  debugConsoleState.open = Boolean(open);
+  debugConsoleEl.classList.toggle("hidden", !debugConsoleState.open);
+  if (debugConsoleStatusEl) {
+    debugConsoleStatusEl.textContent = `${Object.keys(debugTuneRegistry).length} keys / session only`;
+  }
+
+  if (debugConsoleState.open) {
+    keys.clear();
+    if (debugConsoleState.lines.length === 0) {
+      writeDebugConsoleLine("Safe tune console. Type help or list.", "muted");
+    }
+    requestAnimationFrame(() => debugConsoleInputEl.focus());
+  } else {
+    debugConsoleInputEl.blur();
+  }
+}
+
+function toggleDebugConsole() {
+  setDebugConsoleOpen(!debugConsoleState.open);
+}
+
+function writeDebugConsoleLine(text, kind = "") {
+  debugConsoleState.lines.push({ text: String(text), kind });
+  if (debugConsoleState.lines.length > 90) {
+    debugConsoleState.lines.splice(0, debugConsoleState.lines.length - 90);
+  }
+  renderDebugConsoleOutput();
+}
+
+function renderDebugConsoleOutput() {
+  if (!debugConsoleOutputEl) return;
+  debugConsoleOutputEl.textContent = "";
+  for (const line of debugConsoleState.lines) {
+    const element = document.createElement("div");
+    element.className = "debug-console-line";
+    if (line.kind) element.classList.add(`is-${line.kind}`);
+    element.textContent = line.text;
+    debugConsoleOutputEl.appendChild(element);
+  }
+  debugConsoleOutputEl.scrollTop = debugConsoleOutputEl.scrollHeight;
+}
+
+function bindDebugConsole() {
+  if (!debugConsoleForm || !debugConsoleInputEl) return;
+
+  debugConsoleForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitDebugConsoleInput();
+  });
+
+  debugConsoleInputEl.addEventListener("keydown", (event) => {
+    if (event.code === "Enter") {
+      event.preventDefault();
+      submitDebugConsoleInput();
+      return;
+    }
+    if (event.code === "Escape") {
+      event.preventDefault();
+      setDebugConsoleOpen(false);
+      return;
+    }
+    if (event.code === "ArrowUp") {
+      event.preventDefault();
+      debugConsoleState.historyIndex = Math.max(0, debugConsoleState.historyIndex - 1);
+      debugConsoleInputEl.value = debugConsoleState.history[debugConsoleState.historyIndex] || "";
+      return;
+    }
+    if (event.code === "ArrowDown") {
+      event.preventDefault();
+      debugConsoleState.historyIndex = Math.min(
+        debugConsoleState.history.length,
+        debugConsoleState.historyIndex + 1,
+      );
+      debugConsoleInputEl.value = debugConsoleState.history[debugConsoleState.historyIndex] || "";
+    }
+  });
+
+  window.jetDashDebugTune = {
+    keys: () => Object.keys(debugTuneRegistry),
+    get: (key) => getDebugTuneValue(key),
+    set: (key, value) => setDebugTuneValue(key, Number(value)),
+    reset: (key) => {
+      if (!key || key === "all") {
+        resetAllDebugTuneValues();
+        return { ok: true, message: "all reset" };
+      }
+      return resetDebugTuneValue(key);
+    },
+  };
+}
+
+function submitDebugConsoleInput() {
+  if (!debugConsoleInputEl) return;
+  const command = debugConsoleInputEl.value.trim();
+  if (!command) return;
+  debugConsoleInputEl.value = "";
+  debugConsoleState.history.push(command);
+  if (debugConsoleState.history.length > 60) {
+    debugConsoleState.history.shift();
+  }
+  debugConsoleState.historyIndex = debugConsoleState.history.length;
+  writeDebugConsoleLine(`> ${command}`, "command");
+  runDebugConsoleCommand(command);
+}
+
+function runDebugConsoleCommand(command) {
+  const [verbRaw, ...args] = command.split(/\s+/);
+  const verb = verbRaw.toLowerCase();
+
+  if (verb === "help") {
+    writeDebugConsoleLine("help | list [filter] | get <key> | set <key> <value> | reset <key|all> | clear", "muted");
+    return;
+  }
+  if (verb === "clear") {
+    debugConsoleState.lines = [];
+    renderDebugConsoleOutput();
+    return;
+  }
+  if (verb === "list") {
+    const filter = args.join(" ").toLowerCase();
+    const keysToShow = Object.keys(debugTuneRegistry)
+      .filter((key) => !filter || key.toLowerCase().includes(filter));
+    if (keysToShow.length === 0) {
+      writeDebugConsoleLine("no keys", "error");
+      return;
+    }
+    for (const key of keysToShow) {
+      const config = debugTuneRegistry[key];
+      writeDebugConsoleLine(
+        `${key} = ${formatDebugTuneValue(key)}  [${formatDebugTuneValue(key, config.min)}..${formatDebugTuneValue(key, config.max)}]`,
+      );
+    }
+    return;
+  }
+  if (verb === "get") {
+    const resolved = resolveDebugTuneKey(args[0]);
+    if (resolved.error) {
+      writeDebugConsoleLine(resolved.error, "error");
+      return;
+    }
+    const config = debugTuneRegistry[resolved.key];
+    writeDebugConsoleLine(
+      `${resolved.key} = ${formatDebugTuneValue(resolved.key)}  default ${formatDebugTuneValue(resolved.key, debugTuneDefaults[resolved.key])}  range ${formatDebugTuneValue(resolved.key, config.min)}..${formatDebugTuneValue(resolved.key, config.max)}`,
+    );
+    return;
+  }
+  if (verb === "set") {
+    const resolved = resolveDebugTuneKey(args[0]);
+    if (resolved.error) {
+      writeDebugConsoleLine(resolved.error, "error");
+      return;
+    }
+    const result = setDebugTuneValue(resolved.key, Number(args[1]));
+    writeDebugConsoleLine(result.message, result.ok ? "" : "error");
+    return;
+  }
+  if (verb === "reset") {
+    if (!args[0] || args[0] === "all") {
+      resetAllDebugTuneValues();
+      writeDebugConsoleLine("all tune values reset");
+      return;
+    }
+    const resolved = resolveDebugTuneKey(args[0]);
+    if (resolved.error) {
+      writeDebugConsoleLine(resolved.error, "error");
+      return;
+    }
+    const result = resetDebugTuneValue(resolved.key);
+    writeDebugConsoleLine(result.message, result.ok ? "" : "error");
+    return;
+  }
+
+  writeDebugConsoleLine(`unknown command: ${verb}`, "error");
+}
+
 function bindInput() {
   window.addEventListener("keydown", (event) => {
+    if (event.code === "Backquote" && !event.repeat) {
+      event.preventDefault();
+      toggleDebugConsole();
+      return;
+    }
+    if (isDebugConsoleOpen()) {
+      if (event.code === "Escape") {
+        event.preventDefault();
+        setDebugConsoleOpen(false);
+      }
+      return;
+    }
+    if (isTextEntryTarget(event.target)) return;
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyQ", "KeyE", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyO", "KeyU", "KeyP", "Escape"].includes(event.code)) {
       event.preventDefault();
     }
@@ -8744,9 +9096,14 @@ function bindInput() {
   });
 
   window.addEventListener("keyup", (event) => {
+    if (isDebugConsoleOpen() || isTextEntryTarget(event.target)) {
+      keys.delete(event.code);
+      return;
+    }
     keys.delete(event.code);
   });
 
+  bindDebugConsole();
   bindTouchControls();
   canvas.addEventListener("pointermove", handleMouseObjectPointerMove);
   canvas.addEventListener("pointerleave", handleMouseObjectPointerLeave);
@@ -9772,16 +10129,25 @@ function updateTutorialPrompt() {
 
 function renderGame(dt) {
   if (player.mesh) {
-    const quickStepProgress = quickStepTimer > 0
-      ? THREE.MathUtils.clamp(1 - quickStepTimer / quickStepDuration, 0, 1)
+    const motionPreview = getCharacterInspectMotionPreviewState();
+    const quickStepActive = motionPreview?.quickStepActive ?? quickStepTimer > 0;
+    const quickStepProgress = quickStepActive
+      ? THREE.MathUtils.clamp(
+        motionPreview?.quickStepProgress ?? 1 - quickStepTimer / quickStepDuration,
+        0,
+        1,
+      )
       : 0;
-    const quickStepLeanPulse = quickStepTimer > 0 ? Math.sin(quickStepProgress * Math.PI) : 0;
-    const quickStepLean = -quickStepDirection * quickStepLeanPulse * 0.34;
-    const lean = -player.velocity.x * 0.014 + quickStepLean;
+    const quickStepDirectionForLean = motionPreview?.quickStepDirection ?? quickStepDirection;
+    const lateralVelocity = motionPreview?.lateralVelocity ?? player.velocity.x;
+    const quickStepLeanPulse = quickStepActive ? Math.sin(quickStepProgress * Math.PI) : 0;
+    const quickStepLean = -quickStepDirectionForLean * quickStepLeanPulse * 0.34;
+    const lean = -lateralVelocity * 0.014 + quickStepLean;
+    const scaleImpact = motionPreview?.jumpImpact ?? jumpImpact;
     setStageObjectTransform(player.mesh, player.position);
     player.mesh.rotateY(player.yaw);
     player.mesh.rotateZ(lean);
-    player.mesh.scale.set(1 - jumpImpact * 0.08, 1 + jumpImpact * 0.18, 1 - jumpImpact * 0.08);
+    player.mesh.scale.set(1 - scaleImpact * 0.08, 1 + scaleImpact * 0.18, 1 - scaleImpact * 0.08);
     animatePlayerModel(dt);
   }
   updateCamera(dt);
@@ -9807,8 +10173,10 @@ function updateVelocityMotionBlur(dt) {
 }
 
 function updateJetEnergyBloom(dt) {
-  const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
-  const target = playerBoostEffectActive ? 1.0 + speedRatio * 1.28 : 0;
+  const motionPreview = getCharacterInspectMotionPreviewState();
+  const speedRatio = THREE.MathUtils.clamp((motionPreview?.speed ?? getHorizontalSpeed()) / boostTopSpeed, 0, 1);
+  const boostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
+  const target = boostActive ? 1.0 + speedRatio * 1.28 : 0;
   const fadeRate = target > jetEnergyBloomStrength ? 12 : 9;
   jetEnergyBloomStrength = THREE.MathUtils.lerp(
     jetEnergyBloomStrength,
@@ -9824,12 +10192,15 @@ function updateJetEnergyBloom(dt) {
 function updateJetBoostLight() {
   if (!jetBoostLight) return;
 
-  const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
-  const boostLightRatio = playerBoostEffectActive ? 0.12 + speedRatio * 0.88 : 0;
+  const motionPreview = getCharacterInspectMotionPreviewState();
+  const speedRatio = THREE.MathUtils.clamp((motionPreview?.speed ?? getHorizontalSpeed()) / boostTopSpeed, 0, 1);
+  const boostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
+  const boostLightRatio = boostActive ? 0.12 + speedRatio * 0.88 : 0;
+  const maxIntensity = getDebugTuneValue("jet.boostLightMaxIntensity");
   const intensity = THREE.MathUtils.clamp(
-    boostLightRatio * jetBoostLightMaxIntensity,
+    boostLightRatio * maxIntensity,
     0,
-    jetBoostLightMaxIntensity,
+    maxIntensity,
   );
   jetBoostLight.intensity = intensity;
   jetBoostLight.visible = intensity > 0.02;
@@ -9859,15 +10230,16 @@ function renderFrame() {
   velocityMotionBlurMaterial.uniforms.tEnergyBloom.value = jetEnergyBloomBlurTarget.texture;
   velocityMotionBlurMaterial.uniforms.tEnergyBloomWide.value = jetEnergyBloomWideTarget.texture;
   velocityMotionBlurMaterial.uniforms.tEnergyBloomSoft.value = jetEnergyBloomSoftTarget.texture;
-  velocityMotionBlurMaterial.uniforms.uAfterimageIntensity.value = quickStepAfterimageBlurIntensity;
+  velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = getDebugTuneValue("motionBlur.maxPixels");
+  velocityMotionBlurMaterial.uniforms.uAfterimageIntensity.value = getDebugTuneValue("quickstep.afterimageIntensity");
   velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = jetEnergyBloomStrength;
   velocityMotionVectorMaterial.uniforms.tDepth.value = sceneDepthTexture;
   velocityMotionVectorMaterial.uniforms.uCurrentInverseViewProjection.value.copy(currentInverseViewProjectionMatrix);
   velocityMotionVectorMaterial.uniforms.uPreviousViewProjection.value.copy(previousViewProjectionMatrix);
   velocityMotionVectorMaterial.uniforms.uMotionVectorEnabled.value = velocityMotionBlurSupported ? 1 : 0;
   quickStepAfterimageBlurMaterial.uniforms.tDiffuse.value = quickStepAfterimageRenderTarget.texture;
-  quickStepAfterimageBlurMaterial.uniforms.uRadius.value = quickStepAfterimageBlurRadius;
-  jetEnergyBloomBlurMaterial.uniforms.uRadius.value = jetEnergyBloomBlurRadius;
+  quickStepAfterimageBlurMaterial.uniforms.uRadius.value = getDebugTuneValue("quickstep.afterimageBlurRadius");
+  jetEnergyBloomBlurMaterial.uniforms.uRadius.value = getDebugTuneValue("jet.bloomBlurRadius");
 
   const clearColor = renderer.getClearColor(renderClearColorScratch);
   const clearAlpha = renderer.getClearAlpha();
@@ -10030,36 +10402,119 @@ function updateSunShadow() {
   sunLight.updateMatrixWorld();
 }
 
+function getCharacterInspectMotionPreviewState() {
+  if (!debugSettings.characterInspect || debugSettings.characterInspectMotion === "live") return null;
+
+  const mode = characterInspectMotionModes.includes(debugSettings.characterInspectMotion)
+    ? debugSettings.characterInspectMotion
+    : debugDefaults.characterInspectMotion;
+  const timeScale = characterInspectMotionSpeedScale[debugSettings.characterInspectMotionSpeed] ?? 1;
+  const time = performance.now() * 0.001 * timeScale;
+  const quickStepProgress = (time * 1.45) % 1;
+
+  if (mode === "idle") {
+    return { speed: 0, grounded: true, boostActive: false, timeScale };
+  }
+  if (mode === "walk") {
+    return { speed: runTopSpeed * 0.45, grounded: true, boostActive: false, timeScale };
+  }
+  if (mode === "run") {
+    return { speed: runTopSpeed * 1.02, grounded: true, boostActive: false, timeScale };
+  }
+  if (mode === "boost") {
+    return {
+      speed: boostTopSpeed * 0.96,
+      grounded: true,
+      boostActive: true,
+      boostFlare: 0.55 + Math.sin(time * 6.0) * 0.18,
+      timeScale,
+    };
+  }
+  if (mode === "quickstepLeft" || mode === "quickstepRight") {
+    const direction = mode === "quickstepLeft" ? -1 : 1;
+    return {
+      speed: runTopSpeed * 0.28,
+      grounded: true,
+      boostActive: false,
+      quickStepActive: true,
+      quickStepProgress,
+      quickStepDirection: direction,
+      lateralVelocity: direction * 18,
+      timeScale,
+    };
+  }
+  if (mode === "jump") {
+    return {
+      speed: runTopSpeed * 0.56,
+      grounded: false,
+      boostActive: false,
+      verticalLift: 0.22 + Math.sin(time * 2.8) * 0.08,
+      timeScale,
+    };
+  }
+  if (mode === "landing") {
+    return {
+      speed: runTopSpeed * 0.32,
+      grounded: true,
+      boostActive: false,
+      jumpImpact: 0.75 + Math.sin(time * 4.0) * 0.2,
+      timeScale,
+    };
+  }
+  if (mode === "hitstun") {
+    return {
+      speed: 0,
+      grounded: false,
+      boostActive: false,
+      lateralVelocity: Math.sin(time * 5.5) * 10,
+      hitstunAmount: 1,
+      verticalLift: 0.12,
+      timeScale,
+    };
+  }
+
+  return null;
+}
+
 function animatePlayerModel(dt) {
   if (!player.parts) return;
 
-  const speed = getHorizontalSpeed();
+  const motionPreview = getCharacterInspectMotionPreviewState();
+  const speed = motionPreview?.speed ?? getHorizontalSpeed();
   const moving = speed > 2;
-  const quickStepActive = quickStepTimer > 0;
+  const motionGrounded = motionPreview?.grounded ?? player.grounded;
+  const motionBoostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
+  const quickStepActive = motionPreview?.quickStepActive ?? quickStepTimer > 0;
   const quickStepProgress = quickStepActive
-    ? THREE.MathUtils.clamp(1 - quickStepTimer / quickStepDuration, 0, 1)
+    ? THREE.MathUtils.clamp(
+      motionPreview?.quickStepProgress ?? 1 - quickStepTimer / quickStepDuration,
+      0,
+      1,
+    )
     : 0;
   const quickStepPulse = quickStepActive ? Math.sin(quickStepProgress * Math.PI) : 0;
-  const stationaryQuickStepAmount = quickStepActive && player.grounded && speed < 18
+  const stationaryQuickStepAmount = quickStepActive && motionGrounded && speed < 18
     ? quickStepPulse
     : 0;
-  const sideStepDirection = quickStepDirection === 0 ? 1 : quickStepDirection;
+  const sideStepDirection = motionPreview?.quickStepDirection ?? (quickStepDirection === 0 ? 1 : quickStepDirection);
+  const lateralVelocity = motionPreview?.lateralVelocity ?? player.velocity.x;
   const runAmount = THREE.MathUtils.clamp(speed / 54, 0, 1.8);
   const cappedCadenceSpeed = Math.min(speed, runTopSpeed * 1.25);
-  runPhase += cappedCadenceSpeed * dt * 0.4;
+  const motionTimeScale = motionPreview?.timeScale ?? 1;
+  runPhase += cappedCadenceSpeed * dt * 0.4 * motionTimeScale;
 
   const runStrength = Math.min(runAmount, 1.72);
-  const sprintAmount = moving && player.grounded ? THREE.MathUtils.clamp(speed / runTopSpeed, 0, 1) : 0;
-  const boostPoseAmount = moving && player.grounded && playerBoostEffectActive
+  const sprintAmount = moving && motionGrounded ? THREE.MathUtils.clamp(speed / runTopSpeed, 0, 1) : 0;
+  const boostPoseAmount = moving && motionGrounded && motionBoostActive
     ? THREE.MathUtils.clamp((speed - runTopSpeed * 0.75) / (boostTopSpeed - runTopSpeed * 0.75), 0, 1)
     : 0;
   const boostStartFlare = boostPoseAmount > 0
-    ? THREE.MathUtils.smoothstep(boostCameraKick, 0, 1)
+    ? THREE.MathUtils.clamp(motionPreview?.boostFlare ?? THREE.MathUtils.smoothstep(boostCameraKick, 0, 1), 0, 1)
     : 0;
   const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.08;
-  const airborne = !player.grounded;
+  const airborne = !motionGrounded;
   const limbBlend = 1 - Math.exp(-15 * dt);
-  const runBodyBob = moving && player.grounded ? Math.abs(Math.sin(runPhase * 2)) * 0.005 : 0;
+  const runBodyBob = moving && motionGrounded ? Math.abs(Math.sin(runPhase * 2)) * 0.005 : 0;
 
   if (airborne) {
     jetFootContactOffsetY = THREE.MathUtils.lerp(
@@ -10073,15 +10528,19 @@ function animatePlayerModel(dt) {
     + jetFootContactOffsetY
     + runBodyBob
     + stationaryQuickStepAmount * 0.08
-    + (airborne ? 0.04 : 0);
+    + (airborne ? 0.04 : 0)
+    + (motionPreview?.verticalLift ?? 0)
+    - (motionPreview?.jumpImpact ?? 0) * 0.05;
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
     player.parts.model.rotation.x,
-    airborne ? -0.18 : THREE.MathUtils.lerp(-THREE.MathUtils.lerp(0, 0.58, sprintAmount), -0.82, boostPoseAmount),
+    motionPreview?.hitstunAmount
+      ? -0.42
+      : airborne ? -0.18 : THREE.MathUtils.lerp(-THREE.MathUtils.lerp(0, 0.58, sprintAmount), -0.82, boostPoseAmount),
     1 - Math.exp(-9 * dt),
   );
   player.parts.model.rotation.z = THREE.MathUtils.lerp(
     player.parts.model.rotation.z,
-    -player.velocity.x * 0.01 - sideStepDirection * stationaryQuickStepAmount * 0.1,
+    -lateralVelocity * 0.01 - sideStepDirection * stationaryQuickStepAmount * 0.1,
     1 - Math.exp(-8 * dt),
   );
 
@@ -10261,15 +10720,17 @@ function animatePlayerModel(dt) {
     applyLegPose(legRight, runPhase, 1);
   }
 
-  alignJetFootContactToGround(dt, moving || stationaryQuickStepAmount > 0);
+  if (!motionPreview || motionGrounded) {
+    alignJetFootContactToGround(dt, moving || stationaryQuickStepAmount > 0);
+  }
 
   player.parts.head.rotation.y = THREE.MathUtils.lerp(
     player.parts.head.rotation.y,
-    THREE.MathUtils.clamp(player.velocity.x * 0.018, -0.2, 0.2),
+    THREE.MathUtils.clamp(lateralVelocity * 0.018, -0.2, 0.2),
     1 - Math.exp(-8 * dt),
   );
 
-  const energyAmount = playerBoostEffectActive
+  const energyAmount = motionBoostActive
     ? THREE.MathUtils.clamp(0.35 + speed / boostTopSpeed, 0.35, 1)
     : 0;
   materials.jetEnergy.opacity = energyAmount > 0 ? 0.3 + energyAmount * 0.55 : 0;
@@ -10386,6 +10847,8 @@ const characterInspectAnglePresets = Object.freeze({
   backRight: { tangent: -0.72, right: 0.72, up: 0, fovAdd: 1 },
   high: { tangent: -0.55, right: 0, up: 0.82, fovAdd: 3 },
   low: { tangent: -0.92, right: 0, up: -0.22, fovAdd: 3 },
+  top: { tangent: -0.16, right: 0, up: 1.08, fovAdd: 4 },
+  bottom: { tangent: -0.18, right: 0, up: -0.78, fovAdd: 4 },
 });
 
 function updateBoostCameraState(boostActive, dt) {
@@ -10417,21 +10880,25 @@ function updateCamera(dt) {
   const boostCameraSustainEase = boostCameraSustain;
   const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
   const speedBasedFollowRatio = THREE.MathUtils.lerp(
-    cameraLateralIdleFollowRatio,
-    cameraLateralRunFollowRatio,
+    getDebugTuneValue("camera.lateralIdleFollowRatio"),
+    getDebugTuneValue("camera.lateralRunFollowRatio"),
     speedRatio,
   );
   const boostedFollowRatio = THREE.MathUtils.lerp(
     speedBasedFollowRatio,
-    cameraLateralBoostFollowRatio,
+    getDebugTuneValue("camera.lateralBoostFollowRatio"),
     boostCameraSustainEase,
   );
   const lateralFollowRatio = quickStepTimer > 0
-    ? Math.min(boostedFollowRatio, cameraLateralQuickStepFollowRatio)
+    ? Math.min(boostedFollowRatio, getDebugTuneValue("camera.lateralQuickStepFollowRatio"))
     : boostedFollowRatio;
   const lateralFollowRate = quickStepTimer > 0
-    ? cameraLateralQuickStepFollowRate
-    : THREE.MathUtils.lerp(cameraLateralIdleFollowRate, cameraLateralRunFollowRate, speedRatio);
+    ? getDebugTuneValue("camera.lateralQuickStepFollowRate")
+    : THREE.MathUtils.lerp(
+      getDebugTuneValue("camera.lateralIdleFollowRate"),
+      getDebugTuneValue("camera.lateralRunFollowRate"),
+      speedRatio,
+    );
   const lateralTargetX = player.position.x * lateralFollowRatio;
   cameraLateralFocusX = THREE.MathUtils.lerp(
     cameraLateralFocusX,
@@ -10454,7 +10921,7 @@ function updateCamera(dt) {
   cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
   const desired = centerWorld.clone().add(cameraOffset);
 
-  camera.position.lerp(desired, 1 - Math.exp(-14 * dt));
+  camera.position.lerp(desired, 1 - Math.exp(-getDebugTuneValue("camera.followLerp") * dt));
 
   const lookAt = centerWorld.clone()
     .addScaledVector(
@@ -10731,6 +11198,18 @@ function getLegacyCharacterInspectAngle(source = {}) {
   return debugDefaults.characterInspectAngle;
 }
 
+function getCharacterInspectMotionMode(source = {}) {
+  return characterInspectMotionModes.includes(source.characterInspectMotion)
+    ? source.characterInspectMotion
+    : debugDefaults.characterInspectMotion;
+}
+
+function getCharacterInspectMotionSpeed(source = {}) {
+  return characterInspectMotionSpeeds.includes(source.characterInspectMotionSpeed)
+    ? source.characterInspectMotionSpeed
+    : debugDefaults.characterInspectMotionSpeed;
+}
+
 function normalizeDebugSettings(source = {}) {
   return {
     superBoost: typeof source.superBoost === "boolean" ? source.superBoost : debugDefaults.superBoost,
@@ -10745,6 +11224,8 @@ function normalizeDebugSettings(source = {}) {
       : debugDefaults.characterInspect,
     characterInspectTarget: getLegacyCharacterInspectTarget(source),
     characterInspectAngle: getLegacyCharacterInspectAngle(source),
+    characterInspectMotion: getCharacterInspectMotionMode(source),
+    characterInspectMotionSpeed: getCharacterInspectMotionSpeed(source),
   };
 }
 
@@ -10830,6 +11311,24 @@ function bindDebugControls() {
     saveDebugSettings();
     syncDebugControls();
   });
+
+  debugCharacterInspectMotionSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspectMotion: debugCharacterInspectMotionSelect.value,
+    });
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  debugCharacterInspectMotionSpeedSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspectMotionSpeed: debugCharacterInspectMotionSpeedSelect.value,
+    });
+    saveDebugSettings();
+    syncDebugControls();
+  });
 }
 
 function syncGraphicsControls() {
@@ -10851,6 +11350,15 @@ function syncDebugControls() {
   if (debugCharacterInspectAngleSelect) {
     debugCharacterInspectAngleSelect.value = debugSettings.characterInspectAngle;
     debugCharacterInspectAngleSelect.disabled = !debugSettings.characterInspect;
+  }
+  if (debugCharacterInspectMotionSelect) {
+    debugCharacterInspectMotionSelect.value = debugSettings.characterInspectMotion;
+    debugCharacterInspectMotionSelect.disabled = !debugSettings.characterInspect;
+  }
+  if (debugCharacterInspectMotionSpeedSelect) {
+    debugCharacterInspectMotionSpeedSelect.value = debugSettings.characterInspectMotionSpeed;
+    debugCharacterInspectMotionSpeedSelect.disabled = !debugSettings.characterInspect
+      || debugSettings.characterInspectMotion === "live";
   }
   updateDebugRenderPath();
   if (!debugSettings.mouseObject) {
@@ -11153,7 +11661,7 @@ function updateCharacterInspectCamera(dt, frame) {
   cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
 
   const desired = targetWorld.clone().add(cameraOffset);
-  camera.position.lerp(desired, 1 - Math.exp(-12 * dt));
+  camera.position.lerp(desired, 1 - Math.exp(-getDebugTuneValue("camera.inspectLerp") * dt));
 
   camera.up.lerp(frame.up, 1 - Math.exp(-10 * dt)).normalize();
   camera.lookAt(targetWorld);
@@ -11193,6 +11701,8 @@ function applyWaterSettings(rebuildGeometry = true) {
 }
 
 function getMotionBlurScale() {
+  const tuneKey = `motionBlur.${graphicsSettings.motionBlur}`;
+  if (debugTuneRegistry[tuneKey]) return getDebugTuneValue(tuneKey);
   return motionBlurStrengthConfig[graphicsSettings.motionBlur] ?? motionBlurStrengthConfig.high;
 }
 
@@ -11829,6 +12339,6 @@ function resize() {
   quickStepAfterimageBlurMaterial.uniforms.uTexelSize.value.set(1 / targetWidth, 1 / targetHeight);
   jetEnergyBloomBlurMaterial.uniforms.uTexelSize.value.set(1 / bloomWidth, 1 / bloomHeight);
   velocityMotionBlurMaterial.uniforms.uResolution.value.set(targetWidth, targetHeight);
-  velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = velocityMotionBlurMaxPixels;
+  velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = getDebugTuneValue("motionBlur.maxPixels");
   velocityMotionBlurMaterial.uniforms.uEnergyBloomTexelSize.value.set(1 / bloomWidth, 1 / bloomHeight);
 }
