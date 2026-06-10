@@ -72,11 +72,14 @@ const debugControls = {
   performanceHud: document.querySelector("#debug-performance-hud"),
   unlimitedCameraOrbit: document.querySelector("#debug-unlimited-camera-orbit"),
   characterInspect: document.querySelector("#debug-character-inspect"),
+  objectGallery: document.querySelector("#debug-object-gallery"),
+  objectGalleryRotate: document.querySelector("#debug-object-gallery-rotate"),
 };
 const debugCharacterInspectTargetSelect = document.querySelector("#debug-character-inspect-target");
 const debugCharacterInspectAngleSelect = document.querySelector("#debug-character-inspect-angle");
 const debugCharacterInspectMotionSelect = document.querySelector("#debug-character-inspect-motion");
 const debugCharacterInspectMotionSpeedSelect = document.querySelector("#debug-character-inspect-motion-speed");
+const debugObjectGalleryItemSelect = document.querySelector("#debug-object-gallery-item");
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x75cbef);
@@ -318,6 +321,19 @@ const characterInspectMotionSpeedScale = {
   normal: 1,
   fast: 1.55,
 };
+const objectGalleryItems = [
+  "trailer",
+  "forklift",
+  "pallet",
+  "drums",
+  "cones",
+  "serviceVan",
+  "fence",
+  "cableSpool",
+  "crateRack",
+  "container",
+  "longContainer",
+];
 const debugDefaults = {
   superBoost: false,
   infiniteJump: false,
@@ -329,6 +345,9 @@ const debugDefaults = {
   characterInspectAngle: "back",
   characterInspectMotion: "live",
   characterInspectMotionSpeed: "normal",
+  objectGallery: false,
+  objectGalleryItem: "trailer",
+  objectGalleryRotate: true,
 };
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
@@ -890,6 +909,9 @@ let boostCameraWasActive = false;
 let cameraLateralFocusX = 0;
 let cameraYawOffset = 0;
 let cameraPitchOffset = 0;
+let objectGalleryGroup = null;
+let objectGalleryCurrentItem = "";
+let objectGallerySpin = 0;
 let dashPadBoostStartSpeed = 0;
 let dashPadBoostRemaining = 0;
 let debugSuperBoostActive = false;
@@ -1475,6 +1497,16 @@ const materials = {
     emissive: 0xffd86c,
     emissiveIntensity: 0.55,
     roughness: 0.32,
+  }),
+  harborLampOff: new THREE.MeshStandardMaterial({
+    color: 0x3e4648,
+    roughness: 0.52,
+    metalness: 0.22,
+  }),
+  harborLampLensOff: new THREE.MeshStandardMaterial({
+    color: 0x8b8f83,
+    roughness: 0.38,
+    metalness: 0.06,
   }),
   tourBoatHull: new THREE.MeshStandardMaterial({
     color: 0xf5f7f8,
@@ -3108,6 +3140,141 @@ function addTestRoomEnvironment() {
     laneLine.userData.ignoreMouseObject = true;
     scene.add(laneLine);
   }
+}
+
+function updateObjectGallery(dt) {
+  if (!currentStage.testRoom || !debugSettings.objectGallery) {
+    clearObjectGallery();
+    return;
+  }
+
+  syncObjectGallery();
+  if (!objectGalleryGroup) return;
+
+  const pivot = objectGalleryGroup.userData.galleryPivot;
+  if (debugSettings.objectGalleryRotate) {
+    objectGallerySpin += dt * 0.7;
+  }
+  if (pivot) {
+    pivot.rotation.y = objectGallerySpin;
+  }
+}
+
+function syncObjectGallery(force = false) {
+  if (!currentStage.testRoom || !debugSettings.objectGallery) return;
+
+  const item = objectGalleryItems.includes(debugSettings.objectGalleryItem)
+    ? debugSettings.objectGalleryItem
+    : debugDefaults.objectGalleryItem;
+  if (!force && objectGalleryGroup && objectGalleryCurrentItem === item) return;
+
+  clearObjectGallery();
+  const model = createObjectGalleryModel(item);
+  if (!model) return;
+
+  objectGalleryGroup = prepareObjectGalleryRoot(model.group, model.debugName);
+  objectGalleryCurrentItem = item;
+  objectGallerySpin = 0;
+  setStageObjectTransform(objectGalleryGroup, getObjectGalleryLocalPosition(), 0, 0, true);
+  scene.add(objectGalleryGroup);
+}
+
+function clearObjectGallery() {
+  if (!objectGalleryGroup) return;
+
+  scene.remove(objectGalleryGroup);
+  objectGalleryGroup = null;
+  objectGalleryCurrentItem = "";
+}
+
+function getObjectGalleryLocalPosition() {
+  return new THREE.Vector3(0, 0, -44);
+}
+
+function createObjectGalleryModel(item) {
+  switch (item) {
+    case "trailer": {
+      const model = createHarborTrailerObstacle(901);
+      return { group: model.group, debugName: "Object Gallery - Empty Container Trailer" };
+    }
+    case "forklift": {
+      const model = createHarborForkliftObstacle(902);
+      return { group: model.group, debugName: "Object Gallery - Port Forklift" };
+    }
+    case "pallet": {
+      const model = createHarborPalletObstacle(903, 1);
+      return { group: model.group, debugName: "Object Gallery - Cargo Pallets" };
+    }
+    case "drums": {
+      const group = new THREE.Group();
+      addHarborDrumCluster(group, 904);
+      return { group, debugName: "Object Gallery - Drum Storage" };
+    }
+    case "cones": {
+      const group = new THREE.Group();
+      addHarborSafetyConeSignCluster(group, 905);
+      return { group, debugName: "Object Gallery - Cones And Sign" };
+    }
+    case "serviceVan": {
+      const group = new THREE.Group();
+      addHarborServiceVan(group, 906, 1);
+      return { group, debugName: "Object Gallery - Service Van" };
+    }
+    case "fence": {
+      const group = new THREE.Group();
+      addHarborPortableFenceCluster(group, 907);
+      return { group, debugName: "Object Gallery - Portable Fence" };
+    }
+    case "cableSpool": {
+      const group = new THREE.Group();
+      addHarborCableSpoolCluster(group, 908);
+      return { group, debugName: "Object Gallery - Cable Spools" };
+    }
+    case "crateRack": {
+      const group = new THREE.Group();
+      addHarborCrateRackCluster(group, 909);
+      return { group, debugName: "Object Gallery - Crate Rack" };
+    }
+    case "container": {
+      const group = createHarborContainer(910);
+      return { group, debugName: "Object Gallery - Standard Container" };
+    }
+    case "longContainer": {
+      const group = createHarborLongContainer(911);
+      return { group, debugName: "Object Gallery - Long Container" };
+    }
+    default:
+      return null;
+  }
+}
+
+function prepareObjectGalleryRoot(model, debugName) {
+  const root = new THREE.Group();
+  const pivot = new THREE.Group();
+  root.name = debugName;
+  root.userData.debugName = debugName;
+  root.userData.galleryPivot = pivot;
+  pivot.name = `${debugName} Pivot`;
+  pivot.userData.debugName = debugName;
+
+  const bounds = new THREE.Box3().setFromObject(model);
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  model.position.x -= center.x;
+  model.position.y -= bounds.min.y;
+  model.position.z -= center.z;
+
+  pivot.add(model);
+  root.add(pivot);
+  root.userData.galleryHeight = Math.max(1, size.y);
+  root.userData.galleryRadius = Math.max(1.6, Math.hypot(size.x, size.z) * 0.5);
+  root.traverse((object) => {
+    object.userData.debugName = object.userData.debugName || debugName;
+    if (!object.isMesh) return;
+    object.castShadow = object.castShadow ?? true;
+    object.receiveShadow = object.receiveShadow ?? true;
+  });
+  return root;
 }
 
 function isIslandClearOfStage(x, z, radius) {
@@ -6371,6 +6538,7 @@ function addStageThreeHarbor() {
   addHarborCraneDropEvents(harborEndZ);
   addHarborRoadProps();
   addHarborBackgroundPropClusters(harborEndZ);
+  addHarborLargeSilhouetteLandmarks(harborEndZ);
   addHarborCargoTruckRoutes(harborEndZ);
   addHarborExcavatorField(harborEndZ);
 }
@@ -6590,6 +6758,243 @@ function addHarborBackgroundPropClusters(harborEndZ) {
       seed: 80 + index * 11,
     });
   }
+}
+
+function addHarborLargeSilhouetteLandmarks(harborEndZ) {
+  const landmarks = [
+    { type: "gantryGate", z: -1700, seed: 310, scale: 1.0 },
+    { type: "containerWall", x: 26.8, z: -1900, side: 1, seed: 321, scale: 1.0, yaw: -0.03 },
+    { type: "pipeRack", x: 24.8, z: -3600, side: 1, seed: 332, scale: 0.96, yaw: 0.02 },
+    { type: "warehouseFacade", x: -29.2, z: -4880, side: -1, seed: 343, scale: 1.0, yaw: 0.03 },
+    { type: "shipHullSection", x: -41.5, z: -5600, side: -1, seed: 354, scale: 1.0, yaw: -0.02 },
+    { type: "containerWall", x: -27.2, z: -6400, side: -1, seed: 365, scale: 1.08, yaw: 0.03 },
+    { type: "pipeRack", x: 25.4, z: -6700, side: 1, seed: 376, scale: 1.04, yaw: -0.02 },
+    { type: "shipHullSection", x: 41.2, z: -7900, side: 1, seed: 387, scale: 0.94, yaw: -0.03 },
+    { type: "warehouseFacade", x: 29.4, z: -8600, side: 1, seed: 398, scale: 1.08, yaw: -0.04 },
+    { type: "containerWall", x: -27.6, z: -8900, side: -1, seed: 409, scale: 0.96, yaw: 0.02 },
+  ];
+
+  for (const config of landmarks) {
+    if (config.z <= harborEndZ + 520) continue;
+    addHarborLargeSilhouetteLandmark(config);
+  }
+}
+
+function addHarborLargeSilhouetteLandmark(config) {
+  if (isRollClearZone(config.z)) return;
+
+  switch (config.type) {
+    case "gantryGate":
+      addHarborLandmarkGantryGate(config.z, config.seed ?? 0, config.scale ?? 1);
+      break;
+    case "containerWall":
+      addHarborLandmarkContainerWall(config);
+      break;
+    case "pipeRack":
+      addHarborLandmarkPipeRack(config);
+      break;
+    case "warehouseFacade":
+      addHarborLandmarkWarehouseFacade(config);
+      break;
+    case "shipHullSection":
+      addHarborLandmarkShipHullSection(config);
+      break;
+    default:
+      break;
+  }
+}
+
+function addHarborLandmarkBox(parent, width, height, depth, material, x, y, z, rx = 0, ry = 0, rz = 0, castShadow = false, receiveShadow = true) {
+  const mesh = addBox(parent, width, height, depth, material, x, y, z, rx, ry, rz);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = receiveShadow;
+  return mesh;
+}
+
+function addHarborLandmarkCylinder(parent, radius, length, material, x, y, z, rx = 0, ry = 0, rz = 0, segments = 12, castShadow = false, receiveShadow = true) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, segments), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = receiveShadow;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addHarborLandmarkGantryGate(z, seed, scale = 1) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor Large Landmark - Customs Gantry Gate";
+  setStageObjectTransform(group, new THREE.Vector3(0, sample.y, z), 0, 0, true);
+  group.scale.setScalar(scale);
+
+  for (const x of [-15.2, 15.2]) {
+    addHarborLandmarkBox(group, 0.72, 9.8, 0.72, materials.harborRail, x, 4.9, 0);
+    addHarborLandmarkBox(group, 2.2, 0.42, 1.6, materials.craneDark, x, 0.22, 0);
+    addHarborLandmarkBox(group, 0.3, 8.4, 0.28, materials.containerTrim, x * 0.98, 5.0, -0.52, 0, 0, x > 0 ? -0.16 : 0.16);
+    addHarborLandmarkBox(group, 0.3, 8.4, 0.28, materials.containerTrim, x * 0.98, 5.0, 0.52, 0, 0, x > 0 ? 0.16 : -0.16);
+  }
+
+  addHarborLandmarkBox(group, 32.8, 0.82, 0.82, materials.crane, 0, 9.72, 0);
+  addHarborLandmarkBox(group, 31.4, 0.22, 1.55, materials.containerTrim, 0, 10.34, 0);
+  addHarborLandmarkBox(group, 9.8, 2.35, 0.38, materials.roadSign, 0, 8.02, -0.32);
+  addHarborLandmarkBox(group, 8.7, 0.18, 0.42, seed % 2 === 0 ? materials.harborRailStripe : materials.dashPad, 0, 8.72, -0.58, 0, 0, 0, false, false);
+  addHarborLandmarkBox(group, 7.2, 0.18, 0.42, materials.roadMarkingWhite, 0, 7.44, -0.58, 0, 0, 0, false, false);
+
+  for (const x of [-10.6, -5.3, 5.3, 10.6]) {
+    addHarborLandmarkCylinder(group, 0.16, 1.0, materials.harborLampOff, x, 9.12, -0.7, Math.PI * 0.5, 0, 0, 10, false, false);
+    addHarborLandmarkBox(group, 0.92, 0.12, 0.26, materials.harborLampLensOff, x, 9.1, -1.12, 0, 0, 0, false, false);
+  }
+
+  scene.add(group);
+}
+
+function addHarborLandmarkContainerWall({ x, z, side, seed, scale = 1, yaw = 0 }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor Large Landmark - Container Wall";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+  group.rotateY(side * 0.08 + yaw);
+  group.scale.setScalar(scale);
+
+  const containerMaterials = [materials.containerRed, materials.containerBlue, materials.containerYellow, materials.containerGreen];
+  for (let row = 0; row < 6; row += 1) {
+    for (let layer = 0; layer < 3; layer += 1) {
+      const material = containerMaterials[(seed + row + layer) % containerMaterials.length];
+      const box = addHarborLandmarkBox(
+        group,
+        harborContainerSize.width,
+        harborContainerSize.height,
+        harborContainerSize.length,
+        material,
+        0,
+        harborContainerSize.height * 0.5 + layer * (harborContainerSize.height + 0.08),
+        (row - 2.5) * (harborContainerSize.length + 0.35),
+      );
+      if ((row + layer + seed) % 3 === 0) box.position.x += side * 0.28;
+      addHarborLandmarkBox(group, harborContainerSize.width + 0.18, 0.12, 0.14, materials.containerTrim, 0, box.position.y + harborContainerSize.height * 0.5 + 0.03, box.position.z);
+      addHarborLandmarkBox(group, 0.12, harborContainerSize.height + 0.08, harborContainerSize.length + 0.12, materials.containerTrim, -harborContainerSize.width * 0.5 - 0.04, box.position.y, box.position.z);
+      addHarborLandmarkBox(group, 0.12, harborContainerSize.height + 0.08, harborContainerSize.length + 0.12, materials.containerTrim, harborContainerSize.width * 0.5 + 0.04, box.position.y, box.position.z);
+    }
+  }
+
+  addHarborLandmarkBox(group, 0.36, 8.8, 34.5, materials.craneDark, side * -2.65, 4.4, 0, 0, 0, 0, false, false);
+  addHarborLandmarkBox(group, 0.28, 0.42, 35.4, materials.harborRailStripe, side * -2.9, 8.96, 0, 0, 0, 0, false, false);
+  scene.add(group);
+}
+
+function addHarborLandmarkPipeRack({ x, z, side, seed, scale = 1, yaw = 0 }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor Large Landmark - Pipe Rack";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+  group.rotateY(side * -0.06 + yaw);
+  group.scale.setScalar(scale);
+
+  for (const postZ of [-18, -9, 0, 9, 18]) {
+    for (const postX of [-3.2, 3.2]) {
+      addHarborLandmarkBox(group, 0.34, 7.8, 0.34, materials.harborRail, postX, 3.9, postZ);
+      addHarborLandmarkBox(group, 1.15, 0.28, 1.15, materials.craneDark, postX, 0.14, postZ);
+    }
+    addHarborLandmarkBox(group, 7.2, 0.34, 0.34, materials.containerTrim, 0, 7.65, postZ);
+  }
+
+  for (let level = 0; level < 4; level += 1) {
+    for (const pipeX of [-2.35, -0.78, 0.78, 2.35]) {
+      const material = (seed + level) % 2 === 0 ? materials.harborRail : materials.containerTrim;
+      addHarborLandmarkCylinder(group, 0.22, 40.5, material, pipeX, 3.2 + level * 1.05, 0, Math.PI * 0.5, 0, 0, 12);
+    }
+  }
+
+  for (const braceZ of [-13.5, -4.5, 4.5, 13.5]) {
+    addHarborLandmarkBox(group, 0.18, 8.2, 0.24, materials.craneDark, -3.35, 4.15, braceZ, 0, 0, 0.34, false, false);
+    addHarborLandmarkBox(group, 0.18, 8.2, 0.24, materials.craneDark, 3.35, 4.15, braceZ, 0, 0, -0.34, false, false);
+  }
+
+  scene.add(group);
+}
+
+function addHarborLandmarkWarehouseFacade({ x, z, side, seed, scale = 1, yaw = 0 }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor Large Landmark - Warehouse Facade";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+  group.rotateY(side * 0.05 + yaw);
+  group.scale.setScalar(scale);
+
+  const depth = 42;
+  addHarborLandmarkBox(group, 16.6, 9.6, depth, materials.harborDockDark, 0, 4.8, 0);
+  addHarborLandmarkBox(group, 18.2, 0.9, depth + 2.0, materials.harborRail, 0, 9.85, 0);
+  addHarborLandmarkBox(group, 0.42, 10.1, depth + 0.9, materials.containerTrim, side * -8.55, 5.1, 0, 0, 0, 0, false, false);
+
+  for (const doorZ of [-14, 0, 14]) {
+    addHarborLandmarkBox(group, 0.28, 4.2, 6.8, seed % 2 === 0 ? materials.harborRail : materials.containerTrim, side * -8.45, 2.5, doorZ);
+    addHarborLandmarkBox(group, 0.34, 0.26, 7.3, materials.harborRailStripe, side * -8.68, 4.74, doorZ, 0, 0, 0, false, false);
+    addHarborLandmarkBox(group, 0.3, 0.26, 0.62, materials.harborLampOff, side * -8.78, 5.28, doorZ - 2.25, 0, 0, 0, false, false);
+    addHarborLandmarkBox(group, 0.18, 0.16, 0.52, materials.harborLampLensOff, side * -8.94, 5.18, doorZ - 2.25, 0, 0, 0, false, false);
+    addHarborLandmarkBox(group, 0.3, 0.26, 0.62, materials.harborLampOff, side * -8.78, 5.28, doorZ + 2.25, 0, 0, 0, false, false);
+    addHarborLandmarkBox(group, 0.18, 0.16, 0.52, materials.harborLampLensOff, side * -8.94, 5.18, doorZ + 2.25, 0, 0, 0, false, false);
+  }
+
+  for (const windowZ of [-17.5, -9.0, -3.8, 4.2, 10.5, 17.5]) {
+    addHarborLandmarkBox(group, 0.24, 1.05, 2.2, materials.tourBoatGlass, side * -8.7, 7.2, windowZ, 0, 0, 0, false, false);
+  }
+
+  addHarborLandmarkBox(group, 4.4, 1.6, 7.2, materials.truckCab, side * 4.8, 10.6, -depth * 0.24);
+  addHarborLandmarkBox(group, 4.8, 0.26, 7.8, materials.harborRailStripe, side * 4.8, 11.55, -depth * 0.24, 0, 0, 0, false, false);
+  scene.add(group);
+}
+
+function addHarborLandmarkShipHullSection({ x, z, side, seed, scale = 1, yaw = 0 }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor Large Landmark - Ship Hull Section";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y - 3.0, z), 0, 0, true);
+  group.rotateY(side * -0.04 + yaw);
+  group.scale.setScalar(scale);
+
+  const hullMaterial = seed % 2 === 0 ? materials.tourBoatNavy : materials.containerBlue;
+  addHarborLandmarkBox(group, 10.8, 5.8, 58, hullMaterial, 0, 3.2, 0);
+  addHarborLandmarkBox(group, 11.6, 0.62, 54, materials.harborDock, 0, 6.35, 0);
+  addHarborLandmarkBox(group, 0.42, 3.8, 55, materials.craneDark, side * -5.6, 5.0, 0, 0, 0, 0, false, false);
+
+  const containerMaterials = [materials.containerRed, materials.containerBlue, materials.containerYellow, materials.containerGreen];
+  for (let row = 0; row < 5; row += 1) {
+    for (let layer = 0; layer < 2; layer += 1) {
+      addHarborLandmarkBox(
+        group,
+        2.2,
+        1.7,
+        5.2,
+        containerMaterials[(seed + row + layer) % containerMaterials.length],
+        side * -2.2,
+        7.2 + layer * 1.82,
+        -18 + row * 9.0,
+      );
+    }
+  }
+
+  for (const railX of [-5.2, 5.2]) {
+    addHarborLandmarkBox(group, 0.12, 0.16, 52, materials.harborRail, railX, 7.05, 0, 0, 0, 0, false, false);
+  }
+  for (const lightZ of [-22, -8, 8, 22]) {
+    addHarborLandmarkBox(group, 0.42, 0.28, 0.18, materials.harborLampOff, side * -5.7, 7.42, lightZ, 0, 0, 0, false, false);
+    addHarborLandmarkBox(group, 0.3, 0.18, 0.12, materials.harborLampLensOff, side * -5.95, 7.42, lightZ, 0, 0, 0, false, false);
+  }
+  addHarborLandmarkBox(group, 3.8, 4.2, 7.4, materials.harborRail, side * 2.2, 9.0, -20);
+  addHarborLandmarkBox(group, 3.2, 0.72, 6.7, materials.tourBoatGlass, side * 2.2, 10.6, -20.2, 0, 0, 0, false, false);
+
+  scene.add(group);
 }
 
 function addHarborBackgroundPropCluster({ x, z, side, variant, seed }) {
@@ -7078,9 +7483,13 @@ function addHarborHighMastLight(x, z, height) {
   group.add(crown);
 
   for (const [lampX, lampZ] of [[1.3, 0], [-1.3, 0], [0, 1.3], [0, -1.3]]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.44), materials.beachLamp);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.44), materials.harborLampOff);
     lamp.position.set(lampX, height - 0.22, lampZ);
     group.add(lamp);
+
+    const lens = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.32), materials.harborLampLensOff);
+    lens.position.set(lampX, height - 0.34, lampZ);
+    group.add(lens);
   }
 
   scene.add(group);
@@ -7486,6 +7895,12 @@ function addShipBridge(group, x, y, z, width, height, depth) {
   glass.position.set(x, y + height * 0.18, z - depth * 0.52);
   group.add(glass);
 
+  for (const lightX of [-0.28, 0, 0.28]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(width * 0.09, height * 0.055, 0.1), materials.harborLampOff);
+    lamp.position.set(x + lightX * width, y - height * 0.08, z - depth * 0.53);
+    group.add(lamp);
+  }
+
   const roof = new THREE.Mesh(new THREE.BoxGeometry(width * 1.06, height * 0.08, depth * 1.04), materials.harborRail);
   roof.position.set(x, y + height * 0.54, z);
   roof.castShadow = true;
@@ -7585,9 +8000,13 @@ function addHarborLightPole(x, z, height) {
   arm.castShadow = true;
   group.add(arm);
 
-  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 0.42), materials.beachLamp);
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 0.42), materials.harborLampOff);
   lamp.position.set(armDirection * 1.62, height - 0.38, 0);
   group.add(lamp);
+
+  const lens = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.3), materials.harborLampLensOff);
+  lens.position.set(armDirection * 1.62, height - 0.49, 0);
+  group.add(lens);
 
   scene.add(group);
 }
@@ -9073,6 +9492,11 @@ function createObstacle(x, z, width, height, depth) {
 function addGoal() {
   if (currentStage.testRoom) return;
 
+  if (currentStage.harborTheme) {
+    addHarborGoalGate(goalZ);
+    return;
+  }
+
   const z = goalZ;
   const sample = getGroundSample(0, z);
   if (!sample) return;
@@ -9103,6 +9527,44 @@ function addGoal() {
       tile.position.set(x * 1.05 + 0.52, 5.1 - yy * 0.64, 0.04);
       goal.add(tile);
     }
+  }
+
+  scene.add(goal);
+}
+
+function addHarborGoalGate(z) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const goal = new THREE.Group();
+  goal.userData.debugName = "Harbor Finish Gate";
+  setStageObjectTransform(goal, new THREE.Vector3(0, sample.y, z), 0, 0, true);
+
+  for (const x of [-15.8, 15.8]) {
+    addHarborLandmarkBox(goal, 0.86, 12.4, 0.86, materials.harborRail, x, 6.2, 0, 0, 0, 0, true);
+    addHarborLandmarkBox(goal, 2.8, 0.52, 2.1, materials.craneDark, x, 0.26, 0, 0, 0, 0, false, true);
+    addHarborLandmarkBox(goal, 0.36, 10.6, 0.32, materials.containerTrim, x * 0.98, 6.25, -0.72, 0, 0, x > 0 ? -0.15 : 0.15, false, false);
+    addHarborLandmarkBox(goal, 0.36, 10.6, 0.32, materials.containerTrim, x * 0.98, 6.25, 0.72, 0, 0, x > 0 ? 0.15 : -0.15, false, false);
+    addHarborLandmarkCylinder(goal, 0.22, 0.9, materials.harborLampOff, x, 12.82, -0.74, Math.PI * 0.5, 0, 0, 14, false, false);
+    addHarborLandmarkBox(goal, 0.92, 0.1, 0.3, materials.harborLampLensOff, x, 12.68, -1.2, 0, 0, 0, false, false);
+  }
+
+  addHarborLandmarkBox(goal, 34.8, 0.96, 0.96, materials.crane, 0, 12.25, 0, 0, 0, 0, true);
+  addHarborLandmarkBox(goal, 33.2, 0.24, 1.82, materials.containerTrim, 0, 13.04, 0, 0, 0, 0, false, false);
+  addHarborLandmarkBox(goal, 14.4, 2.65, 0.44, materials.roadSign, 0, 10.12, -0.44, 0, 0, 0, false, false);
+  addHarborLandmarkBox(goal, 13.2, 0.24, 0.5, materials.goal, 0, 10.92, -0.72, 0, 0, 0, false, false);
+  addHarborLandmarkBox(goal, 10.6, 0.24, 0.5, materials.roadMarkingWhite, 0, 9.35, -0.72, 0, 0, 0, false, false);
+
+  for (let index = 0; index < 10; index += 1) {
+    const x = -4.5 + index;
+    const tileMaterial = index % 2 === 0 ? materials.roadMarkingWhite : materials.craneDark;
+    addHarborLandmarkBox(goal, 0.82, 0.54, 0.12, tileMaterial, x, 10.12, -0.82, 0, 0, 0, false, false);
+    addHarborLandmarkBox(goal, 0.82, 0.54, 0.12, index % 2 === 0 ? materials.craneDark : materials.roadMarkingWhite, x, 9.54, -0.82, 0, 0, 0, false, false);
+  }
+
+  for (const x of [-11.6, -6.0, 6.0, 11.6]) {
+    addHarborLandmarkCylinder(goal, 0.18, 1.12, materials.harborLampOff, x, 11.4, -0.9, Math.PI * 0.5, 0, 0, 12, false, false);
+    addHarborLandmarkBox(goal, 1.12, 0.14, 0.3, materials.harborLampLensOff, x, 11.38, -1.36, 0, 0, 0, false, false);
   }
 
   scene.add(goal);
@@ -10490,6 +10952,7 @@ function updateGame(dt) {
   updateDashPads(dt);
   updateStageThreeHarbor(dt);
   updateGwangalliTourBoats(dt);
+  updateObjectGallery(dt);
   updateWater(dt);
   updateMusicState();
   hitCooldown = Math.max(0, hitCooldown - dt);
@@ -11835,6 +12298,10 @@ function updateBoostCameraState(boostActive, dt) {
 function updateCamera(dt) {
   updateManualCameraInput(dt);
   const frame = getStageFrame(player.position.z);
+  if (currentStage.testRoom && debugSettings.objectGallery) {
+    updateObjectGalleryCamera(dt);
+    return;
+  }
   if (debugSettings.characterInspect) {
     updateCharacterInspectCamera(dt, frame);
     return;
@@ -11904,6 +12371,48 @@ function updateCamera(dt) {
     + jumpImpact * 2.5
     + quickStepFlash * 1.5;
   camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-4.2 * dt));
+  camera.updateProjectionMatrix();
+}
+
+function updateObjectGalleryCamera(dt) {
+  syncObjectGallery();
+
+  const localPosition = getObjectGalleryLocalPosition();
+  const frame = getStageFrame(localPosition.z, true);
+  const anglePreset = characterInspectAnglePresets[debugSettings.characterInspectAngle]
+    || characterInspectAnglePresets.back;
+  const height = objectGalleryGroup?.userData.galleryHeight ?? 2.4;
+  const radius = objectGalleryGroup?.userData.galleryRadius ?? 3.2;
+  const focusLift = THREE.MathUtils.clamp(height * 0.52, 0.7, 3.1);
+  const targetWorld = toWorldPosition(new THREE.Vector3(localPosition.x, focusLift, localPosition.z), true);
+  const horizontalDirection = frame.tangent.clone()
+    .multiplyScalar(anglePreset.tangent)
+    .addScaledVector(frame.right, anglePreset.right);
+  if (horizontalDirection.lengthSq() < 0.001) {
+    horizontalDirection.copy(frame.tangent).multiplyScalar(-1);
+  } else {
+    horizontalDirection.normalize();
+  }
+
+  const cameraDistance = THREE.MathUtils.clamp(radius * 1.55 + 2.2, 3.8, 12.5);
+  const baseHeight = THREE.MathUtils.clamp(height * 0.18, 0.24, 1.2);
+  const cameraOffset = horizontalDirection
+    .multiplyScalar(cameraDistance)
+    .addScaledVector(frame.up, baseHeight + anglePreset.up * cameraDistance * 0.72);
+  const yawRotation = new THREE.Quaternion().setFromAxisAngle(frame.up, cameraYawOffset);
+  cameraOffset.applyQuaternion(yawRotation);
+  const pitchAxis = frame.right.clone().applyQuaternion(yawRotation).normalize();
+  cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
+
+  const desired = targetWorld.clone().add(cameraOffset);
+  camera.position.lerp(desired, 1 - Math.exp(-getDebugTuneValue("camera.inspectLerp") * dt));
+  camera.up.lerp(frame.up, 1 - Math.exp(-10 * dt)).normalize();
+  camera.lookAt(targetWorld);
+  camera.fov = THREE.MathUtils.lerp(
+    camera.fov,
+    THREE.MathUtils.clamp(34 + radius * 0.85 + anglePreset.fovAdd, 35, 56),
+    1 - Math.exp(-8 * dt),
+  );
   camera.updateProjectionMatrix();
 }
 
@@ -12174,6 +12683,12 @@ function getCharacterInspectMotionSpeed(source = {}) {
     : debugDefaults.characterInspectMotionSpeed;
 }
 
+function getObjectGalleryItem(source = {}) {
+  return objectGalleryItems.includes(source.objectGalleryItem)
+    ? source.objectGalleryItem
+    : debugDefaults.objectGalleryItem;
+}
+
 function normalizeDebugSettings(source = {}) {
   return {
     superBoost: typeof source.superBoost === "boolean" ? source.superBoost : debugDefaults.superBoost,
@@ -12190,6 +12705,13 @@ function normalizeDebugSettings(source = {}) {
     characterInspectAngle: getLegacyCharacterInspectAngle(source),
     characterInspectMotion: getCharacterInspectMotionMode(source),
     characterInspectMotionSpeed: getCharacterInspectMotionSpeed(source),
+    objectGallery: typeof source.objectGallery === "boolean"
+      ? source.objectGallery
+      : debugDefaults.objectGallery,
+    objectGalleryItem: getObjectGalleryItem(source),
+    objectGalleryRotate: typeof source.objectGalleryRotate === "boolean"
+      ? source.objectGalleryRotate
+      : debugDefaults.objectGalleryRotate,
   };
 }
 
@@ -12243,8 +12765,15 @@ function bindDebugControls() {
       });
       saveDebugSettings();
       syncDebugControls();
-      if (key === "characterInspect") {
+      if (key === "characterInspect" || key === "objectGallery") {
         resetCameraView();
+      }
+      if (key === "objectGallery") {
+        if (debugSettings.objectGallery) {
+          syncObjectGallery(true);
+        } else {
+          clearObjectGallery();
+        }
       }
       if (key === "mouseObject" && !debugSettings.mouseObject) {
         hideMouseObjectLabel();
@@ -12293,6 +12822,17 @@ function bindDebugControls() {
     saveDebugSettings();
     syncDebugControls();
   });
+
+  debugObjectGalleryItemSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      objectGalleryItem: debugObjectGalleryItemSelect.value,
+    });
+    resetCameraView();
+    syncObjectGallery(true);
+    saveDebugSettings();
+    syncDebugControls();
+  });
 }
 
 function syncGraphicsControls() {
@@ -12303,9 +12843,20 @@ function syncGraphicsControls() {
 }
 
 function syncDebugControls() {
+  const objectGalleryAvailable = Boolean(currentStage.testRoom);
+  const objectGalleryActive = objectGalleryAvailable && debugSettings.objectGallery;
+  const inspectAngleActive = debugSettings.characterInspect || objectGalleryActive;
   for (const [key, control] of Object.entries(debugControls)) {
     if (!control) continue;
-    control.checked = Boolean(debugSettings[key]);
+    control.checked = key === "objectGallery"
+      ? objectGalleryActive
+      : Boolean(debugSettings[key]);
+  }
+  if (debugControls.objectGallery) {
+    debugControls.objectGallery.disabled = !objectGalleryAvailable;
+  }
+  if (debugControls.objectGalleryRotate) {
+    debugControls.objectGalleryRotate.disabled = !objectGalleryActive;
   }
   if (debugCharacterInspectTargetSelect) {
     debugCharacterInspectTargetSelect.value = debugSettings.characterInspectTarget;
@@ -12313,7 +12864,7 @@ function syncDebugControls() {
   }
   if (debugCharacterInspectAngleSelect) {
     debugCharacterInspectAngleSelect.value = debugSettings.characterInspectAngle;
-    debugCharacterInspectAngleSelect.disabled = !debugSettings.characterInspect;
+    debugCharacterInspectAngleSelect.disabled = !inspectAngleActive;
   }
   if (debugCharacterInspectMotionSelect) {
     debugCharacterInspectMotionSelect.value = debugSettings.characterInspectMotion;
@@ -12323,6 +12874,10 @@ function syncDebugControls() {
     debugCharacterInspectMotionSpeedSelect.value = debugSettings.characterInspectMotionSpeed;
     debugCharacterInspectMotionSpeedSelect.disabled = !debugSettings.characterInspect
       || debugSettings.characterInspectMotion === "live";
+  }
+  if (debugObjectGalleryItemSelect) {
+    debugObjectGalleryItemSelect.value = debugSettings.objectGalleryItem;
+    debugObjectGalleryItemSelect.disabled = !objectGalleryActive;
   }
   updateDebugRenderPath();
   if (!debugSettings.mouseObject) {

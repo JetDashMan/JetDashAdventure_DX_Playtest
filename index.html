@@ -29,7 +29,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-075A: Stage 2 항구 배경 소품 클러스터를 추가합니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-079C: Stage 2 밀도를 유지하면서 대형 랜드마크 위치를 재배치합니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -312,6 +312,30 @@
           <option value="normal">Normal</option>
           <option value="fast">Fast</option>
         </select>
+      </label>
+      <label class="debug-check">
+        <span>Object Gallery</span>
+        <input id="debug-object-gallery" type="checkbox" />
+      </label>
+      <label class="debug-select">
+        <span>Gallery Object</span>
+        <select id="debug-object-gallery-item">
+          <option value="trailer">Trailer</option>
+          <option value="forklift">Forklift</option>
+          <option value="pallet">Pallet</option>
+          <option value="drums">Drum Storage</option>
+          <option value="cones">Cones + Sign</option>
+          <option value="serviceVan">Service Van</option>
+          <option value="fence">Portable Fence</option>
+          <option value="cableSpool">Cable Spool</option>
+          <option value="crateRack">Crate Rack</option>
+          <option value="container">Container</option>
+          <option value="longContainer">Long Container</option>
+        </select>
+      </label>
+      <label class="debug-check">
+        <span>Gallery Rotate</span>
+        <input id="debug-object-gallery-rotate" type="checkbox" />
       </label>
     </section>
 
