@@ -822,6 +822,8 @@ const quickStepLaneSnapEpsilon = 0.05;
 const speedDisplayScale = 3.2;
 const debugSuperBoostSpeed = 2000 / speedDisplayScale;
 const seaLevelY = -8.2;
+const waterPlaneBaseSize = 14000;
+const waterPlaneZMargin = 1800;
 const runTopSpeed = 46;
 const reverseTopSpeed = 147 / speedDisplayScale;
 const boostTopSpeed = 300 / speedDisplayScale;
@@ -880,6 +882,7 @@ let boostGauge = boostGaugeMax;
 let velocityMotionBlurTarget = 0;
 let velocityMotionBlurStrength = 0;
 let jetEnergyBloomStrength = 0;
+let harborCraneWarningBloomStrength = 0;
 let playerBoostEffectActive = false;
 let boostCameraKick = 0;
 let boostCameraSustain = 0;
@@ -1089,6 +1092,21 @@ const materials = {
     emissive: 0x9a6500,
     emissiveIntensity: 0.25,
     roughness: 0.35,
+  }),
+  craneWarningLight: new THREE.MeshBasicMaterial({
+    color: 0xff140c,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+  }),
+  craneWarningGlow: new THREE.MeshBasicMaterial({
+    color: 0xff2c18,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+    blending: THREE.AdditiveBlending,
   }),
   speedsterBlue: new THREE.MeshStandardMaterial({
     color: 0x126dff,
@@ -1593,6 +1611,34 @@ const materials = {
     color: 0x121820,
     roughness: 0.74,
   }),
+  cargoWrap: new THREE.MeshStandardMaterial({
+    color: 0xd7eef0,
+    roughness: 0.24,
+    metalness: 0.0,
+    transparent: true,
+    opacity: 0.32,
+    depthWrite: false,
+  }),
+  harborSafetyOrange: new THREE.MeshStandardMaterial({
+    color: 0xf06a1a,
+    roughness: 0.44,
+    metalness: 0.02,
+  }),
+  harborServiceBlue: new THREE.MeshStandardMaterial({
+    color: 0x2f6fa8,
+    roughness: 0.48,
+    metalness: 0.05,
+  }),
+  harborDrumBlue: new THREE.MeshStandardMaterial({
+    color: 0x1f5d86,
+    roughness: 0.46,
+    metalness: 0.22,
+  }),
+  harborCableBlack: new THREE.MeshStandardMaterial({
+    color: 0x10151a,
+    roughness: 0.78,
+    metalness: 0.04,
+  }),
 };
 
 materials.roadMarkingWhite = createRealtimePbrMaterial("road_marking_white", {
@@ -1921,6 +1967,12 @@ const harborContainerSize = {
   length: 6.4,
   stackGap: 0.08,
 };
+const harborLongContainerSize = {
+  width: 2.85,
+  height: 2.7,
+  length: 11.6,
+  stackGap: 0.08,
+};
 const harborContainerGeometry = new THREE.BoxGeometry(
   harborContainerSize.width,
   harborContainerSize.height,
@@ -1929,11 +1981,52 @@ const harborContainerGeometry = new THREE.BoxGeometry(
 const harborContainerRibGeometry = new THREE.BoxGeometry(0.1, harborContainerSize.height + 0.14, harborContainerSize.length + 0.16);
 const harborContainerDoorGeometry = new THREE.BoxGeometry(harborContainerSize.width + 0.08, harborContainerSize.height * 0.82, 0.1);
 const harborWheelGeometry = new THREE.CylinderGeometry(0.42, 0.42, 0.42, 18);
+const harborCraneWarningLightGeometry = new THREE.SphereGeometry(0.44, 18, 10);
+const harborCraneWarningGlowGeometry = new THREE.SphereGeometry(1.08, 18, 10);
+const harborCraneWarningBaseGeometry = new THREE.BoxGeometry(0.82, 0.18, 0.82);
 const harborAnimatedCranes = [];
+const harborCraneDropEvents = [];
 const harborCargoTrucks = [];
 const harborExcavators = [];
 const harborContainerChunks = [];
 const harborContainerChunkSize = 420;
+const harborCraneDropLane5Centers = [-quickStepDistance * 2, -quickStepDistance, 0, quickStepDistance, quickStepDistance * 2];
+const harborCraneDropLanePair5Centers = [
+  (harborCraneDropLane5Centers[0] + harborCraneDropLane5Centers[1]) * 0.5,
+  (harborCraneDropLane5Centers[1] + harborCraneDropLane5Centers[2]) * 0.5,
+  (harborCraneDropLane5Centers[2] + harborCraneDropLane5Centers[3]) * 0.5,
+  (harborCraneDropLane5Centers[3] + harborCraneDropLane5Centers[4]) * 0.5,
+];
+const harborCraneDropLaneTriplet5Centers = [
+  harborCraneDropLane5Centers[1],
+  harborCraneDropLane5Centers[2],
+  harborCraneDropLane5Centers[3],
+];
+const harborCraneDropBaseConfig = {
+  triggerLead: 650,
+  urgentLead: 300,
+  fallStartLead: 210,
+  fallDuration: 0.78,
+  landedBeaconIntensity: 0.44,
+  landedDuration: Number.POSITIVE_INFINITY,
+};
+const harborCraneDropConfigs = [
+  {
+    ...harborCraneDropBaseConfig,
+    z: -5480,
+    laneTriplet5: 1,
+    containerType: "long",
+    containerYaw: Math.PI * 0.5,
+    containerScaleX: 1,
+    containerScaleY: 1,
+    containerScaleZ: 1,
+    collisionScaleX: 1,
+    collisionScaleY: 1,
+    collisionScaleZ: 0.92,
+    phase: 0.45,
+    seed: 240,
+  },
+];
 const harborVisibilityState = {
   frame: 0,
   lastPlayerZ: Number.NaN,
@@ -2480,40 +2573,42 @@ function getGwangalliBridgeRoadY(z, baseY, startZ, rampEndZ, fenceEndZ, raisedY)
 
 function createStageThreeDefinition(label = "STAGE 3") {
   const goalZ = -9000;
+  const harborRoadY = 0;
+  const harborRoadWidth = 24;
   const trackNodes = [
-    [28, 0, 24],
-    [-260, 0, 24],
-    [-520, 1.1, 24],
-    [-760, 1.1, 22],
-    [-980, 0.4, 23],
-    [-1180, 0.4, 24],
-    [-1460, 0, 24],
-    [-1760, 0, 23],
-    [-2060, 1, 24],
-    [-2360, 1, 22],
-    [-2660, 0.2, 24],
-    [-2960, 0.2, 25],
-    [-3260, 1.5, 24],
-    [-3560, 1.5, 23],
-    [-3860, 0.8, 24],
-    [-4160, 0.8, 25],
-    [-4460, 0, 23],
-    [-4760, 0, 24],
-    [-5060, 1.3, 24],
-    [-5360, 1.3, 22],
-    [-5660, 0.3, 24],
-    [-5960, 0.3, 25],
-    [-6260, 1.6, 24],
-    [-6560, 1.6, 23],
-    [-6860, 0.8, 24],
-    [-7160, 0.8, 25],
-    [-7460, 0.1, 23],
-    [-7760, 0.1, 24],
-    [-8060, 1.4, 24],
-    [-8360, 1.4, 23],
-    [-8660, 0.7, 24],
-    [goalZ, 0.7, 25],
-    [goalZ - 140, 0.7, 25],
+    [28, harborRoadY, harborRoadWidth],
+    [-260, harborRoadY, harborRoadWidth],
+    [-520, harborRoadY, harborRoadWidth],
+    [-760, harborRoadY, harborRoadWidth],
+    [-980, harborRoadY, harborRoadWidth],
+    [-1180, harborRoadY, harborRoadWidth],
+    [-1460, harborRoadY, harborRoadWidth],
+    [-1760, harborRoadY, harborRoadWidth],
+    [-2060, harborRoadY, harborRoadWidth],
+    [-2360, harborRoadY, harborRoadWidth],
+    [-2660, harborRoadY, harborRoadWidth],
+    [-2960, harborRoadY, harborRoadWidth],
+    [-3260, harborRoadY, harborRoadWidth],
+    [-3560, harborRoadY, harborRoadWidth],
+    [-3860, harborRoadY, harborRoadWidth],
+    [-4160, harborRoadY, harborRoadWidth],
+    [-4460, harborRoadY, harborRoadWidth],
+    [-4760, harborRoadY, harborRoadWidth],
+    [-5060, harborRoadY, harborRoadWidth],
+    [-5360, harborRoadY, harborRoadWidth],
+    [-5660, harborRoadY, harborRoadWidth],
+    [-5960, harborRoadY, harborRoadWidth],
+    [-6260, harborRoadY, harborRoadWidth],
+    [-6560, harborRoadY, harborRoadWidth],
+    [-6860, harborRoadY, harborRoadWidth],
+    [-7160, harborRoadY, harborRoadWidth],
+    [-7460, harborRoadY, harborRoadWidth],
+    [-7760, harborRoadY, harborRoadWidth],
+    [-8060, harborRoadY, harborRoadWidth],
+    [-8360, harborRoadY, harborRoadWidth],
+    [-8660, harborRoadY, harborRoadWidth],
+    [goalZ, harborRoadY, harborRoadWidth],
+    [goalZ - 140, harborRoadY, harborRoadWidth],
   ];
 
   return {
@@ -2577,28 +2672,17 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { lane: 0, z: -8560 },
         { lane: 1, z: -8860 },
       ],
-      obstacles: [
-        { lanes: [2], z: -330, height: 2.0 },
-        { lanes: [0, 1], z: -680, height: 2.1 },
-        { lanes: [1], z: -980, height: 1.7 },
-        { lanes: [0], z: -1330, height: 2.0 },
-        { lanes: [1, 2], z: -1740, height: 2.15 },
-        { lanes: [0, 2], z: -2180, height: 2.05 },
-        { lanes: [1], z: -2600, height: 1.9 },
-        { lanes: [0, 2], z: -3120, height: 2.1 },
-        { lanes: [2], z: -3560, height: 2.0 },
-        { lanes: [0, 1], z: -4040, height: 2.15 },
-        { lanes: [1], z: -4480, height: 1.9 },
-        { lanes: [0], z: -4920, height: 2.0 },
-        { lanes: [1, 2], z: -5380, height: 2.15 },
-        { lanes: [2], z: -5820, height: 2.0 },
-        { lanes: [0, 2], z: -6260, height: 2.05 },
-        { lanes: [1], z: -6720, height: 1.9 },
-        { lanes: [0, 1], z: -7180, height: 2.15 },
-        { lanes: [2], z: -7620, height: 2.0 },
-        { lanes: [0], z: -8080, height: 2.0 },
-        { lanes: [1, 2], z: -8520, height: 2.15 },
-        { lanes: [0, 2], z: -8840, height: 2.05 },
+      obstacles: [],
+      harborRoadProps: [
+        { type: "pallet", x: -17.2, z: -620, yaw: -0.08, seed: 11 },
+        { type: "forklift", x: 17.8, z: -1180, yaw: -0.72, seed: 13 },
+        { type: "trailer", x: -19.0, z: -1760, yaw: Math.PI * 0.5, seed: 17 },
+        { type: "pallet", x: 16.8, z: -2840, yaw: 0.1, seed: 23 },
+        { type: "forklift", x: -18.2, z: -3740, yaw: 0.68, seed: 29 },
+        { type: "trailer", x: 19.2, z: -4620, yaw: Math.PI * 0.5, seed: 31 },
+        { type: "pallet", x: -16.5, z: -6120, yaw: 0.04, seed: 37, laneSpan: 2 },
+        { type: "forklift", x: 18.5, z: -7240, yaw: -0.54, seed: 41 },
+        { type: "trailer", x: -19.4, z: -8260, yaw: Math.PI * 0.5, seed: 43 },
       ],
       dnaPlan: [
         { type: "trail", lane: 1, zStart: -48, count: 6, spacing: 9.0 },
@@ -2797,7 +2881,15 @@ function setStageObjectTransform(object, localPosition, localZRotation = 0, extr
 
 function createWaterGeometry(quality = graphicsSettings.waterQuality) {
   const config = waterQualityConfig[quality] ?? waterQualityConfig.high;
-  return new THREE.PlaneGeometry(14000, 14000, config.segments, config.segments);
+  return new THREE.PlaneGeometry(waterPlaneBaseSize, getWaterPlaneLength(), config.segments, config.segments);
+}
+
+function getWaterPlaneLength() {
+  return Math.max(waterPlaneBaseSize, Math.abs(stageStartZ - stageEndZ) + waterPlaneZMargin * 2);
+}
+
+function getWaterPlaneCenterZ() {
+  return (stageStartZ + stageEndZ) * 0.5;
 }
 
 function createWaterMaterial() {
@@ -2924,7 +3016,7 @@ function addEnvironment() {
   waterMaterial = createWaterMaterial();
   waterMesh = new THREE.Mesh(createWaterGeometry(), waterMaterial);
   waterMesh.rotation.x = -Math.PI / 2;
-  waterMesh.position.y = seaLevelY;
+  waterMesh.position.set(0, seaLevelY, getWaterPlaneCenterZ());
   waterMesh.receiveShadow = true;
   waterMesh.userData.defaultReceiveShadow = true;
   waterMesh.userData.waterQuality = graphicsSettings.waterQuality;
@@ -6276,6 +6368,9 @@ function addStageThreeHarbor() {
   addHarborPortWorkZones(harborEndZ);
   addHarborLargeShipFleet(harborEndZ);
   addHarborCraneField(harborEndZ);
+  addHarborCraneDropEvents(harborEndZ);
+  addHarborRoadProps();
+  addHarborBackgroundPropClusters(harborEndZ);
   addHarborCargoTruckRoutes(harborEndZ);
   addHarborExcavatorField(harborEndZ);
 }
@@ -6307,6 +6402,12 @@ function addHarborCraneField(harborEndZ) {
   })
     .filter(({ z }) => z > harborEndZ + 120)
     .forEach(addHarborCrane);
+}
+
+function addHarborCraneDropEvents(harborEndZ) {
+  harborCraneDropConfigs
+    .filter(({ z }) => z > harborEndZ + 160)
+    .forEach(addHarborCraneDropEvent);
 }
 
 function addHarborCargoTruckRoutes(harborEndZ) {
@@ -6435,6 +6536,411 @@ function addHarborPortWorkZones(harborEndZ) {
       addHarborInspectionBooth({ x: -side * 30.5, z: z + 92, side: -side, seed: index });
     }
   }
+}
+
+function addHarborRoadProps() {
+  const roadProps = currentStage.harborRoadProps ?? [];
+  for (const config of roadProps) {
+    addHarborRoadProp(config);
+  }
+}
+
+function addHarborRoadProp(config) {
+  if (isRollClearZone(config.z)) return;
+
+  const x = getHarborCraneDropX(config);
+  const sample = getGroundSample(x, config.z) ?? getGroundSample(0, config.z);
+  if (!sample) return;
+
+  const model = createHarborRoadPropModel(config);
+  if (!model) return;
+
+  const group = model.group;
+  const yaw = config.yaw ?? 0;
+  group.userData.debugName = model.debugName;
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, config.z), 0, 0, true);
+  group.rotateY(yaw);
+  scene.add(group);
+}
+
+function createHarborRoadPropModel(config) {
+  switch (config.type) {
+    case "trailer":
+      return createHarborTrailerObstacle(config.seed ?? 0);
+    case "forklift":
+      return createHarborForkliftObstacle(config.seed ?? 0);
+    case "pallet":
+      return createHarborPalletObstacle(config.seed ?? 0, config.laneSpan ?? (config.lanePair5 !== undefined ? 2 : 1));
+    default:
+      return null;
+  }
+}
+
+function addHarborBackgroundPropClusters(harborEndZ) {
+  const clusterSpacing = 620;
+  for (let index = 0, z = -860; z > harborEndZ + 420; index += 1, z -= clusterSpacing) {
+    const side = index % 2 === 0 ? 1 : -1;
+    const variant = index % 6;
+    const x = side * (23.5 + (index % 3) * 2.6);
+    addHarborBackgroundPropCluster({
+      x,
+      z: z - (index % 2) * 70,
+      side,
+      variant,
+      seed: 80 + index * 11,
+    });
+  }
+}
+
+function addHarborBackgroundPropCluster({ x, z, side, variant, seed }) {
+  const sample = getGroundSample(0, z);
+  if (!sample) return;
+
+  const group = new THREE.Group();
+  group.userData.debugName = "Harbor Background Detail Cluster";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+  group.rotateY(side * (0.08 + (seed % 3) * 0.035));
+
+  switch (variant) {
+    case 0:
+      group.userData.debugName = "Harbor Background Prop - Drum Storage";
+      addHarborDrumCluster(group, seed);
+      break;
+    case 1:
+      group.userData.debugName = "Harbor Background Prop - Safety Cones And Sign";
+      addHarborSafetyConeSignCluster(group, seed);
+      break;
+    case 2:
+      group.userData.debugName = "Harbor Background Prop - Service Van";
+      addHarborServiceVan(group, seed, side);
+      break;
+    case 3:
+      group.userData.debugName = "Harbor Background Prop - Portable Fence";
+      addHarborPortableFenceCluster(group, seed);
+      break;
+    case 4:
+      group.userData.debugName = "Harbor Background Prop - Cable Spools";
+      addHarborCableSpoolCluster(group, seed);
+      break;
+    default:
+      group.userData.debugName = "Harbor Background Prop - Crate Rack";
+      addHarborCrateRackCluster(group, seed);
+      break;
+  }
+
+  scene.add(group);
+}
+
+function addHarborDrumCluster(parent, seed) {
+  addHarborObstacleBox(parent, 3.2, 0.18, 2.1, materials.containerTrim, 0, 0.12, 0, 0, 0, 0, true, true);
+  for (const plankZ of [-0.72, 0, 0.72]) {
+    addHarborObstacleBox(parent, 3.42, 0.08, 0.18, materials.harborRail, 0, 0.28, plankZ, 0, 0, 0, true, true);
+  }
+
+  const drumPositions = [
+    [-1.05, 0.0],
+    [0, -0.08],
+    [1.05, 0.0],
+    [-0.52, 0.88],
+    [0.58, 0.82],
+  ];
+  const drumMaterials = [materials.harborDrumBlue, materials.containerGreen, materials.craneDark];
+  drumPositions.forEach(([x, z], index) => {
+    const material = drumMaterials[(seed + index) % drumMaterials.length];
+    const drum = addHarborObstacleCylinder(parent, 0.34, 0.92, material, x, 0.78, z, 0, 0, 0, 18, true, true);
+    drum.scale.y = 1.02;
+    for (const y of [0.43, 0.78, 1.12]) {
+      addHarborObstacleCylinder(parent, 0.35, 0.055, materials.containerTrim, x, y, z, 0, 0, 0, 18, true, false);
+    }
+    addHarborObstacleBox(parent, 0.44, 0.18, 0.03, materials.roadMarkingWhite, x, 0.84, z - 0.35, 0, 0, 0, false, false);
+  });
+
+  addHarborObstacleBox(parent, 3.6, 0.08, 0.08, materials.harborRailStripe, 0, 1.36, -1.22, 0, 0, 0, false, false);
+  for (const x of [-1.7, 1.7]) {
+    addHarborObstacleBox(parent, 0.12, 1.15, 0.12, materials.containerTrim, x, 0.82, -1.22);
+  }
+}
+
+function addHarborSafetyConeSignCluster(parent, seed) {
+  const conePositions = [
+    [-1.55, -1.0],
+    [-0.55, -0.7],
+    [0.5, -0.88],
+    [1.45, -0.55],
+    [1.95, 0.5],
+    [-1.85, 0.42],
+  ];
+  conePositions.forEach(([x, z], index) => {
+    addHarborSafetyCone(parent, x, z, 0.92 + ((seed + index) % 2) * 0.08);
+  });
+
+  for (const x of [-0.72, 0.72]) {
+    addHarborObstacleCylinder(parent, 0.05, 1.65, materials.containerTrim, x, 0.92, 1.08, 0, 0, 0, 8, true, false);
+  }
+  addHarborObstacleBox(parent, 2.1, 0.88, 0.1, materials.harborRailStripe, 0, 1.72, 1.08, 0, 0, 0, true, false);
+  addHarborObstacleBox(parent, 1.82, 0.14, 0.12, materials.containerTrim, 0, 1.82, 1.0, 0, 0, -0.28, false, false);
+  addHarborObstacleBox(parent, 1.82, 0.14, 0.12, materials.containerTrim, 0, 1.58, 1.0, 0, 0, 0.28, false, false);
+}
+
+function addHarborSafetyCone(parent, x, z, height = 0.95) {
+  addHarborObstacleBox(parent, 0.58, 0.1, 0.58, materials.containerTrim, x, 0.06, z, 0, 0, 0, true, true);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, height, 16), materials.harborSafetyOrange);
+  cone.position.set(x, 0.12 + height * 0.5, z);
+  cone.castShadow = true;
+  cone.receiveShadow = true;
+  parent.add(cone);
+  addHarborObstacleCylinder(parent, 0.2, 0.055, materials.roadMarkingWhite, x, 0.42, z, 0, 0, 0, 16, false, false);
+  addHarborObstacleCylinder(parent, 0.14, 0.05, materials.roadMarkingWhite, x, 0.68, z, 0, 0, 0, 16, false, false);
+}
+
+function addHarborServiceVan(parent, seed, side) {
+  const bodyMaterial = seed % 2 === 0 ? materials.truckCab : materials.harborServiceBlue;
+  addHarborObstacleBox(parent, 2.25, 1.42, 4.15, bodyMaterial, 0, 1.08, 0.12);
+  addHarborObstacleBox(parent, 2.08, 0.58, 1.72, bodyMaterial, 0, 1.9, -1.12);
+  addHarborObstacleBox(parent, 2.12, 0.18, 4.2, materials.harborRail, 0, 1.88, 0.12, 0, 0, 0, true, false);
+  addHarborObstacleBox(parent, 1.6, 0.52, 0.08, materials.tourBoatGlass, 0, 1.65, -2.04, -0.08, 0, 0, false, false);
+
+  for (const sideX of [-1, 1]) {
+    addHarborObstacleBox(parent, 0.08, 0.48, 1.0, materials.tourBoatGlass, sideX * 1.16, 1.52, -0.95, 0, 0, 0, false, false);
+    addHarborObstacleBox(parent, 0.08, 0.18, 3.4, materials.harborRailStripe, sideX * 1.18, 1.26, 0.28, 0, 0, 0, false, false);
+    addHarborObstacleBox(parent, 0.08, 0.18, 0.3, materials.beachLamp, sideX * 0.56, 0.78, -2.02, 0, 0, 0, false, false);
+    addHarborObstacleBox(parent, 0.08, 0.18, 0.26, materials.tourBoatRed, sideX * 0.64, 0.78, 2.26, 0, 0, 0, false, false);
+    for (const wheelZ of [-1.35, 1.42]) {
+      addHarborObstacleCylinder(parent, 0.36, 0.32, materials.tire, sideX * 1.14, 0.42, wheelZ, 0, 0, Math.PI * 0.5, 16, true, false);
+      addHarborObstacleCylinder(parent, 0.17, 0.36, materials.harborRail, sideX * 1.14, 0.42, wheelZ, 0, 0, Math.PI * 0.5, 12, true, false);
+    }
+  }
+
+  addHarborObstacleCylinder(parent, 0.18, 0.14, materials.harborSafetyOrange, side * 0.48, 2.16, -0.2, 0, 0, 0, 12, false, false);
+  addHarborObstacleBox(parent, 1.15, 0.12, 0.58, materials.containerTrim, 0, 2.08, 0.72, 0, 0, 0, true, false);
+  addHarborObstacleBox(parent, 0.78, 0.08, 0.42, materials.roadMarkingWhite, 0, 2.18, 0.72, 0, 0, 0, false, false);
+}
+
+function addHarborPortableFenceCluster(parent, seed) {
+  for (let panel = 0; panel < 3; panel += 1) {
+    const z = (panel - 1) * 1.55;
+    const yaw = (panel - 1) * 0.08;
+    const frame = new THREE.Group();
+    frame.position.set(0, 0, z);
+    frame.rotation.y = yaw;
+    parent.add(frame);
+
+    addHarborObstacleBox(frame, 3.2, 0.12, 0.12, materials.harborSafetyOrange, 0, 1.38, 0);
+    addHarborObstacleBox(frame, 3.2, 0.12, 0.12, materials.harborSafetyOrange, 0, 0.58, 0);
+    for (const x of [-1.55, 0, 1.55]) {
+      addHarborObstacleBox(frame, 0.1, 1.24, 0.12, materials.harborSafetyOrange, x, 0.98, 0);
+    }
+    addHarborObstacleBox(frame, 3.05, 0.08, 0.08, materials.containerTrim, 0, 1.02, 0.03, 0, 0, 0.28, false, false);
+    addHarborObstacleBox(frame, 3.05, 0.08, 0.08, materials.containerTrim, 0, 0.92, 0.03, 0, 0, -0.28, false, false);
+    for (const x of [-1.48, 1.48]) {
+      addHarborObstacleBox(frame, 0.62, 0.16, 0.52, materials.harborDockDark, x, 0.08, 0.02);
+    }
+  }
+}
+
+function addHarborCableSpoolCluster(parent, seed) {
+  const spoolData = [
+    [-0.92, -0.2, 0.62],
+    [1.05, 0.5, 0.48],
+  ];
+  spoolData.forEach(([x, z, radius], index) => {
+    addHarborObstacleCylinder(parent, radius, 0.36, materials.harborRail, x - 0.2, radius + 0.08, z, 0, 0, Math.PI * 0.5, 24, true, true);
+    addHarborObstacleCylinder(parent, radius, 0.36, materials.harborRail, x + 0.2, radius + 0.08, z, 0, 0, Math.PI * 0.5, 24, true, true);
+    addHarborObstacleCylinder(parent, radius * 0.72, 0.54, materials.harborCableBlack, x, radius + 0.08, z, 0, 0, Math.PI * 0.5, 24, true, true);
+    addHarborObstacleCylinder(parent, radius * 0.18, 0.74, materials.containerTrim, x, radius + 0.08, z, 0, 0, Math.PI * 0.5, 12, true, false);
+    addHarborObstacleBox(parent, radius * 2.1, 0.14, 0.28, materials.containerTrim, x, 0.1, z + radius * 0.98);
+    addHarborObstacleBox(parent, radius * 2.1, 0.14, 0.28, materials.containerTrim, x, 0.1, z - radius * 0.98);
+    if ((seed + index) % 2 === 0) {
+      const cable = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.92, 0.055, 8, 32), materials.harborCableBlack);
+      cable.position.set(x, radius + 0.08, z);
+      cable.rotation.y = Math.PI * 0.5;
+      cable.castShadow = true;
+      parent.add(cable);
+    }
+  });
+  addHarborObstacleBox(parent, 3.6, 0.12, 0.16, materials.harborRailStripe, 0, 0.24, -1.28, 0, 0, 0, false, false);
+}
+
+function addHarborCrateRackCluster(parent, seed) {
+  const rackWidth = 3.8;
+  const rackDepth = 1.55;
+  for (const x of [-rackWidth * 0.5, rackWidth * 0.5]) {
+    for (const z of [-rackDepth * 0.5, rackDepth * 0.5]) {
+      addHarborObstacleBox(parent, 0.12, 2.1, 0.12, materials.containerTrim, x, 1.08, z);
+    }
+  }
+  for (const y of [0.52, 1.18, 1.86]) {
+    addHarborObstacleBox(parent, rackWidth + 0.22, 0.1, rackDepth + 0.12, materials.harborRail, 0, y, 0);
+  }
+  const boxMaterials = [materials.harborDockDark, materials.truckTrailer, materials.containerGreen, materials.containerYellow];
+  for (let index = 0; index < 9; index += 1) {
+    const level = Math.floor(index / 3);
+    const column = index % 3;
+    const x = (column - 1) * 1.12;
+    const y = 0.78 + level * 0.66;
+    const z = ((seed + index) % 2 === 0 ? -0.34 : 0.34);
+    addHarborObstacleBox(parent, 0.92, 0.42, 0.62, boxMaterials[(seed + index) % boxMaterials.length], x, y, z, 0, ((seed + index) % 3 - 1) * 0.03, 0, true, true);
+  }
+  addHarborObstacleBox(parent, rackWidth + 0.52, 0.08, 0.08, materials.harborRailStripe, 0, 2.2, -rackDepth * 0.5 - 0.18, 0, 0, 0, false, false);
+}
+
+function addHarborObstacleBox(parent, width, height, depth, material, x, y, z, rx = 0, ry = 0, rz = 0, castShadow = true, receiveShadow = true) {
+  const mesh = addBox(parent, width, height, depth, material, x, y, z, rx, ry, rz);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = receiveShadow;
+  return mesh;
+}
+
+function addHarborObstacleCylinder(parent, radius, length, material, x, y, z, rx = 0, ry = 0, rz = 0, segments = 14, castShadow = true, receiveShadow = true) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, segments), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = receiveShadow;
+  parent.add(mesh);
+  return mesh;
+}
+
+function createHarborTrailerObstacle(seed) {
+  const group = new THREE.Group();
+  const sideMarkerZ = [-3.8, -1.45, 1.45, 3.8];
+  const crossBeamZ = [-4.05, -2.35, -0.65, 1.05, 2.75, 4.2];
+
+  addHarborObstacleBox(group, 3.18, 0.34, 8.95, materials.craneDark, 0, 1.02, 0);
+  addHarborObstacleBox(group, 2.84, 0.12, 8.55, materials.harborRail, 0, 1.28, 0, 0, 0, 0, true, true);
+
+  for (const side of [-1, 1]) {
+    addHarborObstacleBox(group, 0.16, 0.34, 9.1, materials.containerTrim, side * 1.68, 1.38, 0);
+    addHarborObstacleBox(group, 0.1, 0.22, 8.75, materials.harborRailStripe, side * 1.78, 1.64, 0, 0, 0, 0, false, false);
+    for (const markerZ of sideMarkerZ) {
+      addHarborObstacleBox(group, 0.08, 0.18, 0.34, materials.roadMarkingYellow, side * 1.88, 1.14, markerZ, 0, 0, 0, false, false);
+    }
+  }
+
+  for (const beamZ of crossBeamZ) {
+    addHarborObstacleBox(group, 3.35, 0.09, 0.12, materials.containerTrim, 0, 1.51, beamZ, 0, 0, 0, true, false);
+  }
+
+  for (const side of [-1, 1]) {
+    for (const wheelZ of [1.85, 3.05, 4.0]) {
+      const wheel = addHarborObstacleCylinder(group, 0.43, 0.44, materials.tire, side * 1.38, 0.54, wheelZ, 0, 0, Math.PI * 0.5, 18);
+      wheel.scale.z = 1.05;
+      addHarborObstacleCylinder(group, 0.21, 0.48, materials.harborRail, side * 1.38, 0.54, wheelZ, 0, 0, Math.PI * 0.5, 14, true, false);
+    }
+    addHarborObstacleBox(group, 0.16, 0.98, 0.16, materials.containerTrim, side * 0.66, 0.52, -3.58);
+    addHarborObstacleBox(group, 0.46, 0.1, 0.34, materials.harborRail, side * 0.66, 0.06, -3.58);
+  }
+
+  addHarborObstacleBox(group, 3.25, 0.34, 0.26, materials.containerTrim, 0, 0.82, 4.58);
+  addHarborObstacleBox(group, 2.65, 0.14, 0.12, materials.roadMarkingWhite, 0, 1.62, 4.72, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.42, 0.2, 0.08, materials.tourBoatRed, -1.12, 0.95, 4.76, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.42, 0.2, 0.08, materials.tourBoatRed, 1.12, 0.95, 4.76, 0, 0, 0, false, false);
+
+  const toolBoxMaterial = seed % 2 === 0 ? materials.truckTrailer : materials.containerGreen;
+  addHarborObstacleBox(group, 1.34, 0.5, 0.72, toolBoxMaterial, 0, 1.78, -3.18);
+  addHarborObstacleBox(group, 1.46, 0.08, 0.82, materials.containerTrim, 0, 2.07, -3.18, 0, 0, 0, true, false);
+
+  return {
+    group,
+    debugName: "Harbor Background Prop - Empty Container Trailer",
+  };
+}
+
+function createHarborPalletObstacle(seed, laneSpan = 1) {
+  const group = new THREE.Group();
+  const width = laneSpan > 1 ? 6.85 : 2.95;
+  const depth = 2.55;
+  const columns = laneSpan > 1 ? 4 : 2;
+  const rows = 2;
+  const crateWidth = width / columns - 0.18;
+  const crateDepth = depth / rows - 0.18;
+  const crateMaterials = [
+    materials.harborDockDark,
+    materials.truckTrailer,
+    materials.containerGreen,
+    materials.containerYellow,
+  ];
+
+  for (const z of [-0.92, 0, 0.92]) {
+    addHarborObstacleBox(group, width + 0.2, 0.12, 0.18, materials.containerTrim, 0, 0.16, z, 0, 0, 0, true, true);
+  }
+  for (let column = 0; column < columns; column += 1) {
+    const x = (column - (columns - 1) * 0.5) * (width / columns);
+    addHarborObstacleBox(group, crateWidth, 0.1, depth + 0.18, materials.harborRail, x, 0.33, 0, 0, 0, 0, true, true);
+  }
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const index = row * columns + column;
+      const x = (column - (columns - 1) * 0.5) * (width / columns);
+      const z = (row - 0.5) * (depth / rows);
+      const material = crateMaterials[(seed + index) % crateMaterials.length];
+      const height = 0.72 + ((seed + index) % 3) * 0.08;
+      const crate = addHarborObstacleBox(group, crateWidth, height, crateDepth, material, x, 0.76 + height * 0.5, z, 0, ((seed + index) % 2) * 0.03, 0);
+      crate.scale.x *= 0.97 + ((seed + index) % 2) * 0.035;
+    }
+  }
+
+  addHarborObstacleBox(group, width + 0.28, 1.22, depth + 0.28, materials.cargoWrap, 0, 1.28, 0, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, width + 0.36, 0.12, 0.08, materials.containerTrim, 0, 1.32, depth * 0.5 + 0.18, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, width + 0.36, 0.12, 0.08, materials.containerTrim, 0, 1.32, -depth * 0.5 - 0.18, 0, 0, 0, false, false);
+  for (const x of [-width * 0.28, width * 0.28]) {
+    addHarborObstacleBox(group, 0.1, 1.34, depth + 0.32, materials.containerTrim, x, 1.27, 0, 0, 0, 0, false, false);
+  }
+
+  for (const sideX of [-width * 0.5 - 0.05, width * 0.5 + 0.05]) {
+    for (const sideZ of [-depth * 0.5 - 0.05, depth * 0.5 + 0.05]) {
+      addHarborObstacleBox(group, 0.16, 1.28, 0.16, materials.harborRailStripe, sideX, 1.16, sideZ, 0, 0, 0, false, false);
+    }
+  }
+
+  return {
+    group,
+    debugName: laneSpan > 1 ? "Harbor Background Prop - Wide Cargo Pallets" : "Harbor Background Prop - Cargo Pallets",
+  };
+}
+
+function createHarborForkliftObstacle(seed) {
+  const group = new THREE.Group();
+  const bodyMaterial = seed % 2 === 0 ? materials.excavatorBody : materials.containerYellow;
+
+  addHarborObstacleBox(group, 1.9, 0.96, 2.35, bodyMaterial, 0, 0.86, 0.32);
+  addHarborObstacleBox(group, 1.62, 0.48, 1.32, materials.excavatorArm, 0, 1.42, -0.42);
+  addHarborObstacleBox(group, 1.92, 1.24, 0.72, materials.craneDark, 0, 1.12, 1.42);
+  addHarborObstacleBox(group, 1.42, 0.24, 0.52, materials.harborRail, 0, 1.74, -1.02);
+
+  for (const side of [-1, 1]) {
+    addHarborObstacleBox(group, 0.14, 1.58, 0.14, materials.craneDark, side * 0.78, 1.58, 0.28);
+    addHarborObstacleBox(group, 0.14, 1.58, 0.14, materials.craneDark, side * 0.78, 1.58, 1.18);
+  }
+  addHarborObstacleBox(group, 1.78, 0.16, 1.26, materials.craneDark, 0, 2.42, 0.74);
+  addHarborObstacleBox(group, 1.45, 0.12, 0.82, materials.tourBoatGlass, 0, 1.94, 0.72, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.68, 0.2, 0.68, materials.tire, 0, 1.02, 0.66);
+  addHarborObstacleBox(group, 0.12, 0.54, 0.12, materials.harborRail, 0, 1.36, 0.42, -0.42, 0, 0);
+
+  for (const side of [-1, 1]) {
+    addHarborObstacleBox(group, 0.16, 2.58, 0.16, materials.containerTrim, side * 0.58, 1.48, -1.64);
+    addHarborObstacleBox(group, 0.12, 2.14, 0.12, materials.harborRail, side * 0.36, 1.33, -1.5);
+    addHarborObstacleBox(group, 0.16, 0.1, 2.2, materials.containerTrim, side * 0.42, 0.34, -2.5, -0.03, 0, 0);
+  }
+  for (const y of [0.82, 1.48, 2.12]) {
+    addHarborObstacleBox(group, 1.52, 0.12, 0.16, materials.containerTrim, 0, y, -1.64);
+  }
+
+  for (const side of [-1, 1]) {
+    for (const wheelZ of [-0.72, 1.02]) {
+      addHarborObstacleCylinder(group, wheelZ > 0 ? 0.38 : 0.32, 0.34, materials.tire, side * 0.98, 0.42, wheelZ, 0, 0, Math.PI * 0.5, 16);
+      addHarborObstacleCylinder(group, wheelZ > 0 ? 0.18 : 0.15, 0.38, materials.harborRail, side * 0.98, 0.42, wheelZ, 0, 0, Math.PI * 0.5, 12, true, false);
+    }
+    addHarborObstacleBox(group, 0.28, 0.16, 0.08, materials.beachLamp, side * 0.52, 1.42, -1.0, 0, 0, 0, false, false);
+  }
+
+  addHarborObstacleCylinder(group, 0.22, 0.16, materials.harborRailStripe, 0, 2.65, 0.76, 0, 0, 0, 12, false, false);
+
+  return {
+    group,
+    debugName: "Harbor Background Prop - Port Forklift",
+  };
 }
 
 function addHarborTrailerParking({ x, z, side, seed }) {
@@ -7367,6 +7873,7 @@ function createHarborContainer(seed) {
     materials.containerGreen,
   ];
   const group = new THREE.Group();
+  group.userData.containerSize = harborContainerSize;
   const body = new THREE.Mesh(harborContainerGeometry, colorMaterials[seed % colorMaterials.length]);
   body.castShadow = true;
   body.receiveShadow = true;
@@ -7424,6 +7931,97 @@ function createHarborContainer(seed) {
 
   const idPlate = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.13), seed % 2 === 0 ? materials.harborRailStripe : materials.truckCab);
   idPlate.position.set(-halfW - 0.08, halfH * 0.42, -halfL * 0.2);
+  idPlate.castShadow = true;
+  group.add(idPlate);
+
+  return group;
+}
+
+function createHarborLongContainer(seed) {
+  const colorMaterials = [
+    materials.containerRed,
+    materials.containerBlue,
+    materials.containerYellow,
+    materials.containerGreen,
+  ];
+  const size = harborLongContainerSize;
+  const group = new THREE.Group();
+  group.userData.containerSize = size;
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(size.width, size.height, size.length), colorMaterials[seed % colorMaterials.length]);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const halfW = size.width * 0.5;
+  const halfL = size.length * 0.5;
+  const halfH = size.height * 0.5;
+  const cornerGeometry = new THREE.BoxGeometry(0.16, size.height + 0.18, 0.16);
+  const sidePostGeometry = new THREE.BoxGeometry(0.14, size.height + 0.12, 0.16);
+  const topBottomXGeometry = new THREE.BoxGeometry(size.width + 0.18, 0.12, 0.14);
+  const topBottomZGeometry = new THREE.BoxGeometry(0.12, 0.12, size.length + 0.18);
+
+  for (const x of [-halfW - 0.04, halfW + 0.04]) {
+    for (const z of [-halfL - 0.04, halfL + 0.04]) {
+      const corner = new THREE.Mesh(cornerGeometry, materials.containerTrim);
+      corner.position.set(x, 0, z);
+      corner.castShadow = true;
+      group.add(corner);
+    }
+  }
+
+  for (let i = -4; i <= 4; i += 1) {
+    const z = i * (size.length / 10);
+    for (const x of [-halfW - 0.055, halfW + 0.055]) {
+      const post = new THREE.Mesh(sidePostGeometry, materials.containerTrim);
+      post.position.set(x, 0, z);
+      post.castShadow = true;
+      group.add(post);
+    }
+  }
+
+  for (const y of [-halfH - 0.04, halfH + 0.04]) {
+    for (const z of [-halfL - 0.04, halfL + 0.04]) {
+      const rail = new THREE.Mesh(topBottomXGeometry, materials.containerTrim);
+      rail.position.set(0, y, z);
+      rail.castShadow = true;
+      group.add(rail);
+    }
+
+    for (const x of [-halfW - 0.04, halfW + 0.04]) {
+      const rail = new THREE.Mesh(topBottomZGeometry, materials.containerTrim);
+      rail.position.set(x, y, 0);
+      rail.castShadow = true;
+      group.add(rail);
+    }
+  }
+
+  for (const z of [-halfL + 1.35, -halfL + 3.05, 0, halfL - 3.05, halfL - 1.35]) {
+    const topRib = new THREE.Mesh(new THREE.BoxGeometry(size.width + 0.1, 0.1, 0.08), materials.containerTrim);
+    topRib.position.set(0, halfH + 0.08, z);
+    topRib.castShadow = true;
+    group.add(topRib);
+
+    const bottomRib = topRib.clone();
+    bottomRib.position.y = -halfH - 0.08;
+    bottomRib.castShadow = true;
+    group.add(bottomRib);
+  }
+
+  const door = new THREE.Mesh(new THREE.BoxGeometry(size.width + 0.08, size.height * 0.82, 0.1), materials.containerTrim);
+  door.position.z = halfL + 0.06;
+  door.castShadow = true;
+  group.add(door);
+
+  for (const x of [-0.54, 0.54]) {
+    const doorBar = new THREE.Mesh(new THREE.BoxGeometry(0.08, size.height * 0.75, 0.12), materials.harborRail);
+    doorBar.position.set(x, 0, halfL + 0.13);
+    doorBar.castShadow = true;
+    group.add(doorBar);
+  }
+
+  const idPlate = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.34, 0.13), seed % 2 === 0 ? materials.harborRailStripe : materials.truckCab);
+  idPlate.position.set(-halfW - 0.08, halfH * 0.42, -halfL * 0.42);
   idPlate.castShadow = true;
   group.add(idPlate);
 
@@ -7512,6 +8110,192 @@ function addHarborCrane({ x, z, side, phase }) {
 
   scene.add(group);
   harborAnimatedCranes.push({ group, z, boomPivot, trolley, side, phase, trolleyBase: 10.5, trolleyRange: 8.0 });
+}
+
+function addHarborCraneWarningBeacon(parent, x, y, z, options = {}) {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+  if (options.primary) {
+    group.scale.setScalar(1.18);
+  }
+
+  const base = new THREE.Mesh(harborCraneWarningBaseGeometry, materials.craneDark);
+  base.position.y = -0.18;
+  base.castShadow = true;
+  group.add(base);
+
+  const glow = new THREE.Mesh(harborCraneWarningGlowGeometry, materials.craneWarningGlow.clone());
+  glow.visible = false;
+  glow.renderOrder = 12;
+  glow.layers.enable(selectiveBloomLayer);
+  group.add(glow);
+
+  const light = new THREE.Mesh(harborCraneWarningLightGeometry, materials.craneWarningLight.clone());
+  light.visible = false;
+  light.renderOrder = 13;
+  light.layers.enable(selectiveBloomLayer);
+  group.add(light);
+
+  parent.add(group);
+  return { group, light, glow, primary: Boolean(options.primary) };
+}
+
+function getStableRandomUnit(seed, salt = 0) {
+  const value = Math.sin((seed + 1) * 12.9898 + (salt + 1) * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function getHarborCraneDropLanePair5Index(config) {
+  if (Number.isInteger(config.lanePair5)) {
+    return THREE.MathUtils.clamp(config.lanePair5, 0, harborCraneDropLanePair5Centers.length - 1);
+  }
+
+  if (config.randomLanePair5) {
+    return Math.floor(getStableRandomUnit(config.seed ?? 0, 70) * harborCraneDropLanePair5Centers.length);
+  }
+
+  return -1;
+}
+
+function getHarborCraneDropLaneTriplet5Index(config) {
+  if (Number.isInteger(config.laneTriplet5)) {
+    return THREE.MathUtils.clamp(config.laneTriplet5, 0, harborCraneDropLaneTriplet5Centers.length - 1);
+  }
+
+  return -1;
+}
+
+function getHarborCraneDropX(config) {
+  if (Number.isFinite(config.x)) return config.x;
+  const laneTriplet5Index = getHarborCraneDropLaneTriplet5Index(config);
+  if (laneTriplet5Index >= 0) {
+    return harborCraneDropLaneTriplet5Centers[laneTriplet5Index] ?? 0;
+  }
+  const lanePair5Index = getHarborCraneDropLanePair5Index(config);
+  if (lanePair5Index >= 0) {
+    return harborCraneDropLanePair5Centers[lanePair5Index] ?? 0;
+  }
+  if (Number.isInteger(config.lane5)) {
+    return harborCraneDropLane5Centers[THREE.MathUtils.clamp(config.lane5, 0, harborCraneDropLane5Centers.length - 1)] ?? 0;
+  }
+  return lanes[config.lane] ?? 0;
+}
+
+function addHarborCraneDropEvent(config) {
+  const dropX = getHarborCraneDropX(config);
+  const sample = getGroundSample(dropX, config.z);
+  if (!sample) return;
+
+  const crane = new THREE.Group();
+  setStageObjectTransform(crane, new THREE.Vector3(0, sample.y, config.z), 0, 0, true);
+
+  const legGeometry = new THREE.BoxGeometry(0.92, 18.8, 0.92);
+  for (const legX of [-15.5, 15.5]) {
+    for (const legZ of [-3.8, 3.8]) {
+      const leg = new THREE.Mesh(legGeometry, materials.crane);
+      leg.position.set(legX, 9.4, legZ);
+      leg.castShadow = true;
+      crane.add(leg);
+
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.42, 1.45), materials.craneDark);
+      foot.position.set(legX, 0.26, legZ);
+      foot.castShadow = true;
+      crane.add(foot);
+    }
+  }
+
+  for (const beamZ of [-3.8, 3.8]) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(35.2, 0.82, 1.12), materials.crane);
+    beam.position.set(0, 18.95, beamZ);
+    beam.castShadow = true;
+    crane.add(beam);
+  }
+
+  for (const crossX of [-15.5, 0, 15.5]) {
+    const cross = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.58, 8.3), materials.craneDark);
+    cross.position.set(crossX, 18.95, 0);
+    cross.castShadow = true;
+    crane.add(cross);
+  }
+
+  const trolley = new THREE.Group();
+  trolley.position.set(dropX, 19.7, 0);
+  const trolleyBody = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.92, 1.45), materials.craneDark);
+  trolleyBody.castShadow = true;
+  trolley.add(trolleyBody);
+
+  const cable = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1, 0.1), materials.craneDark);
+  trolley.add(cable);
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.56, 0.56), materials.craneDark);
+  hook.castShadow = true;
+  trolley.add(hook);
+  crane.add(trolley);
+
+  const warningBeacons = [
+    addHarborCraneWarningBeacon(crane, -13.2, 20.25, -4.25),
+    addHarborCraneWarningBeacon(crane, 13.2, 20.25, -4.25),
+    addHarborCraneWarningBeacon(crane, -13.2, 20.25, 4.25),
+    addHarborCraneWarningBeacon(crane, 13.2, 20.25, 4.25),
+    addHarborCraneWarningBeacon(crane, dropX, 20.65, 0, { primary: true }),
+  ];
+
+  const cargo = config.containerType === "long"
+    ? createHarborLongContainer(config.seed)
+    : createHarborContainer(config.seed);
+  const containerSize = cargo.userData.containerSize ?? harborContainerSize;
+  const visualScale = new THREE.Vector3(
+    config.containerScaleX ?? 1.12,
+    config.containerScaleY ?? 1.06,
+    config.containerScaleZ ?? 1.04,
+  );
+  const collisionScale = new THREE.Vector3(
+    config.collisionScaleX ?? 1.12,
+    config.collisionScaleY ?? 1.06,
+    config.collisionScaleZ ?? 1.04,
+  );
+  cargo.scale.copy(visualScale);
+  cargo.visible = true;
+  const cargoYaw = config.containerYaw ?? 0;
+
+  scene.add(crane);
+  scene.add(cargo);
+
+  const halfHeight = containerSize.height * cargo.scale.y * 0.5;
+  const landedCenterY = sample.y + halfHeight + 0.03;
+  const startCenterY = sample.y + 14.6;
+  const event = {
+    state: "idle",
+    timer: 0,
+    z: config.z,
+    dropX,
+    triggerZ: config.z + config.triggerLead,
+    triggerLead: config.triggerLead,
+    urgentLead: config.urgentLead,
+    fallStartLead: config.fallStartLead,
+    fallDuration: config.fallDuration,
+    landedBeaconIntensity: config.landedBeaconIntensity,
+    landedDuration: config.landedDuration,
+    phase: config.phase,
+    groundY: sample.y,
+    startCenterY,
+    landedCenterY,
+    halfHeight,
+    containerSize,
+    localPosition: new THREE.Vector3(dropX, startCenterY, config.z),
+    cargoYaw,
+    collisionScale,
+    crane,
+    trolley,
+    cable,
+    hook,
+    warningBeacons,
+    warningBlinkPhase: 0,
+    cargo,
+    obstacle: null,
+  };
+
+  updateHarborDropCargoTransform(event, startCenterY, 0);
+  harborCraneDropEvents.push(event);
 }
 
 function addHarborCargoTruck({ x, zStart, zEnd, z, direction, speed, material }) {
@@ -7717,11 +8501,13 @@ function updateStageThreeHarbor(dt) {
 
   for (const crane of harborAnimatedCranes) {
     if (!crane.active) continue;
-    crane.boomPivot.rotation.y = Math.sin(harborTime * 0.48 + crane.phase) * 0.045;
+    crane.boomPivot.rotation.y = Math.sin(harborTime * 0.48 + crane.phase) * 0.085;
     crane.trolley.position.x = -crane.side * (
       (crane.trolleyBase ?? 4.2) + Math.sin(harborTime * 0.78 + crane.phase) * (crane.trolleyRange ?? 3.3)
     );
   }
+
+  updateHarborCraneDropEvents(dt);
 
   for (const truck of harborCargoTrucks) {
     advanceHarborTruckRoute(truck, dt);
@@ -7737,6 +8523,172 @@ function updateStageThreeHarbor(dt) {
     excavator.bodyPivot.rotation.y = Math.sin(harborTime * 0.34 + excavator.phase) * 0.28;
     excavator.armPivot.rotation.x = -0.18 + Math.sin(harborTime * 0.72 + excavator.phase) * 0.18;
   }
+}
+
+function updateHarborCraneWarningSignal(event, intensity) {
+  const amount = THREE.MathUtils.clamp(intensity, 0, 1);
+  const active = amount > 0.015;
+  const lightOpacity = active ? THREE.MathUtils.lerp(0.28, 1.0, amount) : 0;
+  const glowOpacity = active ? THREE.MathUtils.lerp(0.04, 0.42, amount) : 0;
+  const lightScale = 1 + amount * 0.24;
+  const glowScale = 0.72 + amount * 1.15;
+
+  for (const beacon of event.warningBeacons ?? []) {
+    const beaconAmount = beacon.primary ? amount : 0;
+    const beaconActive = beaconAmount > 0.015;
+    beacon.light.visible = beaconActive;
+    beacon.glow.visible = beaconActive;
+    beacon.light.material.opacity = beacon.primary ? lightOpacity : 0;
+    beacon.glow.material.opacity = beacon.primary ? glowOpacity : 0;
+    beacon.light.scale.setScalar(beacon.primary ? lightScale : 1);
+    beacon.glow.scale.setScalar(beacon.primary ? glowScale : 1);
+  }
+}
+
+function updateHarborCraneWarningBloomStrength(target, dt) {
+  const fadeRate = target > harborCraneWarningBloomStrength ? 18 : 10;
+  harborCraneWarningBloomStrength = THREE.MathUtils.lerp(
+    harborCraneWarningBloomStrength,
+    target,
+    1 - Math.exp(-fadeRate * dt),
+  );
+
+  if (target <= 0 && harborCraneWarningBloomStrength < 0.02) {
+    harborCraneWarningBloomStrength = 0;
+  }
+}
+
+function updateHarborCraneDropEvents(dt) {
+  let warningBloomTarget = 0;
+
+  for (const event of harborCraneDropEvents) {
+    event.trolley.position.x = event.dropX;
+
+    if (event.state === "idle") {
+      updateHarborDropCable(event, event.startCenterY);
+      if (player.position.z <= event.triggerZ && player.position.z > event.z - 55) {
+        event.state = "warning";
+        event.timer = 0;
+        event.warningBlinkPhase = 0;
+      }
+      continue;
+    }
+
+    event.timer += dt;
+
+    if (event.state === "warning") {
+      const distanceToDrop = player.position.z - event.z;
+      const warningSpan = Math.max(1, event.triggerLead - event.fallStartLead);
+      const urgentSpan = Math.max(1, event.urgentLead - event.fallStartLead);
+      const warningProgress = THREE.MathUtils.clamp((event.triggerLead - distanceToDrop) / warningSpan, 0, 1);
+      const urgentProgress = THREE.MathUtils.clamp((event.urgentLead - distanceToDrop) / urgentSpan, 0, 1);
+      const blinkHz = distanceToDrop > event.urgentLead
+        ? THREE.MathUtils.lerp(1.15, 2.4, warningProgress)
+        : THREE.MathUtils.lerp(3.2, 10.5, urgentProgress * urgentProgress);
+      event.warningBlinkPhase += blinkHz * Math.PI * 2 * dt;
+      const beaconFlash = Math.pow((Math.sin(event.warningBlinkPhase) + 1) * 0.5, 1.7);
+      const phaseIntensity = distanceToDrop > event.urgentLead
+        ? THREE.MathUtils.lerp(0.16, 0.46, warningProgress)
+        : THREE.MathUtils.lerp(0.55, 1.18, urgentProgress);
+      const beaconIntensity = THREE.MathUtils.clamp(
+        THREE.MathUtils.lerp(0.07, phaseIntensity, beaconFlash),
+        0,
+        1,
+      );
+      updateHarborCraneWarningSignal(event, beaconIntensity);
+      warningBloomTarget = Math.max(warningBloomTarget, THREE.MathUtils.lerp(0.35, 2.2, warningProgress) * beaconIntensity);
+      updateHarborDropCargoTransform(event, event.startCenterY, 0);
+      const shouldForceFall = distanceToDrop <= event.fallStartLead;
+      if (shouldForceFall) {
+        event.state = "falling";
+        event.timer = 0;
+        updateHarborCraneWarningSignal(event, event.landedBeaconIntensity);
+        warningBloomTarget = Math.max(warningBloomTarget, event.landedBeaconIntensity);
+      }
+      continue;
+    }
+
+    if (event.state === "falling") {
+      updateHarborCraneWarningSignal(event, event.landedBeaconIntensity);
+      warningBloomTarget = Math.max(warningBloomTarget, event.landedBeaconIntensity);
+      const t = THREE.MathUtils.clamp(event.timer / event.fallDuration, 0, 1);
+      const eased = t * t;
+      const y = THREE.MathUtils.lerp(event.startCenterY, event.landedCenterY, eased);
+      updateHarborDropCargoTransform(event, y, t);
+      if (t >= 1) {
+        event.state = "landed";
+        event.timer = 0;
+        updateHarborCraneWarningSignal(event, event.landedBeaconIntensity);
+        warningBloomTarget = Math.max(warningBloomTarget, event.landedBeaconIntensity);
+        registerHarborDropObstacle(event);
+      }
+      continue;
+    }
+
+    if (event.state === "landed") {
+      updateHarborCraneWarningSignal(event, event.landedBeaconIntensity);
+      warningBloomTarget = Math.max(warningBloomTarget, event.landedBeaconIntensity);
+      if (Number.isFinite(event.landedDuration) && event.timer >= event.landedDuration) {
+        clearHarborDropObstacle(event);
+      }
+    }
+  }
+
+  updateHarborCraneWarningBloomStrength(warningBloomTarget, dt);
+}
+
+function updateHarborDropCargoTransform(event, centerY, fallProgress) {
+  event.localPosition.set(event.dropX, centerY, event.z);
+  setStageObjectTransform(event.cargo, event.localPosition, 0, 0, true);
+  event.cargo.rotateY(event.cargoYaw ?? 0);
+  const fallWobble = Math.sin(fallProgress * Math.PI);
+  event.cargo.rotateX(fallWobble * -0.12);
+  event.cargo.rotateZ(fallWobble * 0.08);
+  updateHarborDropCable(event, centerY);
+}
+
+function updateHarborDropCable(event, centerY) {
+  const relativeCargoY = centerY - event.groundY;
+  const cableLength = Math.max(1.8, event.trolley.position.y - relativeCargoY - event.halfHeight);
+  event.cable.scale.set(1, cableLength, 1);
+  event.cable.position.y = -cableLength * 0.5;
+  event.hook.position.y = -cableLength - 0.42;
+}
+
+function registerHarborDropObstacle(event) {
+  if (event.obstacle) return;
+
+  const containerSize = event.containerSize ?? event.cargo.userData.containerSize ?? harborContainerSize;
+  const cargoScale = event.collisionScale ?? event.cargo.scale;
+  const isCrossLaneCargo = Math.abs(Math.sin(event.cargoYaw ?? 0)) > 0.5;
+  const sizeX = isCrossLaneCargo
+    ? containerSize.length * cargoScale.z
+    : containerSize.width * cargoScale.x;
+  const sizeZ = isCrossLaneCargo
+    ? containerSize.width * cargoScale.x
+    : containerSize.length * cargoScale.z;
+  event.obstacle = {
+    mesh: event.cargo,
+    position: event.localPosition.clone(),
+    basePosition: event.cargo.position.clone(),
+    baseQuaternion: event.cargo.quaternion.clone(),
+    baseScale: event.cargo.scale.clone(),
+    size: new THREE.Vector3(sizeX, containerSize.height * cargoScale.y, sizeZ),
+    noIdleMotion: true,
+  };
+  obstacles.push(event.obstacle);
+}
+
+function clearHarborDropObstacle(event) {
+  if (event.obstacle) {
+    const index = obstacles.indexOf(event.obstacle);
+    if (index >= 0) obstacles.splice(index, 1);
+    event.obstacle = null;
+  }
+
+  event.state = "cleared";
+  updateHarborCraneWarningSignal(event, 0);
+  event.cargo.visible = false;
 }
 
 function updateHarborVehicleTransform(vehicle) {
@@ -9851,6 +10803,14 @@ function updateObstacles(dt) {
   for (const obstacle of obstacles) {
     obstacle.mesh.position.copy(obstacle.basePosition);
     obstacle.mesh.quaternion.copy(obstacle.baseQuaternion);
+    if (obstacle.noIdleMotion) {
+      if (obstacle.baseScale) {
+        obstacle.mesh.scale.copy(obstacle.baseScale);
+      } else {
+        obstacle.mesh.scale.set(1, 1, 1);
+      }
+      continue;
+    }
     obstacle.mesh.rotateY(Math.sin(performance.now() * 0.002 + obstacle.position.z) * 0.02);
     const pulse = 1 + Math.sin(performance.now() * 0.006 + obstacle.position.z) * 0.015;
     obstacle.mesh.scale.set(pulse, 1, pulse);
@@ -10189,6 +11149,10 @@ function updateJetEnergyBloom(dt) {
   }
 }
 
+function getSelectiveBloomStrength() {
+  return Math.max(jetEnergyBloomStrength, harborCraneWarningBloomStrength);
+}
+
 function updateJetBoostLight() {
   if (!jetBoostLight) return;
 
@@ -10232,7 +11196,7 @@ function renderFrame() {
   velocityMotionBlurMaterial.uniforms.tEnergyBloomSoft.value = jetEnergyBloomSoftTarget.texture;
   velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = getDebugTuneValue("motionBlur.maxPixels");
   velocityMotionBlurMaterial.uniforms.uAfterimageIntensity.value = getDebugTuneValue("quickstep.afterimageIntensity");
-  velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = jetEnergyBloomStrength;
+  velocityMotionBlurMaterial.uniforms.uEnergyBloomIntensity.value = getSelectiveBloomStrength();
   velocityMotionVectorMaterial.uniforms.tDepth.value = sceneDepthTexture;
   velocityMotionVectorMaterial.uniforms.uCurrentInverseViewProjection.value.copy(currentInverseViewProjectionMatrix);
   velocityMotionVectorMaterial.uniforms.uPreviousViewProjection.value.copy(previousViewProjectionMatrix);
@@ -10329,7 +11293,7 @@ function resetVelocityMotionHistory() {
 }
 
 function renderJetEnergyBloomTarget() {
-  if (jetEnergyBloomStrength <= 0) return;
+  if (getSelectiveBloomStrength() <= 0) return;
 
   const previousCameraLayerMask = camera.layers.mask;
   const previousBackground = scene.background;
@@ -10352,7 +11316,7 @@ function renderJetEnergyBloomTarget() {
 }
 
 function renderJetEnergyBloomBlurTargets() {
-  if (jetEnergyBloomStrength <= 0) return;
+  if (getSelectiveBloomStrength() <= 0) return;
 
   renderer.setClearColor(0x000000, 0);
 
@@ -11873,6 +12837,7 @@ function warpToGoalProgress(progress) {
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
+  harborCraneWarningBloomStrength = 0;
   playerBoostEffectActive = false;
   boostCameraKick = 0;
   boostCameraSustain = 0;
@@ -11926,6 +12891,7 @@ function resetGame(options = {}) {
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
+  harborCraneWarningBloomStrength = 0;
   playerBoostEffectActive = false;
   boostCameraKick = 0;
   boostCameraSustain = 0;
