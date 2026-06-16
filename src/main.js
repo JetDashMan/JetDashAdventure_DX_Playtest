@@ -80,6 +80,40 @@ const debugCharacterInspectAngleSelect = document.querySelector("#debug-characte
 const debugCharacterInspectMotionSelect = document.querySelector("#debug-character-inspect-motion");
 const debugCharacterInspectMotionSpeedSelect = document.querySelector("#debug-character-inspect-motion-speed");
 const debugObjectGalleryItemSelect = document.querySelector("#debug-object-gallery-item");
+const testRoomInspectPanel = document.querySelector("#test-room-inspect-panel");
+const testRoomCharacterInspectToggle = document.querySelector("#test-room-character-inspect");
+const testRoomCharacterInspectTargetSelect = document.querySelector("#test-room-character-inspect-target");
+const testRoomCharacterInspectAngleSelect = document.querySelector("#test-room-character-inspect-angle");
+const testRoomCharacterInspectMotionSelect = document.querySelector("#test-room-character-inspect-motion");
+const testRoomCharacterInspectMotionSpeedSelect = document.querySelector("#test-room-character-inspect-motion-speed");
+const testRoomCharacterInspectPreviewPlayButton = document.querySelector("#test-room-character-inspect-preview-play");
+const testRoomCharacterInspectPreviewEditButton = document.querySelector("#test-room-character-inspect-preview-edit");
+const testRoomCharacterInspectMotionPhaseInput = document.querySelector("#test-room-character-inspect-motion-phase");
+const testRoomCharacterInspectMotionPhaseValue = document.querySelector("#test-room-character-inspect-motion-phase-value");
+const testRoomCharacterInspectMotionMarkersEl = document.querySelector("#test-room-character-inspect-motion-markers");
+const testRoomCharacterInspectMotionPointEl = document.querySelector("#test-room-character-inspect-motion-point");
+const testRoomCharacterInspectKeyPoseStatusEl = document.querySelector("#test-room-character-inspect-key-pose-status");
+const testRoomCharacterInspectKeyPoseCaptureButton = document.querySelector("#test-room-character-inspect-key-pose-capture");
+const testRoomCharacterInspectKeyPoseClearButton = document.querySelector("#test-room-character-inspect-key-pose-clear");
+const testRoomCharacterInspectKeyPoseCopyButton = document.querySelector("#test-room-character-inspect-key-pose-copy");
+const testRoomCharacterInspectKeyPoseCopyMotionButton = document.querySelector("#test-room-character-inspect-key-pose-copy-motion");
+const testRoomCharacterInspectJumpPoseSelect = document.querySelector("#test-room-character-inspect-jump-pose");
+const testRoomCharacterInspectResetViewButton = document.querySelector("#test-room-character-inspect-reset-view");
+const testRoomPoseTunerEl = document.querySelector("#test-room-pose-tuner");
+const testRoomPoseTunerTitleText = document.querySelector("#test-room-pose-tuner-title-text");
+const testRoomPoseTunerStatusEl = document.querySelector("#test-room-pose-tuner-status");
+const testRoomPoseTunerControlsEl = document.querySelector("#test-room-pose-tuner-controls");
+const testRoomPoseTunerOutputEl = document.querySelector("#test-room-pose-tuner-output");
+const testRoomPoseTunerRangeModeSelect = document.querySelector("#test-room-pose-tuner-range-mode");
+const testRoomPoseTunerResetButton = document.querySelector("#test-room-pose-tuner-reset");
+const testRoomPoseTunerCopyButton = document.querySelector("#test-room-pose-tuner-copy");
+const testRoomMotionTunerEl = document.querySelector("#test-room-motion-tuner");
+const testRoomMotionTunerStatusEl = document.querySelector("#test-room-motion-tuner-status");
+const testRoomMotionTunerControlsEl = document.querySelector("#test-room-motion-tuner-controls");
+const testRoomMotionTunerOutputEl = document.querySelector("#test-room-motion-tuner-output");
+const testRoomMotionTunerRangeModeSelect = document.querySelector("#test-room-motion-tuner-range-mode");
+const testRoomMotionTunerResetButton = document.querySelector("#test-room-motion-tuner-reset");
+const testRoomMotionTunerCopyButton = document.querySelector("#test-room-motion-tuner-copy");
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x75cbef);
@@ -309,6 +343,7 @@ const characterInspectMotionModes = [
   "walk",
   "run",
   "boost",
+  "slide",
   "quickstepLeft",
   "quickstepRight",
   "jump",
@@ -321,6 +356,157 @@ const characterInspectMotionSpeedScale = {
   normal: 1,
   fast: 1.55,
 };
+const characterInspectMotionPhaseMarkers = Object.freeze({
+  walk: [
+    { phase: 0, label: "Contact A" },
+    { phase: 0.25, label: "Pass A" },
+    { phase: 0.5, label: "Contact B" },
+    { phase: 0.75, label: "Pass B" },
+  ],
+  run: [
+    { phase: 0, label: "Contact A" },
+    { phase: 0.25, label: "Drive A" },
+    { phase: 0.5, label: "Contact B" },
+    { phase: 0.75, label: "Drive B" },
+  ],
+  boost: [
+    { phase: 0, label: "Aero Base" },
+    { phase: 0.25, label: "Reach" },
+    { phase: 0.5, label: "Kick" },
+    { phase: 0.75, label: "Recover" },
+  ],
+  slide: [
+    { phase: 0, label: "Enter" },
+    { phase: 0.35, label: "Low Hold" },
+    { phase: 0.7, label: "Recover" },
+  ],
+  quickstepLeft: [
+    { phase: 0, label: "Start" },
+    { phase: 0.5, label: "Shift" },
+    { phase: 1, label: "Land" },
+  ],
+  quickstepRight: [
+    { phase: 0, label: "Start" },
+    { phase: 0.5, label: "Shift" },
+    { phase: 1, label: "Land" },
+  ],
+  jump: [
+    { phase: 0, label: "Lift" },
+    { phase: 0.45, label: "Tuck" },
+    { phase: 0.8, label: "Extend" },
+  ],
+  landing: [
+    { phase: 0, label: "Drop" },
+    { phase: 0.5, label: "Impact" },
+    { phase: 0.85, label: "Recover" },
+  ],
+  hitstun: [
+    { phase: 0, label: "Hit" },
+    { phase: 0.5, label: "Twist" },
+    { phase: 1, label: "End" },
+  ],
+});
+const characterInspectJumpPosePresets = ["exp096c", "exp096d", "exp096e", "exp096f"];
+const characterInspectJumpPoseConfigs = Object.freeze({
+  exp096c: {
+    bodyX: -0.52,
+    arms: {
+      left: { x: -1.22, z: -0.44, forearmX: 0.72, handX: 0.1 },
+      right: { x: -1.22, z: 0.44, forearmX: 0.72, handX: 0.1 },
+    },
+    legs: {
+      left: { x: 2.36, z: 0, lowerX: -2.25, shoeX: -0.62 },
+      right: { x: 1.45, z: 0, lowerX: -2.16, shoeX: -0.48 },
+    },
+  },
+  exp096d: {
+    bodyX: -0.38,
+    arms: {
+      left: { x: -1.32, z: -0.42, forearmX: 0.52, handX: 0.08 },
+      right: { x: 0.88, z: 0.5, forearmX: 0.76, handX: 0.12 },
+    },
+    legs: {
+      left: { x: -0.88, z: -0.12, lowerX: 0.06, shoeX: -0.18 },
+      right: { x: 1.42, z: 0.12, lowerX: -1.48, shoeX: 0.44 },
+    },
+  },
+  exp096e: {
+    bodyX: -0.64,
+    arms: {
+      left: { x: -1.08, z: -0.96, forearmX: 0.14, handX: -0.04 },
+      right: { x: -1.08, z: 0.96, forearmX: 0.14, handX: -0.04 },
+    },
+    legs: {
+      left: { x: -1.02, z: -0.1, lowerX: 0.18, shoeX: -0.24 },
+      right: { x: 1.24, z: 0.1, lowerX: -1.36, shoeX: 0.34 },
+    },
+  },
+  exp096f: {
+    bodyX: -0.48,
+    arms: {
+      left: { x: -0.42, z: -0.74, forearmX: 1.08, handX: 0.24 },
+      right: { x: 0.86, z: 0.48, forearmX: 0.66, handX: 0.12 },
+    },
+    legs: {
+      left: { x: -0.56, z: -0.5, lowerX: -0.74, shoeX: -0.16 },
+      right: { x: 1.34, z: 0.18, lowerX: -1.5, shoeX: 0.42 },
+    },
+  },
+});
+const characterInspectPoseTunerFields = Object.freeze([
+  { group: "Body", label: "Body X", path: ["bodyX"], min: -1.8, max: 0.8, wideMin: -2.4, wideMax: 1.2, step: 0.01 },
+  { group: "Left Arm", label: "Upper X", path: ["arms", "left", "x"], min: -2.2, max: 1.4, wideMin: -3.0, wideMax: 2.2, step: 0.01 },
+  { label: "Upper Z", path: ["arms", "left", "z"], min: -1.6, max: 1.6, wideMin: -2.4, wideMax: 2.4, step: 0.01 },
+  { label: "Forearm X", path: ["arms", "left", "forearmX"], min: -0.8, max: 1.8, wideMin: -1.4, wideMax: 2.4, step: 0.01 },
+  { label: "Hand X", path: ["arms", "left", "handX"], min: -0.8, max: 0.8, wideMin: -1.4, wideMax: 1.4, step: 0.01 },
+  { group: "Right Arm", label: "Upper X", path: ["arms", "right", "x"], min: -2.2, max: 1.4, wideMin: -3.0, wideMax: 2.2, step: 0.01 },
+  { label: "Upper Z", path: ["arms", "right", "z"], min: -1.6, max: 1.6, wideMin: -2.4, wideMax: 2.4, step: 0.01 },
+  { label: "Forearm X", path: ["arms", "right", "forearmX"], min: -0.8, max: 1.8, wideMin: -1.4, wideMax: 2.4, step: 0.01 },
+  { label: "Hand X", path: ["arms", "right", "handX"], min: -0.8, max: 0.8, wideMin: -1.4, wideMax: 1.4, step: 0.01 },
+  { group: "Left Leg", label: "Thigh X", path: ["legs", "left", "x"], min: -1.8, max: 1.8, wideMin: -2.8, wideMax: 3.0, step: 0.01 },
+  { label: "Thigh Z", path: ["legs", "left", "z"], min: -1.2, max: 1.2, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Lower X", path: ["legs", "left", "lowerX"], min: -2.2, max: 0.9, wideMin: -3.2, wideMax: 1.8, step: 0.01 },
+  { label: "Shoe X", path: ["legs", "left", "shoeX"], min: -0.9, max: 0.9, wideMin: -1.4, wideMax: 1.4, step: 0.01 },
+  { group: "Right Leg", label: "Thigh X", path: ["legs", "right", "x"], min: -1.8, max: 1.8, wideMin: -2.8, wideMax: 3.0, step: 0.01 },
+  { label: "Thigh Z", path: ["legs", "right", "z"], min: -1.2, max: 1.2, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Lower X", path: ["legs", "right", "lowerX"], min: -2.2, max: 0.9, wideMin: -3.2, wideMax: 1.8, step: 0.01 },
+  { label: "Shoe X", path: ["legs", "right", "shoeX"], min: -0.9, max: 0.9, wideMin: -1.4, wideMax: 1.4, step: 0.01 },
+]);
+const characterMotionTunerModes = ["walk", "run", "boost"];
+const characterMotionTuneDefaults = Object.freeze({
+  runLean: 0.58,
+  boostLean: 0.82,
+  bodyBob: 0.005,
+  shoePulse: 0.08,
+  runArmSwing: 1.12,
+  runArmSide: 0.28,
+  boostArmBack: 1.1,
+  boostArmSide: 0.62,
+  runLegSwing: 1.14,
+  runKneeLift: 1.24,
+  runKneePush: 0.48,
+  boostForwardReach: 1.32,
+  boostGroundKick: 1.04,
+  boostKneeLift: 0.58,
+  boostKneePush: 0.72,
+});
+const characterMotionTunerFields = Object.freeze([
+  { group: "Body", label: "Run Lean", key: "runLean", min: 0.2, max: 1.2, wideMin: 0, wideMax: 1.6, step: 0.01 },
+  { label: "Boost Lean", key: "boostLean", min: 0.3, max: 1.3, wideMin: 0, wideMax: 1.8, step: 0.01 },
+  { label: "Body Bob", key: "bodyBob", min: 0, max: 0.03, wideMin: 0, wideMax: 0.08, step: 0.001 },
+  { label: "Shoe Pulse", key: "shoePulse", min: 0, max: 0.2, wideMin: 0, wideMax: 0.5, step: 0.005 },
+  { group: "Arms", label: "Run Swing", key: "runArmSwing", min: 0.4, max: 1.8, wideMin: 0, wideMax: 2.8, step: 0.01 },
+  { label: "Run Side", key: "runArmSide", min: 0, max: 0.8, wideMin: -0.2, wideMax: 1.3, step: 0.01 },
+  { label: "Boost Back", key: "boostArmBack", min: 0.2, max: 1.8, wideMin: 0, wideMax: 2.8, step: 0.01 },
+  { label: "Boost Side", key: "boostArmSide", min: 0, max: 1.3, wideMin: -0.2, wideMax: 2.0, step: 0.01 },
+  { group: "Legs", label: "Run Swing", key: "runLegSwing", min: 0.4, max: 1.9, wideMin: 0, wideMax: 3.0, step: 0.01 },
+  { label: "Run Knee Lift", key: "runKneeLift", min: 0.4, max: 2.1, wideMin: 0, wideMax: 3.2, step: 0.01 },
+  { label: "Run Knee Push", key: "runKneePush", min: 0, max: 1.2, wideMin: 0, wideMax: 2.4, step: 0.01 },
+  { label: "Boost Reach", key: "boostForwardReach", min: 0.4, max: 2.2, wideMin: 0, wideMax: 3.4, step: 0.01 },
+  { label: "Boost Kick", key: "boostGroundKick", min: 0.3, max: 2.0, wideMin: 0, wideMax: 3.2, step: 0.01 },
+  { label: "Boost Knee Lift", key: "boostKneeLift", min: 0, max: 1.4, wideMin: 0, wideMax: 2.6, step: 0.01 },
+  { label: "Boost Knee Push", key: "boostKneePush", min: 0, max: 1.6, wideMin: 0, wideMax: 2.8, step: 0.01 },
+]);
 const objectGalleryItems = [
   "trailer",
   "forklift",
@@ -345,6 +531,9 @@ const debugDefaults = {
   characterInspectAngle: "back",
   characterInspectMotion: "live",
   characterInspectMotionSpeed: "normal",
+  characterInspectMotionFreeze: false,
+  characterInspectMotionPhase: 0,
+  characterInspectJumpPose: "exp096c",
   objectGallery: false,
   objectGalleryItem: "trailer",
   objectGalleryRotate: true,
@@ -352,6 +541,16 @@ const debugDefaults = {
 let graphicsSettings = loadGraphicsSettings();
 let debugSettings = loadDebugSettings();
 let lastFrameTime = 0;
+const characterInspectJumpPoseOverrides = new Map();
+const characterInspectKeyPoseOverrides = new Map();
+let poseTunerControlsInitialized = false;
+let poseTunerSyncing = false;
+let poseTunerRangeMode = "safe";
+let motionTunerControlsInitialized = false;
+let motionTunerSyncing = false;
+let motionTunerRangeMode = "safe";
+let characterInspectMotionMarkerKey = "";
+const characterMotionTunerValues = { ...characterMotionTuneDefaults };
 const quickStepAfterimageCount = 9;
 const quickStepAfterimageRevealLead = 0.08;
 const quickStepAfterimageBlurRadius = 14;
@@ -825,6 +1024,7 @@ const debugStartZParam = urlParams.get("debugStartZ");
 const debugStartZ = debugStartZParam === null ? Number.NaN : Number(debugStartZParam);
 const currentStageIndex = getStageIndex(requestedStageRoute);
 const currentStage = createStageDefinition(currentStageIndex);
+document.body.classList.toggle("test-room-active", Boolean(currentStage.testRoom));
 const goalZ = currentStage.goalZ;
 const stageEndZ = getStageEndZ(currentStage);
 const stageStartZ = currentStage.startZ ?? playerStart.z;
@@ -838,6 +1038,9 @@ const quickStepDuration = 0.2;
 const quickStepDistance = 4.2;
 const quickStepCooldownDuration = 0.015;
 const quickStepLaneSnapEpsilon = 0.05;
+const slideDuration = 0.72;
+const slideCooldownDuration = 0.16;
+const slideMinStartSpeed = 12;
 const speedDisplayScale = 3.2;
 const debugSuperBoostSpeed = 2000 / speedDisplayScale;
 const seaLevelY = -8.2;
@@ -854,6 +1057,10 @@ const dnaScoreValue = 100;
 const obstacleScorePenalty = 1000;
 const dashPadSpeedGain = 100 / speedDisplayScale;
 const dashPadFadeDuration = 3;
+const dashPadThreeLineDnaSuppressRadius = 65;
+const dashPadSingleLineDnaAlignRadius = 65;
+const dashPadDnaLineBreakRadius = 34;
+const dashPadDnaLaneAlignEpsilon = 0.05;
 const hitStunDuration = 1;
 const groundSnapDistance = 1.35;
 const jetModelBaseY = 1.14;
@@ -876,6 +1083,27 @@ const jetFootContactBox = new THREE.Box3();
 const jetFootContactInverse = new THREE.Matrix4();
 const jetFootContactMatrix = new THREE.Matrix4();
 const jetFootContactCorner = new THREE.Vector3();
+const characterInspectBox = new THREE.Box3();
+const characterInspectMeshBox = new THREE.Box3();
+const characterInspectCenter = new THREE.Vector3();
+const characterInspectSize = new THREE.Vector3();
+const characterInspectWorldCorner = new THREE.Vector3();
+const characterInspectCameraRight = new THREE.Vector3();
+const characterInspectCameraUp = new THREE.Vector3();
+const characterInspectCameraDirection = new THREE.Vector3();
+const characterInspectProjectionCamera = new THREE.PerspectiveCamera();
+const characterInspectProjectionOffset = new THREE.Vector3();
+const characterInspectProjectionCorner = new THREE.Vector3();
+const characterInspectProjectionPitchAxis = new THREE.Vector3();
+const characterInspectProjectionYaw = new THREE.Quaternion();
+const characterInspectProjectionPitch = new THREE.Quaternion();
+const characterInspectOrbitHorizontalOffset = new THREE.Vector3();
+const characterInspectOrbitPitchAxis = new THREE.Vector3();
+const characterInspectStableCenter = new THREE.Vector3();
+const characterInspectStableDirection = new THREE.Vector3();
+let characterInspectStableDistance = 0;
+let characterInspectStableFrameValid = false;
+let characterInspectStableFrameKey = "";
 let waterMesh;
 let waterMaterial;
 let waterTime = 0;
@@ -886,6 +1114,10 @@ let finished = false;
 let jumpQueued = false;
 let jumpHoldRemaining = 0;
 let jumpImpact = 0;
+let slideQueued = false;
+let slideTimer = 0;
+let slideCooldown = 0;
+let slidePoseAmount = 0;
 let hitCooldown = 0;
 let hitStun = 0;
 let runPhase = 0;
@@ -909,6 +1141,13 @@ let boostCameraWasActive = false;
 let cameraLateralFocusX = 0;
 let cameraYawOffset = 0;
 let cameraPitchOffset = 0;
+let characterInspectZoomScale = 1;
+const characterInspectOrbitState = {
+  active: false,
+  pointerId: null,
+  lastX: 0,
+  lastY: 0,
+};
 let objectGalleryGroup = null;
 let objectGalleryCurrentItem = "";
 let objectGallerySpin = 0;
@@ -951,6 +1190,7 @@ const touchInput = {
   runStarted: false,
   brake: false,
   boost: false,
+  slide: false,
   jump: false,
   lateral: 0,
   lateralPointerId: null,
@@ -2059,6 +2299,65 @@ const harborCraneDropConfigs = [
     seed: 240,
   },
 ];
+const harborRoadContainerObstacleConfigs = [
+  { z: -900, span: 2, lanePair5: 1, guideLane5: 3, seed: 505 },
+  { z: -1260, span: 2, lanePair5: 3, guideLane5: 2, seed: 508 },
+  { z: -1380, span: 2, lanePair5: 2, guideLane5: 1, seed: 511 },
+  { z: -1660, span: 2, lanePair5: 0, guideLane5: 2, seed: 514 },
+  { z: -1780, span: 2, lanePair5: 1, guideLane5: 3, seed: 517 },
+  { z: -2070, span: 2, lanePair5: 3, guideLane5: 2, seed: 520 },
+  { z: -2070, span: 2, lanePair5: 0, stackLayers: 2, guideDna: false, seed: 521 },
+  { z: -2220, span: 3, laneTriplet5: 2, guideLane5: 1, seed: 523 },
+  { z: -2220, span: 1, lane5: 0, stackLayers: 2, guideDna: false, seed: 524 },
+  { z: -2500, span: 2, lanePair5: 0, stackLayers: 2, guideLane5: 2, seed: 526 },
+  { z: -2500, span: 2, lanePair5: 3, stackLayers: 2, guideDna: false, seed: 527 },
+  { z: -2610, span: 2, lanePair5: 1, guideLane5: 3, seed: 529 },
+  { z: -2610, span: 1, lane5: 4, stackLayers: 2, guideDna: false, seed: 530 },
+  { z: -2880, span: 2, lanePair5: 2, stackLayers: 2, guideLane5: 4, seed: 532 },
+  { z: -2880, span: 2, lanePair5: 0, stackLayers: 2, guideDna: false, seed: 533 },
+  { z: -3040, span: 3, laneTriplet5: 0, guideLane5: 3, seed: 535 },
+  { z: -3040, span: 1, lane5: 4, stackLayers: 2, guideDna: false, seed: 536 },
+  { z: -3340, span: 2, lanePair5: 0, guideLane5: 2, seed: 538 },
+  { z: -3340, span: 2, lanePair5: 3, guideDna: false, seed: 541 },
+  { z: -3560, span: 3, laneTriplet5: 0, guideLane5: 3, seed: 544 },
+  { z: -3560, span: 1, lane5: 4, stackLayers: 2, guideDna: false, seed: 547 },
+  { z: -3780, span: 3, laneTriplet5: 0, guideLane5: 4, seed: 550 },
+  { z: -3780, span: 1, lane5: 3, stackLayers: 2, guideDna: false, seed: 553 },
+  { z: -4000, span: 3, laneTriplet5: 0, guideLane5: 3, seed: 556 },
+  { z: -4000, span: 1, lane5: 4, stackLayers: 2, guideDna: false, seed: 559 },
+  { z: -4220, span: 2, lanePair5: 0, guideLane5: 2, seed: 562 },
+  { z: -4220, span: 2, lanePair5: 3, guideDna: false, seed: 565 },
+  { z: -4440, span: 1, lane5: 0, stackLayers: 2, guideLane5: 1, seed: 568 },
+  { z: -4440, span: 3, laneTriplet5: 2, guideDna: false, seed: 571 },
+];
+const harborSlideTrailerObstacleConfigs = [
+];
+const harborSpecialTrailerBackgroundConfigs = [
+  {
+    z: -1825,
+    x: -32.5,
+    seed: 612,
+    yaw: Math.PI * 0.5,
+  },
+  {
+    z: -4825,
+    x: 31.5,
+    seed: 610,
+    yaw: Math.PI * 0.5,
+  },
+  {
+    z: -7350,
+    x: -33.5,
+    seed: 614,
+    yaw: Math.PI * 0.5,
+  },
+];
+const harborRelaxedObstacleSingleLineDnaStart = 110;
+const harborRelaxedObstacleSingleLineDnaCount = 10;
+const harborRelaxedObstacleSingleLineDnaSpacing = 9.0;
+const harborRelaxedObstaclePostClearGap = 50;
+const harborRelaxedObstacleRowSuppressPadding = 160;
+const harborMajorEventDnaSuppressRadius = 180;
 const harborVisibilityState = {
   frame: 0,
   lastPlayerZ: Number.NaN,
@@ -2651,6 +2950,7 @@ function createStageThreeDefinition(label = "STAGE 3") {
       rollLiftHeight: 0,
       rollEnabled: false,
       harborTheme: true,
+      minimumDnaGroupCount: 8,
       curvePoints: [
         [0, 0, playerStart.z],
         [0, 0, -420],
@@ -2689,12 +2989,11 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { lane: 2, z: -1920 },
         { lane: 1, z: -2360 },
         { lane: 2, z: -2740 },
-        { lane: 0, z: -3180 },
-        { lane: 1, z: -3620 },
+        { lane: 2, lane5: 4, z: -3180 },
         { lane: 2, z: -4080 },
         { lane: 0, z: -4520 },
         { lane: 1, z: -4980 },
-        { lane: 2, z: -5420 },
+        { lane: 2, z: -5220 },
         { lane: 0, z: -5860 },
         { lane: 1, z: -6320 },
         { lane: 2, z: -6760 },
@@ -2717,47 +3016,25 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { type: "trailer", x: -19.4, z: -8260, yaw: Math.PI * 0.5, seed: 43 },
       ],
       dnaPlan: [
-        { type: "trail", lane: 1, zStart: -48, count: 6, spacing: 9.0 },
-        { type: "rows", zStart: -170, rowCount: 2, spacing: 16.0 },
-        { type: "switch", pattern: [0, 1, 0, 1], zStart: -262, count: 6, spacing: 10.0 },
-        { type: "trail", lane: 0, zStart: -384, count: 5, spacing: 8.0 },
-        { type: "rows", zStart: -500, rowCount: 2, spacing: 16.0 },
-        { type: "trail", lane: 2, zStart: -610, count: 6, spacing: 9.0 },
-        { type: "trail", lane: 2, zStart: -790, count: 5, spacing: 9.0 },
-        { type: "switch", pattern: [0, 2], zStart: -904, count: 6, spacing: 10.0 },
-        { type: "trail", lane: 1, zStart: -1038, count: 5, spacing: 8.0 },
-        { type: "rows", zStart: -1168, rowCount: 2, spacing: 16.0 },
-        { type: "switch", pattern: [1, 2], zStart: -1252, count: 7, spacing: 9.0 },
-        { type: "trail", lane: 0, zStart: -1438, count: 5, spacing: 8.0 },
-        { type: "trail", lane: 0, zStart: -1660, count: 6, spacing: 9.0 },
-        { type: "trail", lane: 2, zStart: -1848, count: 5, spacing: 9.0 },
-        { type: "rows", zStart: -1990, rowCount: 2, spacing: 16.0 },
-        { type: "trail", lane: 1, zStart: -2098, count: 6, spacing: 9.0 },
-        { type: "trail", lane: 1, zStart: -2310, count: 5, spacing: 8.0 },
-        { type: "switch", pattern: [0, 2], zStart: -2510, count: 6, spacing: 9.0 },
-        { type: "trail", lane: 2, zStart: -2670, count: 5, spacing: 8.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -2840, count: 8, spacing: 8.0 },
-        { type: "rows", zStart: -3160, rowCount: 2, spacing: 16.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -3340, count: 8, spacing: 9.0 },
-        { type: "trail", lane: 0, zStart: -3600, count: 7, spacing: 9.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -3920, count: 9, spacing: 9.0 },
-        { type: "rows", zStart: -4240, rowCount: 2, spacing: 16.0 },
-        { type: "trail", lane: 2, zStart: -4540, count: 7, spacing: 9.0 },
-        { type: "switch", pattern: [1, 0, 1, 2], zStart: -4820, count: 9, spacing: 9.0 },
-        { type: "trail", lane: 1, zStart: -5140, count: 8, spacing: 9.0 },
-        { type: "rows", zStart: -5460, rowCount: 2, spacing: 16.0 },
-        { type: "switch", pattern: [0, 2, 1, 2], zStart: -5760, count: 9, spacing: 9.0 },
-        { type: "trail", lane: 0, zStart: -6060, count: 8, spacing: 9.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -6380, count: 9, spacing: 9.0 },
-        { type: "rows", zStart: -6680, rowCount: 2, spacing: 16.0 },
-        { type: "trail", lane: 2, zStart: -7000, count: 8, spacing: 9.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -7320, count: 9, spacing: 9.0 },
-        { type: "trail", lane: 1, zStart: -7640, count: 8, spacing: 9.0 },
-        { type: "rows", zStart: -7960, rowCount: 2, spacing: 16.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -8240, count: 9, spacing: 9.0 },
-        { type: "trail", lane: 0, zStart: -8560, count: 8, spacing: 9.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -8780, count: 8, spacing: 8.0 },
+        { type: "trail", lane: 1, zStart: -34, count: 8, spacing: 6.5 },
+        { type: "rows", zStart: -230, rowCount: 3, spacing: 18.0 },
+        { type: "trail", lane: 0, zStart: -336, count: 8, spacing: 7.0 },
+        { type: "rows", zStart: -540, rowCount: 3, spacing: 18.0 },
+        { type: "trail", lane: 2, zStart: -650, count: 8, spacing: 7.5 },
+        { type: "trail", lane: 1, zStart: -4590, count: 8, spacing: 10.0 },
+        { type: "trail", lane: 1, zStart: -4820, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -4882, count: 8, spacing: 8.0 },
+        { type: "trail", lane: 2, zStart: -5120, count: 8, spacing: 8.0 },
+        { type: "trail", lane: 0, zStart: -5740, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -6200, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 2, zStart: -6640, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -7120, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -7560, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 2, zStart: -8000, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -8440, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -8740, count: 8, spacing: 8.5 },
       ],
+      tutorialPrompts: [],
     };
 }
 
@@ -3140,6 +3417,44 @@ function addTestRoomEnvironment() {
     laneLine.userData.ignoreMouseObject = true;
     scene.add(laneLine);
   }
+
+  addTestRoomSlideClearanceGate();
+}
+
+function addTestRoomSlideClearanceGate() {
+  const group = new THREE.Group();
+  group.name = "Test Room Slide Clearance Gate";
+  group.userData.debugName = "Test Room Slide Clearance Gate";
+  group.position.set(-7.2, 0, -30);
+
+  const upperBar = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.38, 0.42), materials.truckTrailer);
+  upperBar.position.set(0, 1.74, 0);
+  upperBar.castShadow = false;
+  upperBar.receiveShadow = true;
+  group.add(upperBar);
+
+  for (const x of [-4.95, 4.95]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.28, 1.74, 0.36), materials.containerTrim);
+    post.position.set(x, 0.87, 0);
+    post.castShadow = false;
+    post.receiveShadow = true;
+    group.add(post);
+  }
+
+  const clearance = new THREE.Mesh(new THREE.BoxGeometry(8.8, 1.22, 0.18), materials.testRoomGlass);
+  clearance.position.set(0, 0.66, -0.28);
+  clearance.castShadow = false;
+  clearance.receiveShadow = false;
+  group.add(clearance);
+
+  for (const x of [-3.6, 3.6]) {
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 0.2), materials.harborRailStripe);
+    marker.position.set(x, 1.28, -0.42);
+    marker.castShadow = false;
+    group.add(marker);
+  }
+
+  scene.add(group);
 }
 
 function updateObjectGallery(dt) {
@@ -6536,6 +6851,9 @@ function addStageThreeHarbor() {
   addHarborLargeShipFleet(harborEndZ);
   addHarborCraneField(harborEndZ);
   addHarborCraneDropEvents(harborEndZ);
+  addHarborRoadContainerObstacles(harborEndZ);
+  addHarborRoadSlideObstacles(harborEndZ);
+  addHarborSpecialTrailerBackgroundProps(harborEndZ);
   addHarborRoadProps();
   addHarborBackgroundPropClusters(harborEndZ);
   addHarborLargeSilhouetteLandmarks(harborEndZ);
@@ -6576,6 +6894,294 @@ function addHarborCraneDropEvents(harborEndZ) {
   harborCraneDropConfigs
     .filter(({ z }) => z > harborEndZ + 160)
     .forEach(addHarborCraneDropEvent);
+}
+
+function addHarborRoadContainerObstacles(harborEndZ) {
+  harborRoadContainerObstacleConfigs
+    .map((config) => ({
+      ...config,
+      z: Number.isFinite(config.z) ? config.z : getStageZAtGoalProgress(config.progress),
+    }))
+    .filter(({ z }) => z > harborEndZ + 160)
+    .forEach(addHarborRoadContainerObstacle);
+}
+
+function addHarborRoadSlideObstacles(harborEndZ) {
+  harborSlideTrailerObstacleConfigs
+    .filter(({ z }) => z > harborEndZ + 160)
+    .forEach(addHarborRoadSlideObstacle);
+}
+
+function addHarborSpecialTrailerBackgroundProps(harborEndZ) {
+  harborSpecialTrailerBackgroundConfigs
+    .filter(({ z }) => z > harborEndZ + 160)
+    .forEach((config) => {
+      const x = Number.isFinite(config.x) ? config.x : 32;
+      const z = config.z;
+      const sample = getGroundSample(x, z);
+      if (!sample) return;
+
+      const group = createHarborCrossTrailerSlideObstacle(config.seed ?? 0);
+      group.userData.debugName = "Harbor Background - Special Cargo Trailer";
+      setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+      group.rotateY(config.yaw ?? Math.PI * 0.5);
+      scene.add(group);
+    });
+}
+
+function addHarborRoadSlideObstacle(config) {
+  const x = Number.isFinite(config.x) ? config.x : 0;
+  const z = config.z;
+  const sample = getGroundSample(x, z);
+  if (!sample) return;
+
+  const group = createHarborCrossTrailerSlideObstacle(config.seed ?? 0);
+  group.userData.debugName = "Harbor Slide Obstacle - Crosswise Trailer";
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y, z), 0, 0, true);
+  group.rotateY(config.yaw ?? 0);
+  scene.add(group);
+
+  obstacles.push({
+    mesh: group,
+    position: new THREE.Vector3(x, sample.y + 4.2, z),
+    basePosition: group.position.clone(),
+    baseQuaternion: group.quaternion.clone(),
+    baseScale: group.scale.clone(),
+    size: new THREE.Vector3(27.4, 8.4, 8.2),
+    noIdleMotion: true,
+    slideUnderRequired: true,
+    dnaFrontClearance: 62,
+    dnaRearClearance: 32,
+  });
+}
+
+function createHarborCrossTrailerSlideObstacle(seed) {
+  const group = new THREE.Group();
+
+  const cabSide = seed % 2 === 0 ? -1 : 1;
+  const wheelXs = [-11.8, -8.2, -4.6, 4.6, 8.2, 11.8];
+  const frameXs = [-12.4, -8.2, -4.1, 0, 4.1, 8.2, 12.4];
+  const cargoRingGeometry = new THREE.TorusGeometry(1.92, 0.06, 8, 36);
+
+  addHarborObstacleBox(group, 26.4, 0.38, 5.72, materials.craneDark, 0, 1.72, 0);
+  addHarborObstacleBox(group, 25.6, 0.2, 5.18, materials.harborRail, 0, 1.98, 0, 0, 0, 0, true, true);
+  addHarborObstacleBox(group, 26.9, 0.24, 0.22, materials.containerTrim, 0, 1.32, -2.98);
+  addHarborObstacleBox(group, 26.9, 0.24, 0.22, materials.containerTrim, 0, 1.32, 2.98);
+  addHarborObstacleBox(group, 25.4, 0.12, 0.14, materials.harborRailStripe, 0, 1.12, -3.12, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 25.4, 0.12, 0.14, materials.harborRailStripe, 0, 1.12, 3.12, 0, 0, 0, false, false);
+
+  for (const z of [-2.56, -1.28, 0, 1.28, 2.56]) {
+    addHarborObstacleBox(group, 25.8, 0.16, 0.14, materials.containerTrim, 0, 1.5, z, 0, 0, 0, true, false);
+  }
+
+  for (const x of frameXs) {
+    addHarborObstacleBox(group, 0.18, 1.28, 0.14, materials.containerTrim, x, 2.54, -2.64, 0, 0, 0, true, false);
+    addHarborObstacleBox(group, 0.18, 1.28, 0.14, materials.containerTrim, x, 2.54, 2.64, 0, 0, 0, true, false);
+    addHarborObstacleBox(group, 0.14, 0.14, 5.18, materials.harborRail, x, 3.18, 0, 0, 0, 0, true, false);
+  }
+
+  for (const x of wheelXs) {
+    for (const z of [-2.72, 2.72]) {
+      addHarborObstacleCylinder(group, 0.56, 0.5, materials.tire, x, 0.62, z, Math.PI * 0.5, 0, 0, 20, true, false);
+      addHarborObstacleCylinder(group, 0.24, 0.54, materials.harborRail, x, 0.62, z, Math.PI * 0.5, 0, 0, 14, true, false);
+    }
+  }
+
+  for (const x of [-12.8, -6.4, 0, 6.4, 12.8]) {
+    addHarborObstacleBox(group, 1.55, 0.14, 0.12, materials.roadMarkingYellow, x, 1.08, -3.18, 0, 0, 0, false, false);
+    addHarborObstacleBox(group, 1.55, 0.14, 0.12, materials.roadMarkingYellow, x, 1.08, 3.18, 0, 0, 0, false, false);
+  }
+
+  for (const x of [-7.2, 0, 7.2]) {
+    addHarborObstacleBox(group, 2.5, 0.48, 0.72, materials.harborRail, x, 2.34, -1.28, 0, 0, 0.12, true, false);
+    addHarborObstacleBox(group, 2.5, 0.48, 0.72, materials.harborRail, x, 2.34, 1.28, 0, 0, -0.12, true, false);
+    addHarborObstacleBox(group, 0.2, 1.9, 0.18, materials.containerTrim, x, 3.38, -1.78, 0, 0, 0.18, true, false);
+    addHarborObstacleBox(group, 0.2, 1.9, 0.18, materials.containerTrim, x, 3.38, 1.78, 0, 0, -0.18, true, false);
+  }
+
+  const generatorCore = addHarborObstacleCylinder(group, 1.78, 16.8, materials.cargoWrap, 0, 4.38, 0, 0, 0, Math.PI * 0.5, 32, true, true);
+  generatorCore.name = "Special Cargo Turbine Housing";
+  addHarborObstacleCylinder(group, 1.86, 0.18, materials.containerTrim, -8.5, 4.38, 0, 0, 0, Math.PI * 0.5, 32, true, false);
+  addHarborObstacleCylinder(group, 1.86, 0.18, materials.containerTrim, 8.5, 4.38, 0, 0, 0, Math.PI * 0.5, 32, true, false);
+
+  for (const x of [-6.0, -2.0, 2.0, 6.0]) {
+    const strap = new THREE.Mesh(cargoRingGeometry, materials.containerTrim);
+    strap.position.set(x, 4.38, 0);
+    strap.rotation.y = Math.PI * 0.5;
+    strap.castShadow = true;
+    strap.receiveShadow = false;
+    group.add(strap);
+    addHarborObstacleBox(group, 0.18, 0.18, 4.4, materials.harborRailStripe, x, 4.38, 0, 0, 0, 0, false, false);
+  }
+
+  addHarborObstacleBox(group, 15.8, 0.22, 0.28, materials.craneDark, 0, 6.28, -0.4, 0, 0, 0.035, true, false);
+  addHarborObstacleBox(group, 15.8, 0.22, 0.28, materials.craneDark, 0, 6.28, 0.4, 0, 0, -0.035, true, false);
+  addHarborObstacleBox(group, 2.4, 0.58, 0.18, materials.harborRailStripe, -7.15, 4.38, -1.92, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 2.4, 0.58, 0.18, materials.harborRailStripe, 7.15, 4.38, 1.92, 0, 0, 0, false, false);
+
+  const cabX = cabSide * 17.6;
+  addHarborObstacleBox(group, 4.15, 2.9, 3.45, materials.truckCab, cabX, 1.95, 1.78);
+  addHarborObstacleBox(group, 3.92, 0.42, 2.75, materials.harborRail, cabX, 3.58, 1.68, 0, 0, 0, true, false);
+  addHarborObstacleBox(group, 2.75, 0.78, 0.12, materials.tourBoatGlass, cabX, 2.42, -0.0, -0.12, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.12, 0.58, 1.0, materials.tourBoatGlass, cabX - cabSide * 2.12, 2.28, 2.36, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.12, 0.58, 1.0, materials.tourBoatGlass, cabX + cabSide * 2.12, 2.28, 2.36, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 3.9, 0.34, 0.24, materials.craneDark, cabX, 0.92, -0.05, 0, 0, 0, true, false);
+  addHarborObstacleBox(group, 0.72, 0.24, 0.14, materials.beachLamp, cabX - cabSide * 1.28, 1.34, -0.28, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.72, 0.24, 0.14, materials.beachLamp, cabX + cabSide * 1.28, 1.34, -0.28, 0, 0, 0, false, false);
+  addHarborObstacleBox(group, 0.84, 0.22, 0.14, materials.tourBoatRed, -cabSide * 13.25, 1.18, 2.88, 0, 0, 0, false, false);
+
+  for (const z of [-2.55, 2.55]) {
+    addHarborObstacleBox(group, 0.18, 1.55, 0.18, materials.craneDark, cabSide * 13.4, 0.86, z, 0, 0, 0.08 * cabSide, true, false);
+    addHarborObstacleBox(group, 0.78, 0.16, 0.5, materials.craneDark, cabSide * 13.4, 0.1, z, 0, 0, 0, true, true);
+  }
+
+  const underGlow = addHarborObstacleBox(group, 18.6, 0.08, 0.18, materials.jetEnergyIdle, 0, 1.42, -2.12, 0, 0, 0, false, false);
+  underGlow.layers.enable(selectiveBloomLayer);
+  underGlow.userData.energyLine = true;
+  const underGlowBack = addHarborObstacleBox(group, 18.6, 0.08, 0.18, materials.jetEnergyIdle, 0, 1.42, 2.12, 0, 0, 0, false, false);
+  underGlowBack.layers.enable(selectiveBloomLayer);
+  underGlowBack.userData.energyLine = true;
+
+  return group;
+}
+
+function addHarborRoadContainerObstacle(config) {
+  const span = THREE.MathUtils.clamp(config.span ?? 1, 1, 3);
+  const z = config.z;
+  const x = getHarborRoadContainerObstacleX(config, span);
+  const sample = getGroundSample(x, z);
+  if (!sample) return;
+
+  const isLongContainer = span >= 3;
+  const cargo = createHarborRoadContainerCargo(config, isLongContainer);
+  const containerSize = cargo.userData.containerSize ?? harborContainerSize;
+  const visualScale = getHarborRoadContainerObstacleVisualScale(span);
+  const collisionScale = getHarborRoadContainerObstacleCollisionScale(span);
+  const yaw = span === 1 ? 0 : Math.PI * 0.5;
+  const halfHeight = containerSize.height * visualScale.y * 0.5;
+  const localPosition = new THREE.Vector3(x, sample.y + halfHeight + 0.03, z);
+
+  cargo.userData.debugName = `Harbor Road ${span}-Lane Container Obstacle`;
+  cargo.scale.copy(visualScale);
+  setStageObjectTransform(cargo, localPosition, 0, 0, true);
+  cargo.rotateY(yaw);
+  scene.add(cargo);
+
+  const isCrossLaneCargo = span > 1;
+  const sizeX = isCrossLaneCargo
+    ? containerSize.length * collisionScale.z
+    : containerSize.width * collisionScale.x;
+  const rawSizeZ = isCrossLaneCargo
+    ? containerSize.width * collisionScale.x
+    : containerSize.length * collisionScale.z;
+  const sizeZ = Math.max(rawSizeZ, span > 1 ? 5.4 : rawSizeZ);
+  obstacles.push({
+    mesh: cargo,
+    position: localPosition,
+    basePosition: cargo.position.clone(),
+    baseQuaternion: cargo.quaternion.clone(),
+    baseScale: cargo.scale.clone(),
+    size: new THREE.Vector3(sizeX, containerSize.height * collisionScale.y, sizeZ),
+    noIdleMotion: true,
+    harborRoadContainerObstacle: true,
+    suppressGuideDna: config.guideDna === false,
+    guideLaneX: config.guideDna === false ? Number.NaN : getHarborRoadContainerGuideLaneX(config, span),
+    dnaFrontClearance: 44,
+    dnaRearClearance: 7,
+  });
+}
+
+function createHarborRoadContainerCargo(config, isLongContainer) {
+  const stackLayers = THREE.MathUtils.clamp(Math.round(config.stackLayers ?? 1), 1, 3);
+  const createLayer = (seed) => (isLongContainer ? createHarborLongContainer(seed) : createHarborContainer(seed));
+  if (stackLayers <= 1) return createLayer(config.seed ?? 0);
+
+  const baseSize = isLongContainer ? harborLongContainerSize : harborContainerSize;
+  const stackGap = baseSize.stackGap ?? 0.08;
+  const stackHeight = baseSize.height * stackLayers + stackGap * (stackLayers - 1);
+  const group = new THREE.Group();
+  group.userData.containerSize = {
+    ...baseSize,
+    height: stackHeight,
+  };
+
+  for (let layer = 0; layer < stackLayers; layer += 1) {
+    const cargoLayer = createLayer((config.seed ?? 0) + layer * 17);
+    cargoLayer.position.y = -stackHeight * 0.5
+      + baseSize.height * 0.5
+      + layer * (baseSize.height + stackGap);
+    group.add(cargoLayer);
+  }
+
+  return group;
+}
+
+function getHarborRoadContainerGuideLaneX(config, span) {
+  const blockedStartLane = getHarborRoadContainerBlockedStartLane(config, span);
+  const candidates = [
+    blockedStartLane - 1,
+    blockedStartLane + span,
+  ].filter((laneIndex) => (
+    laneIndex >= 0 && laneIndex < harborCraneDropLane5Centers.length
+  ));
+  if (candidates.length === 0) return Number.NaN;
+
+  if (Number.isFinite(config.guideLane5)) {
+    const requestedLane = THREE.MathUtils.clamp(
+      Math.round(config.guideLane5),
+      0,
+      harborCraneDropLane5Centers.length - 1
+    );
+    if (candidates.includes(requestedLane)) {
+      return harborCraneDropLane5Centers[requestedLane] ?? Number.NaN;
+    }
+
+    const nearestRequestedLane = candidates.reduce((best, laneIndex) => (
+      Math.abs(laneIndex - requestedLane) < Math.abs(best - requestedLane) ? laneIndex : best
+    ), candidates[0]);
+    return harborCraneDropLane5Centers[nearestRequestedLane] ?? Number.NaN;
+  }
+
+  const centerLane = Math.floor(harborCraneDropLane5Centers.length * 0.5);
+  const nearestCenterLane = candidates.reduce((best, laneIndex) => (
+    Math.abs(laneIndex - centerLane) < Math.abs(best - centerLane) ? laneIndex : best
+  ), candidates[0]);
+  return harborCraneDropLane5Centers[nearestCenterLane] ?? Number.NaN;
+}
+
+function getHarborRoadContainerBlockedStartLane(config, span) {
+  if (span >= 3) {
+    return THREE.MathUtils.clamp(config.laneTriplet5 ?? 1, 0, harborCraneDropLaneTriplet5Centers.length - 1);
+  }
+  if (span === 2) {
+    return THREE.MathUtils.clamp(config.lanePair5 ?? 1, 0, harborCraneDropLanePair5Centers.length - 1);
+  }
+  return THREE.MathUtils.clamp(config.lane5 ?? 2, 0, harborCraneDropLane5Centers.length - 1);
+}
+
+function getHarborRoadContainerObstacleX(config, span) {
+  if (span >= 3) {
+    const index = THREE.MathUtils.clamp(config.laneTriplet5 ?? 1, 0, harborCraneDropLaneTriplet5Centers.length - 1);
+    return harborCraneDropLaneTriplet5Centers[index] ?? 0;
+  }
+  if (span === 2) {
+    const index = THREE.MathUtils.clamp(config.lanePair5 ?? 1, 0, harborCraneDropLanePair5Centers.length - 1);
+    return harborCraneDropLanePair5Centers[index] ?? 0;
+  }
+  const index = THREE.MathUtils.clamp(config.lane5 ?? 2, 0, harborCraneDropLane5Centers.length - 1);
+  return harborCraneDropLane5Centers[index] ?? 0;
+}
+
+function getHarborRoadContainerObstacleVisualScale(span) {
+  if (span >= 3) return new THREE.Vector3(1.0, 1.0, 1.04);
+  if (span === 2) return new THREE.Vector3(1.0, 1.03, 1.15);
+  return new THREE.Vector3(1.0, 1.0, 1.0);
+}
+
+function getHarborRoadContainerObstacleCollisionScale(span) {
+  if (span >= 3) return new THREE.Vector3(1.0, 1.0, 0.94);
+  if (span === 2) return new THREE.Vector3(1.0, 1.03, 1.08);
+  return new THREE.Vector3(1.0, 1.0, 1.0);
 }
 
 function addHarborCargoTruckRoutes(harborEndZ) {
@@ -9311,7 +9917,11 @@ function mergeColoredGeometries(parts) {
 }
 
 function addDnaItems() {
-  const addDnaItem = (x, z, lift = 1.42) => {
+  const addDnaItem = (x, z, lift = 1.42, options = {}) => {
+    if (shouldSuppressHarborMajorEventDna(z)) return;
+    if (!options.harborObstacleGuide && shouldSuppressHarborRelaxedObstacleBaseDna(z)) return;
+    if (shouldSuppressDashPadInlineDna(x, z)) return;
+    if (shouldSuppressDashPadOffLaneDna(x, z)) return;
     if (!isDnaPlacementClear(x, z)) return;
 
     const sample = getGroundSample(x, z);
@@ -9336,14 +9946,17 @@ function addDnaItems() {
   };
 
   const addLaneTrail = (lane, zStart, count, spacing = 5.0) => {
+    if (shouldSkipSparseDnaGroup(count)) return;
     for (let i = 0; i < count; i += 1) {
       addDnaItem(lanes[lane], zStart - i * spacing);
     }
   };
 
   const addRows = (zStart, rowCount, spacing = 9.0) => {
+    if (shouldSkipSparseDnaGroup(rowCount * lanes.length)) return;
     for (let i = 0; i < rowCount; i += 1) {
       const z = zStart - i * spacing;
+      if (shouldSuppressThreeLineDnaRow(z)) continue;
       for (const x of lanes) {
         addDnaItem(x, z);
       }
@@ -9351,6 +9964,7 @@ function addDnaItems() {
   };
 
   const addLaneSwitch = (pattern, zStart, count, spacing = 5.0) => {
+    if (shouldSkipSparseDnaGroup(count)) return;
     for (let i = 0; i < count; i += 1) {
       addDnaItem(lanes[pattern[i % pattern.length]], zStart - i * spacing);
     }
@@ -9366,6 +9980,10 @@ function addDnaItems() {
     }
   }
 
+  if (currentStage.harborTheme) {
+    addHarborContainerObstacleDnaGuides(addDnaItem);
+  }
+
   dnaInstances = new THREE.InstancedMesh(dnaGeometry, materials.dna, dnaItems.length);
   dnaInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   dnaInstances.castShadow = false;
@@ -9377,20 +9995,151 @@ function addDnaItems() {
 
 function isDnaPlacementClear(x, z) {
   const clearOfDashPads = !dashPadPlacements.some((placement) => (
-    Math.abs(x - lanes[placement.lane]) < 0.01 && Math.abs(z - placement.z) <= 3.7
+    Math.abs(x - getDashPadPlacementX(placement)) < 0.01 && Math.abs(z - placement.z) <= 3.7
   ));
   const clearOfObstacles = !obstaclePlacements.some((placement) => (
     placement.lanes.some((lane) => Math.abs(x - lanes[lane]) < 0.01)
       && Math.abs(z - placement.z) <= 5.8
       && !isRollClearZone(placement.z)
   ));
-  return clearOfDashPads && clearOfObstacles;
+  const clearOfRuntimeObstacles = !obstacles.some((obstacle) => {
+    const frontClearance = obstacle.dnaFrontClearance ?? 5.8;
+    const rearClearance = obstacle.dnaRearClearance ?? 5.8;
+    const overlapsX = Math.abs(x - obstacle.position.x) <= obstacle.size.x * 0.5 + 1.2;
+    const overlapsZ = z >= obstacle.position.z - obstacle.size.z * 0.5 - rearClearance
+      && z <= obstacle.position.z + obstacle.size.z * 0.5 + frontClearance;
+    return overlapsX && overlapsZ;
+  });
+  return clearOfDashPads && clearOfObstacles && clearOfRuntimeObstacles;
+}
+
+function shouldSkipSparseDnaGroup(itemCount) {
+  const minimum = currentStage.minimumDnaGroupCount ?? 0;
+  return minimum > 0 && itemCount > 0 && itemCount < minimum;
+}
+
+function shouldSuppressThreeLineDnaRow(z) {
+  return shouldSuppressHarborMajorEventDna(z)
+    || isDashPadFocusDnaSection(z)
+    || isHarborRelaxedObstacleSingleLineDnaSection(z);
+}
+
+function shouldSuppressHarborRelaxedObstacleBaseDna(z) {
+  return isHarborRelaxedObstacleSingleLineDnaSection(z);
+}
+
+function shouldSuppressHarborMajorEventDna(z) {
+  if (!currentStage.harborTheme) return false;
+  return harborCraneDropEvents.some((event) => Math.abs(z - event.z) <= harborMajorEventDnaSuppressRadius);
+}
+
+function isDashPadFocusDnaSection(z) {
+  return dashPadPlacements.some((placement) => Math.abs(z - placement.z) <= dashPadThreeLineDnaSuppressRadius);
+}
+
+function shouldSuppressDashPadOffLaneDna(x, z) {
+  const nearbyDashPads = dashPadPlacements.filter((placement) => (
+    Math.abs(z - placement.z) <= dashPadSingleLineDnaAlignRadius
+  ));
+  if (nearbyDashPads.length === 0) return false;
+
+  return !nearbyDashPads.some((placement) => (
+    Math.abs(x - getDashPadPlacementX(placement)) <= dashPadDnaLaneAlignEpsilon
+  ));
+}
+
+function shouldSuppressDashPadInlineDna(x, z) {
+  return dashPadPlacements.some((placement) => (
+    Math.abs(z - placement.z) <= dashPadDnaLineBreakRadius
+      && Math.abs(x - getDashPadPlacementX(placement)) <= dashPadDnaLaneAlignEpsilon
+  ));
+}
+
+function isHarborRelaxedObstacleSingleLineDnaSection(z) {
+  if (!currentStage.harborTheme) return false;
+
+  let firstObstacleZ = -Infinity;
+  let lastObstacleZ = Infinity;
+  let hasHarborRoadContainerObstacle = false;
+  for (const obstacle of obstacles) {
+    if (!obstacle.harborRoadContainerObstacle) continue;
+    firstObstacleZ = Math.max(firstObstacleZ, obstacle.position.z);
+    lastObstacleZ = Math.min(lastObstacleZ, obstacle.position.z);
+    hasHarborRoadContainerObstacle = true;
+  }
+  if (!hasHarborRoadContainerObstacle) return false;
+
+  const sectionStartZ = firstObstacleZ + harborRelaxedObstacleRowSuppressPadding;
+  const sectionEndZ = lastObstacleZ - harborRelaxedObstacleRowSuppressPadding;
+  return z <= sectionStartZ && z >= sectionEndZ;
+}
+
+function addHarborContainerObstacleDnaGuides(addDnaItem) {
+  const roadContainerObstacles = obstacles
+    .filter((obstacle) => obstacle.harborRoadContainerObstacle)
+    .sort((a, b) => b.position.z - a.position.z);
+
+  for (let obstacleIndex = 0; obstacleIndex < roadContainerObstacles.length; obstacleIndex += 1) {
+    const obstacle = roadContainerObstacles[obstacleIndex];
+    const previousObstacle = roadContainerObstacles[obstacleIndex - 1] ?? null;
+    const guideX = getHarborContainerObstacleGuideLaneX(obstacle);
+    if (!Number.isFinite(guideX)) continue;
+
+    const guideStartZ = obstacle.position.z + harborRelaxedObstacleSingleLineDnaStart;
+    for (let i = 0; i < harborRelaxedObstacleSingleLineDnaCount; i += 1) {
+      const guideZ = guideStartZ - i * harborRelaxedObstacleSingleLineDnaSpacing;
+      if (
+        previousObstacle
+        && guideZ < previousObstacle.position.z
+        && guideZ > previousObstacle.position.z - harborRelaxedObstaclePostClearGap
+      ) {
+        continue;
+      }
+
+      addDnaItem(guideX, guideZ, 1.46, {
+        harborObstacleGuide: true,
+      });
+    }
+  }
+}
+
+function getHarborContainerObstacleGuideLaneX(obstacle) {
+  if (obstacle.suppressGuideDna) return Number.NaN;
+  if (Number.isFinite(obstacle.guideLaneX)) return obstacle.guideLaneX;
+
+  const openLanes = lanes.filter((laneX) => (
+    Math.abs(laneX - obstacle.position.x) > obstacle.size.x * 0.5 + 1.1
+  ));
+  if (openLanes.length === 0) return Number.NaN;
+
+  if (openLanes.includes(0) && Math.abs(obstacle.position.x) > quickStepDistance * 0.6) {
+    return 0;
+  }
+  if (openLanes.length === 1) return openLanes[0];
+
+  const alternate = Math.abs(Math.floor(obstacle.position.z)) % 2 === 0;
+  return alternate ? openLanes[0] : openLanes[openLanes.length - 1];
 }
 
 function addDashPads() {
   for (const placement of dashPadPlacements) {
-    createDashPad(lanes[placement.lane], placement.z);
+    createDashPad(getDashPadPlacementX(placement), placement.z);
   }
+}
+
+function getDashPadPlacementX(placement) {
+  if (Number.isFinite(placement.x)) return placement.x;
+
+  if (Number.isFinite(placement.lane5)) {
+    const lane5 = THREE.MathUtils.clamp(
+      Math.round(placement.lane5),
+      0,
+      harborCraneDropLane5Centers.length - 1
+    );
+    return harborCraneDropLane5Centers[lane5] ?? lanes[placement.lane] ?? 0;
+  }
+
+  return lanes[placement.lane] ?? 0;
 }
 
 function createDashPad(x, z) {
@@ -10460,6 +11209,23 @@ function runDebugConsoleCommand(command) {
   writeDebugConsoleLine(`unknown command: ${verb}`, "error");
 }
 
+function handleDebugProgressWarpShortcut(event) {
+  if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return false;
+
+  const digitMatch = event.code.match(/^(?:Digit|Numpad)([0-9])$/);
+  if (digitMatch) {
+    warpToGoalProgress(Number(digitMatch[1]) / 10);
+    return true;
+  }
+
+  if (event.code === "KeyG") {
+    warpToGoalProgress(1);
+    return true;
+  }
+
+  return false;
+}
+
 function bindInput() {
   window.addEventListener("keydown", (event) => {
     if (event.code === "Backquote" && !event.repeat) {
@@ -10475,7 +11241,12 @@ function bindInput() {
       return;
     }
     if (isTextEntryTarget(event.target)) return;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyQ", "KeyE", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyO", "KeyU", "KeyP", "Escape"].includes(event.code)) {
+    if (handleDebugProgressWarpShortcut(event)) {
+      event.preventDefault();
+      keys.delete(event.code);
+      return;
+    }
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyC", "KeyQ", "KeyE", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyO", "KeyU", "KeyP", "Escape"].includes(event.code)) {
       event.preventDefault();
     }
     if ((event.code === "KeyP" || event.code === "Escape") && !event.repeat) {
@@ -10491,6 +11262,9 @@ function bindInput() {
     if (event.code === "Space" && !keys.has("Space")) {
       jumpQueued = true;
     }
+    if (event.code === "KeyC" && !keys.has("KeyC")) {
+      slideQueued = true;
+    }
     if (event.code === "KeyQ" && !keys.has("KeyQ")) {
       quickStepQueued = -1;
     }
@@ -10503,7 +11277,7 @@ function bindInput() {
     if (event.code === "KeyO") {
       resetCameraView();
     }
-    if (event.code === "Digit1" || event.code === "Numpad1") {
+    if (event.code === "KeyB") {
       refillBoostGauge();
     }
     keys.add(event.code);
@@ -10522,6 +11296,12 @@ function bindInput() {
   canvas.addEventListener("pointermove", handleMouseObjectPointerMove);
   canvas.addEventListener("pointerleave", handleMouseObjectPointerLeave);
   canvas.addEventListener("pointercancel", handleMouseObjectPointerLeave);
+  canvas.addEventListener("pointerdown", handleCharacterInspectOrbitPointerDown);
+  canvas.addEventListener("pointermove", handleCharacterInspectOrbitPointerMove);
+  canvas.addEventListener("pointerup", handleCharacterInspectOrbitPointerEnd);
+  canvas.addEventListener("pointercancel", handleCharacterInspectOrbitPointerEnd);
+  canvas.addEventListener("lostpointercapture", handleCharacterInspectOrbitPointerEnd);
+  canvas.addEventListener("wheel", handleCharacterInspectOrbitWheel, { passive: false });
   restartButton.addEventListener("click", resetGame);
   nextStageButton.addEventListener("click", goToNextStage);
   menuButton?.addEventListener("click", () => setMainMenuOpen(menuPanel?.classList.contains("hidden")));
@@ -10555,10 +11335,27 @@ function bindInput() {
   window.addEventListener("blur", handleWindowBlurPause);
   bindGraphicsControls();
   bindDebugControls();
+  bindTestRoomPanelLayering();
   window.addEventListener("resize", resize);
   updateMusicButton();
   updateStageSelector();
   updateFullscreenButton();
+}
+
+function bindTestRoomPanelLayering() {
+  const panels = [testRoomInspectPanel, testRoomPoseTunerEl, testRoomMotionTunerEl].filter(Boolean);
+  panels.forEach((panel) => {
+    const bringForward = () => bringTestRoomPanelToFront(panel);
+    panel.addEventListener("pointerdown", bringForward);
+    panel.addEventListener("focusin", bringForward);
+  });
+  if (testRoomInspectPanel) bringTestRoomPanelToFront(testRoomInspectPanel);
+}
+
+function bringTestRoomPanelToFront(panel) {
+  [testRoomInspectPanel, testRoomPoseTunerEl, testRoomMotionTunerEl].forEach((item) => {
+    item?.classList.toggle("test-room-panel-front", item === panel);
+  });
 }
 
 function handleVisibilityPause(event) {
@@ -10733,6 +11530,9 @@ function handleTouchControlDown(event) {
   if (control === "jump") {
     if (!touchInput.jump) jumpQueued = true;
     touchInput.jump = true;
+  } else if (control === "slide") {
+    if (!touchInput.slide) slideQueued = true;
+    touchInput.slide = true;
   } else if (control === "boost") {
     touchInput.boost = !touchInput.boost;
   } else if (control === "brake") {
@@ -10757,6 +11557,8 @@ function handleTouchControlUp(event) {
 
   if (control === "jump") {
     touchInput.jump = false;
+  } else if (control === "slide") {
+    touchInput.slide = false;
   } else if (control === "brake") {
     touchInput.brake = false;
   }
@@ -10893,6 +11695,7 @@ function resetTouchRunState() {
   touchInput.runStarted = false;
   touchInput.brake = false;
   touchInput.boost = false;
+  touchInput.slide = false;
   touchInput.jump = false;
   stopTouchLateralMove();
   resetTouchQuickStepGesture();
@@ -10958,6 +11761,8 @@ function updateGame(dt) {
   hitCooldown = Math.max(0, hitCooldown - dt);
   hitStun = Math.max(0, hitStun - dt);
   jumpImpact = Math.max(0, jumpImpact - dt * 4.8);
+  slideTimer = Math.max(0, slideTimer - dt);
+  slideCooldown = Math.max(0, slideCooldown - dt);
   quickStepCooldown = Math.max(0, quickStepCooldown - dt);
   quickStepFlash = Math.max(0, quickStepFlash - dt * 5.5);
   velocityMotionBlurTarget = 0;
@@ -10994,6 +11799,7 @@ function updatePlayer(dt) {
   const boosting = !stunned && !brakingInput && (keyboardBoost || touchBoost) && boostGauge > 0;
   playerBoostEffectActive = boosting || debugSuperBoostActive;
   updateBoostCameraState(playerBoostEffectActive, dt);
+  const sliding = isPlayerSliding();
   const keyboardStrafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
   const touchStrafeInput = touchControlsEnabled ? touchInput.lateral : 0;
   const strafeInput = THREE.MathUtils.clamp(keyboardStrafeInput + touchStrafeInput, -1, 1);
@@ -11005,6 +11811,8 @@ function updatePlayer(dt) {
   if (stunned) {
     jumpHoldRemaining = 0;
     quickStepQueued = 0;
+    slideQueued = false;
+    slideTimer = 0;
   }
 
   const dashPadTargetSpeed = getDashPadTargetSpeed();
@@ -11036,10 +11844,15 @@ function updatePlayer(dt) {
     : moveToward(player.velocity.z, targetVelocityZ, forwardAccel * dt);
 
   const airControl = player.grounded ? 1 : 0.58;
-  const targetSideSpeed = strafeInput * (boosting ? 17 : 15);
+  const targetSideSpeed = strafeInput * (sliding ? 6.5 : boosting ? 17 : 15);
   const sideAccel = (strafeInput === 0 ? 42 : 64) * airControl;
 
-  if (!stunned && quickStepQueued !== 0 && quickStepCooldown <= 0 && quickStepTimer <= 0.012) {
+  if (!stunned && slideQueued) {
+    startSlide();
+    slideQueued = false;
+  }
+
+  if (!stunned && !isPlayerSliding() && quickStepQueued !== 0 && quickStepCooldown <= 0 && quickStepTimer <= 0.012) {
     startQuickStep(quickStepQueued);
     quickStepQueued = 0;
   }
@@ -11062,7 +11875,7 @@ function updatePlayer(dt) {
   const speed = getHorizontalSpeed();
   const canJump = player.grounded || debugSettings.infiniteJump;
 
-  if (!stunned && jumpQueued && canJump) {
+  if (!stunned && jumpQueued && canJump && !isPlayerSliding()) {
     player.velocity.y = 42.5 + Math.min(speed * 0.04, 4.5);
     player.grounded = false;
     jumpHoldRemaining = 0.075;
@@ -11096,6 +11909,27 @@ function updatePlayer(dt) {
   velocityMotionBlurTarget = boosting || debugSuperBoostActive
     ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.55, 1) * getMotionBlurScale()
     : 0;
+}
+
+function startSlide() {
+  if (slideCooldown > 0 || !player.grounded || hitStun > 0) return false;
+
+  const forwardSpeed = Math.max(0, -player.velocity.z);
+  if (forwardSpeed < slideMinStartSpeed && !debugSettings.characterInspect) return false;
+
+  slideTimer = slideDuration;
+  slideCooldown = slideCooldownDuration;
+  quickStepQueued = 0;
+  jumpQueued = false;
+  player.velocity.x *= 0.35;
+  if (forwardSpeed > 0) {
+    player.velocity.z = -Math.max(forwardSpeed, Math.min(runTopSpeed * 0.82, boostTopSpeed));
+  }
+  return true;
+}
+
+function isPlayerSliding() {
+  return slideTimer > 0 && player.grounded && hitStun <= 0;
 }
 
 function snapToGround() {
@@ -11391,6 +12225,10 @@ function checkObstacleCollision() {
       && dz < obstacle.size.z * 0.5 + player.radius * 0.72;
 
     if (!horizontalHit) continue;
+
+    if (obstacle.slideUnderRequired && isPlayerSliding()) {
+      continue;
+    }
 
     const obstacleTop = obstacle.position.y + obstacle.size.y * 0.5;
     const playerBottom = player.position.y - player.radius;
@@ -11836,24 +12674,40 @@ function getCharacterInspectMotionPreviewState() {
     ? debugSettings.characterInspectMotion
     : debugDefaults.characterInspectMotion;
   const timeScale = characterInspectMotionSpeedScale[debugSettings.characterInspectMotionSpeed] ?? 1;
-  const time = performance.now() * 0.001 * timeScale;
-  const quickStepProgress = (time * 1.45) % 1;
+  const frozen = Boolean(debugSettings.characterInspectMotionFreeze);
+  const phase = THREE.MathUtils.clamp(debugSettings.characterInspectMotionPhase, 0, 1);
+  const time = frozen ? phase * Math.PI * 2 : performance.now() * 0.001 * timeScale;
+  const runPhaseOverride = frozen ? phase * Math.PI * 2 : null;
+  const quickStepProgress = frozen ? phase : (time * 1.45) % 1;
+  const cyclePulse = Math.sin(phase * Math.PI);
+  const boostFlareWave = frozen ? Math.sin(phase * Math.PI * 2) : Math.sin(time * 6.0);
 
   if (mode === "idle") {
     return { speed: 0, grounded: true, boostActive: false, timeScale };
   }
   if (mode === "walk") {
-    return { speed: runTopSpeed * 0.45, grounded: true, boostActive: false, timeScale };
+    return { speed: runTopSpeed * 0.45, grounded: true, boostActive: false, runPhaseOverride, timeScale };
   }
   if (mode === "run") {
-    return { speed: runTopSpeed * 1.02, grounded: true, boostActive: false, timeScale };
+    return { speed: runTopSpeed * 1.02, grounded: true, boostActive: false, runPhaseOverride, timeScale };
   }
   if (mode === "boost") {
     return {
       speed: boostTopSpeed * 0.96,
       grounded: true,
       boostActive: true,
-      boostFlare: 0.55 + Math.sin(time * 6.0) * 0.18,
+      boostFlare: 0.55 + boostFlareWave * 0.18,
+      runPhaseOverride,
+      timeScale,
+    };
+  }
+  if (mode === "slide") {
+    return {
+      speed: runTopSpeed * 0.92,
+      grounded: true,
+      boostActive: false,
+      slideActive: true,
+      slideProgress: (time * 1.25) % 1,
       timeScale,
     };
   }
@@ -11875,7 +12729,8 @@ function getCharacterInspectMotionPreviewState() {
       speed: runTopSpeed * 0.56,
       grounded: false,
       boostActive: false,
-      verticalLift: 0.22 + Math.sin(time * 2.8) * 0.08,
+      jumpPosePreset: debugSettings.characterInspectJumpPose,
+      verticalLift: 0.22 + (frozen ? cyclePulse : Math.sin(time * 2.8)) * 0.08,
       timeScale,
     };
   }
@@ -11884,7 +12739,7 @@ function getCharacterInspectMotionPreviewState() {
       speed: runTopSpeed * 0.32,
       grounded: true,
       boostActive: false,
-      jumpImpact: 0.75 + Math.sin(time * 4.0) * 0.2,
+      jumpImpact: frozen ? 0.25 + cyclePulse * 0.75 : 0.75 + Math.sin(time * 4.0) * 0.2,
       timeScale,
     };
   }
@@ -11903,6 +12758,142 @@ function getCharacterInspectMotionPreviewState() {
   return null;
 }
 
+function getCharacterJumpPoseConfig(preset) {
+  const resolvedPreset = characterInspectJumpPosePresets.includes(preset)
+    ? preset
+    : debugDefaults.characterInspectJumpPose;
+  return characterInspectJumpPoseOverrides.get(resolvedPreset)
+    ?? characterInspectJumpPoseConfigs[resolvedPreset]
+    ?? characterInspectJumpPoseConfigs[debugDefaults.characterInspectJumpPose];
+}
+
+function cloneCharacterJumpPoseConfig(config) {
+  return {
+    bodyX: config.bodyX,
+    arms: {
+      left: { ...config.arms.left },
+      right: { ...config.arms.right },
+    },
+    legs: {
+      left: { ...config.legs.left },
+      right: { ...config.legs.right },
+    },
+  };
+}
+
+function getEditableCharacterJumpPoseConfig(preset = debugSettings.characterInspectJumpPose) {
+  const resolvedPreset = characterInspectJumpPosePresets.includes(preset)
+    ? preset
+    : debugDefaults.characterInspectJumpPose;
+  if (!characterInspectJumpPoseOverrides.has(resolvedPreset)) {
+    characterInspectJumpPoseOverrides.set(
+      resolvedPreset,
+      cloneCharacterJumpPoseConfig(characterInspectJumpPoseConfigs[resolvedPreset]),
+    );
+  }
+  return characterInspectJumpPoseOverrides.get(resolvedPreset);
+}
+
+async function copyTunerTextToClipboard(text, outputEl = testRoomPoseTunerOutputEl) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall back to selecting the output field below.
+    }
+  }
+  if (outputEl && typeof document.execCommand === "function") {
+    outputEl.focus();
+    outputEl.select();
+    try {
+      if (document.execCommand("copy")) return true;
+    } catch {
+      // Leave the selected text in place for manual copy.
+    }
+  }
+  return false;
+}
+
+function getPoseConfigValue(config, path) {
+  return path.reduce((current, key) => current?.[key], config);
+}
+
+function setPoseConfigValue(config, path, value) {
+  let current = config;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    current = current[path[index]];
+  }
+  current[path[path.length - 1]] = value;
+}
+
+function getPoseTunerFieldRange(field) {
+  if (poseTunerRangeMode === "wide") {
+    return {
+      min: field.wideMin ?? field.min,
+      max: field.wideMax ?? field.max,
+    };
+  }
+  return { min: field.min, max: field.max };
+}
+
+function clampPoseConfigToCurrentRange(config) {
+  for (const field of characterInspectPoseTunerFields) {
+    const range = getPoseTunerFieldRange(field);
+    const value = getPoseConfigValue(config, field.path);
+    if (!Number.isFinite(value)) continue;
+    const clamped = THREE.MathUtils.clamp(value, range.min, range.max);
+    if (clamped !== value) setPoseConfigValue(config, field.path, clamped);
+  }
+}
+
+function formatPoseTunerNumber(value) {
+  return Number(value).toFixed(2);
+}
+
+function serializeJumpPoseConfig(config) {
+  return JSON.stringify(config, null, 2);
+}
+
+function isCharacterMotionTunerAvailable() {
+  return Boolean(currentStage.testRoom
+    && debugSettings.characterInspect
+    && characterMotionTunerModes.includes(debugSettings.characterInspectMotion));
+}
+
+function getCharacterMotionTuneConfig() {
+  return isCharacterMotionTunerAvailable()
+    ? characterMotionTunerValues
+    : characterMotionTuneDefaults;
+}
+
+function getMotionTunerFieldRange(field) {
+  if (motionTunerRangeMode === "wide") {
+    return {
+      min: field.wideMin ?? field.min,
+      max: field.wideMax ?? field.max,
+    };
+  }
+  return { min: field.min, max: field.max };
+}
+
+function clampMotionTuneValuesToCurrentRange() {
+  for (const field of characterMotionTunerFields) {
+    const range = getMotionTunerFieldRange(field);
+    const value = characterMotionTunerValues[field.key];
+    if (!Number.isFinite(value)) continue;
+    characterMotionTunerValues[field.key] = THREE.MathUtils.clamp(value, range.min, range.max);
+  }
+}
+
+function serializeMotionTuneConfig(config = characterMotionTunerValues) {
+  return JSON.stringify(config, null, 2);
+}
+
+function resetMotionTuneValues() {
+  Object.assign(characterMotionTunerValues, characterMotionTuneDefaults);
+}
+
 function animatePlayerModel(dt) {
   if (!player.parts) return;
 
@@ -11911,6 +12902,7 @@ function animatePlayerModel(dt) {
   const moving = speed > 2;
   const motionGrounded = motionPreview?.grounded ?? player.grounded;
   const motionBoostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
+  const motionSlideActive = motionPreview?.slideActive ?? isPlayerSliding();
   const quickStepActive = motionPreview?.quickStepActive ?? quickStepTimer > 0;
   const quickStepProgress = quickStepActive
     ? THREE.MathUtils.clamp(
@@ -11928,8 +12920,13 @@ function animatePlayerModel(dt) {
   const runAmount = THREE.MathUtils.clamp(speed / 54, 0, 1.8);
   const cappedCadenceSpeed = Math.min(speed, runTopSpeed * 1.25);
   const motionTimeScale = motionPreview?.timeScale ?? 1;
-  runPhase += cappedCadenceSpeed * dt * 0.4 * motionTimeScale;
+  if (Number.isFinite(motionPreview?.runPhaseOverride)) {
+    runPhase = motionPreview.runPhaseOverride;
+  } else {
+    runPhase += cappedCadenceSpeed * dt * 0.4 * motionTimeScale;
+  }
 
+  const motionTune = getCharacterMotionTuneConfig();
   const runStrength = Math.min(runAmount, 1.72);
   const sprintAmount = moving && motionGrounded ? THREE.MathUtils.clamp(speed / runTopSpeed, 0, 1) : 0;
   const boostPoseAmount = moving && motionGrounded && motionBoostActive
@@ -11938,10 +12935,19 @@ function animatePlayerModel(dt) {
   const boostStartFlare = boostPoseAmount > 0
     ? THREE.MathUtils.clamp(motionPreview?.boostFlare ?? THREE.MathUtils.smoothstep(boostCameraKick, 0, 1), 0, 1)
     : 0;
-  const shoePulse = 1 + Math.min(runAmount, 1.2) * 0.08;
+  const shoePulse = 1 + Math.min(runAmount, 1.2) * motionTune.shoePulse;
   const airborne = !motionGrounded;
+  const jumpPoseConfig = airborne ? getCharacterJumpPoseConfig(motionPreview?.jumpPosePreset) : null;
+  const keyPoseConfig = motionPreview ? getCharacterInspectKeyPoseConfig() : null;
   const limbBlend = 1 - Math.exp(-15 * dt);
-  const runBodyBob = moving && motionGrounded ? Math.abs(Math.sin(runPhase * 2)) * 0.005 : 0;
+  const runBodyBob = moving && motionGrounded ? Math.abs(Math.sin(runPhase * 2)) * motionTune.bodyBob : 0;
+  const slideBlendRate = motionSlideActive ? 18 : 14;
+  slidePoseAmount = THREE.MathUtils.lerp(
+    slidePoseAmount,
+    motionSlideActive ? 1 : 0,
+    1 - Math.exp(-slideBlendRate * dt),
+  );
+  const slideAmount = slidePoseAmount;
 
   if (airborne) {
     jetFootContactOffsetY = THREE.MathUtils.lerp(
@@ -11955,19 +12961,35 @@ function animatePlayerModel(dt) {
     + jetFootContactOffsetY
     + runBodyBob
     + stationaryQuickStepAmount * 0.08
+    - slideAmount * 0.72
     + (airborne ? 0.04 : 0)
     + (motionPreview?.verticalLift ?? 0)
     - (motionPreview?.jumpImpact ?? 0) * 0.05;
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
     player.parts.model.rotation.x,
-    motionPreview?.hitstunAmount
+    keyPoseConfig
+      ? keyPoseConfig.bodyX
+      : motionPreview?.hitstunAmount
       ? -0.42
-      : airborne ? -0.18 : THREE.MathUtils.lerp(-THREE.MathUtils.lerp(0, 0.58, sprintAmount), -0.82, boostPoseAmount),
+      : airborne ? jumpPoseConfig.bodyX : THREE.MathUtils.lerp(
+        THREE.MathUtils.lerp(
+          -THREE.MathUtils.lerp(0, motionTune.runLean, sprintAmount),
+          -motionTune.boostLean,
+          boostPoseAmount,
+        ),
+        1.46,
+        slideAmount,
+      ),
     1 - Math.exp(-9 * dt),
+  );
+  player.parts.model.rotation.y = THREE.MathUtils.lerp(
+    player.parts.model.rotation.y,
+    slideAmount * 0.02,
+    1 - Math.exp(-8 * dt),
   );
   player.parts.model.rotation.z = THREE.MathUtils.lerp(
     player.parts.model.rotation.z,
-    -lateralVelocity * 0.01 - sideStepDirection * stationaryQuickStepAmount * 0.1,
+    -lateralVelocity * 0.01 - sideStepDirection * stationaryQuickStepAmount * 0.1 + slideAmount * 0.02,
     1 - Math.exp(-8 * dt),
   );
 
@@ -11976,11 +12998,38 @@ function animatePlayerModel(dt) {
 
   const applyArmPose = (arm, phase, side) => {
     if (!arm) return;
-    if (airborne) {
-      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, -0.72, limbBlend);
-      arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, side * 0.28, limbBlend);
-      if (arm.forearm) arm.forearm.rotation.x = THREE.MathUtils.lerp(arm.forearm.rotation.x, 1.12, limbBlend);
-      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, 0.12, limbBlend);
+    if (keyPoseConfig || airborne) {
+      const sourcePose = keyPoseConfig ?? jumpPoseConfig;
+      const pose = side < 0 ? sourcePose.arms.left : sourcePose.arms.right;
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, pose.x, limbBlend);
+      arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, pose.z, limbBlend);
+      if (arm.forearm) {
+        arm.forearm.rotation.x = THREE.MathUtils.lerp(
+          arm.forearm.rotation.x,
+          pose.forearmX,
+          limbBlend,
+        );
+      }
+      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, pose.handX, limbBlend);
+      return;
+    }
+
+    if (slideAmount > 0.02) {
+      const rightArm = side > 0;
+      const targetArmX = rightArm ? 1.08 : 0.18;
+      const targetArmZ = rightArm ? 0.22 : -1.42;
+      const targetForearmX = rightArm ? 1.06 : 0.12;
+      const targetHandX = rightArm ? 0.78 : 0.02;
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, targetArmX, limbBlend);
+      arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, targetArmZ, limbBlend);
+      if (arm.forearm) {
+        arm.forearm.rotation.x = THREE.MathUtils.lerp(
+          arm.forearm.rotation.x,
+          targetForearmX,
+          limbBlend,
+        );
+      }
+      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, targetHandX, limbBlend);
       return;
     }
 
@@ -12014,10 +13063,10 @@ function animatePlayerModel(dt) {
     const wave = Math.sin(phase);
     const elbowDrive = Math.max(0, -wave);
     const forwardDrive = Math.max(0, wave);
-    const runArmX = wave * 1.12 * runStrength - 0.18;
-    const runArmZ = side * (0.28 + elbowDrive * 0.18);
-    const boostArmX = -1.1 - boostStartFlare * 0.18;
-    const boostArmZ = side * (0.62 + boostStartFlare * 0.16);
+    const runArmX = wave * motionTune.runArmSwing * runStrength - 0.18;
+    const runArmZ = side * (motionTune.runArmSide + elbowDrive * 0.18);
+    const boostArmX = -motionTune.boostArmBack - boostStartFlare * 0.18;
+    const boostArmZ = side * (motionTune.boostArmSide + boostStartFlare * 0.16);
     arm.rotation.x = THREE.MathUtils.lerp(
       arm.rotation.x,
       THREE.MathUtils.lerp(runArmX, boostArmX, boostPoseAmount),
@@ -12050,12 +13099,45 @@ function animatePlayerModel(dt) {
 
   const applyLegPose = (leg, phase, side) => {
     if (!leg) return;
-    if (airborne) {
-      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.5, limbBlend);
-      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, limbBlend);
-      if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.8, limbBlend);
-      if (leg.shoe) leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0.18, limbBlend);
+    if (keyPoseConfig || airborne) {
+      const sourcePose = keyPoseConfig ?? jumpPoseConfig;
+      const pose = side < 0 ? sourcePose.legs.left : sourcePose.legs.right;
+      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, pose.x, limbBlend);
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, pose.z, limbBlend);
+      if (leg.lower) {
+        leg.lower.rotation.x = THREE.MathUtils.lerp(
+          leg.lower.rotation.x,
+          pose.lowerX,
+          limbBlend,
+        );
+      }
+      if (leg.shoe) leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, pose.shoeX, limbBlend);
       if (leg.shoe) leg.shoe.scale.setScalar(1);
+      return;
+    }
+
+    if (slideAmount > 0.02) {
+      leg.rotation.x = THREE.MathUtils.lerp(
+        leg.rotation.x,
+        -0.18,
+        limbBlend,
+      );
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, side * 0.08, limbBlend);
+      if (leg.lower) {
+        leg.lower.rotation.x = THREE.MathUtils.lerp(
+          leg.lower.rotation.x,
+          0.08,
+          limbBlend,
+        );
+      }
+      if (leg.shoe) {
+        leg.shoe.rotation.x = THREE.MathUtils.lerp(
+          leg.shoe.rotation.x,
+          -0.08,
+          limbBlend,
+        );
+        leg.shoe.scale.set(1, 1, 1.08);
+      }
       return;
     }
 
@@ -12104,11 +13186,11 @@ function animatePlayerModel(dt) {
     const wave = Math.sin(phase);
     const lift = Math.max(0, wave);
     const push = Math.max(0, -wave);
-    const runKneeFlex = -(0.28 + lift * 1.24 * runStrength + push * 0.48 * runStrength);
-    const boostForwardReach = lift * 1.32 * runStrength;
-    const boostGroundKick = push * 1.04 * runStrength;
-    const boostKneeFlex = -(0.18 + lift * 0.58 * runStrength + push * 0.72 * runStrength);
-    const runLegX = wave * 1.14 * runStrength;
+    const runKneeFlex = -(0.28 + lift * motionTune.runKneeLift * runStrength + push * motionTune.runKneePush * runStrength);
+    const boostForwardReach = lift * motionTune.boostForwardReach * runStrength;
+    const boostGroundKick = push * motionTune.boostGroundKick * runStrength;
+    const boostKneeFlex = -(0.18 + lift * motionTune.boostKneeLift * runStrength + push * motionTune.boostKneePush * runStrength);
+    const runLegX = wave * motionTune.runLegSwing * runStrength;
     const boostLegX = boostForwardReach - boostGroundKick;
     leg.rotation.x = THREE.MathUtils.lerp(
       leg.rotation.x,
@@ -12257,7 +13339,7 @@ const cameraLateralIdleFollowRate = 3.6;
 const cameraLateralRunFollowRate = 4.2;
 const cameraLateralQuickStepFollowRate = 2.4;
 const characterInspectTargetPresets = Object.freeze({
-  full: { focusLift: 0.5, distance: 3.2, heightOffset: 0.65, fov: 39 },
+  full: { focusLift: 0.18, distance: 5.1, heightOffset: 0.92, fov: 52 },
   face: { focusLift: 2.02, distance: 1.35, heightOffset: 0.08, fov: 29 },
   upper: { focusLift: 1.22, distance: 1.85, heightOffset: 0.14, fov: 32 },
   lower: { focusLift: 0.22, distance: 2.0, heightOffset: 0.14, fov: 34 },
@@ -12277,6 +13359,293 @@ const characterInspectAnglePresets = Object.freeze({
   top: { tangent: -0.16, right: 0, up: 1.08, fovAdd: 4 },
   bottom: { tangent: -0.18, right: 0, up: -0.78, fovAdd: 4 },
 });
+const characterInspectFramingMargin = 1.1;
+const characterInspectProjectionSafety = 0.9;
+const characterInspectProjectionDistancePadding = 1.04;
+const characterInspectProjectionMaxIterations = 6;
+const characterInspectMinDistance = 0.75;
+const characterInspectMaxDistance = 12.5;
+const characterInspectOrbitYawSensitivity = 0.0062;
+const characterInspectOrbitPitchSensitivity = 0.0052;
+const characterInspectOrbitZoomSensitivity = 0.00115;
+const characterInspectOrbitMinZoom = 0.45;
+const characterInspectOrbitMaxZoom = 2.8;
+const characterInspectOrbitMinPitch = THREE.MathUtils.degToRad(-84);
+const characterInspectOrbitMaxPitch = THREE.MathUtils.degToRad(84);
+const characterInspectStableCenterDeadZone = 0.12;
+const characterInspectStableDistanceDeadZone = 0.2;
+const characterInspectStableCenterLerp = 5.5;
+const characterInspectStableDistanceLerp = 5.0;
+const characterInspectMinDistanceByTarget = Object.freeze({
+  face: 1.45,
+  upper: 1.25,
+});
+
+function collectCharacterInspectObjects(target) {
+  if (!player.parts?.model) return [];
+
+  switch (target) {
+    case "face":
+      return [player.parts.head].filter(Boolean);
+    case "lower":
+      return (player.parts.legs ?? []).filter(Boolean);
+    case "foot":
+      return (player.parts.legs ?? []).map((leg) => leg?.shoe).filter(Boolean);
+    case "upper":
+      return [player.parts.model];
+    case "full":
+    default:
+      return [player.parts.model];
+  }
+}
+
+function shouldSkipCharacterInspectObject(object, target) {
+  if (!object?.isMesh) return true;
+  if (object.userData?.energyLine) return true;
+  if (target !== "upper") return false;
+
+  for (const leg of player.parts?.legs ?? []) {
+    if (leg && (object === leg || leg.children.includes(object))) return true;
+    let parent = object.parent;
+    while (parent) {
+      if (parent === leg) return true;
+      parent = parent.parent;
+    }
+  }
+  return false;
+}
+
+function expandCharacterInspectBoxFromObject(root, target) {
+  if (!root) return;
+
+  root.updateWorldMatrix(true, true);
+  root.traverse((object) => {
+    if (shouldSkipCharacterInspectObject(object, target)) return;
+    if (!object.geometry) return;
+    if (!object.geometry.boundingBox) {
+      object.geometry.computeBoundingBox();
+    }
+    characterInspectMeshBox.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld);
+    characterInspectBox.union(characterInspectMeshBox);
+  });
+}
+
+function getCharacterInspectBounds(target) {
+  characterInspectBox.makeEmpty();
+  for (const object of collectCharacterInspectObjects(target)) {
+    expandCharacterInspectBoxFromObject(object, target);
+  }
+
+  if (characterInspectBox.isEmpty()) {
+    return null;
+  }
+
+  return characterInspectBox;
+}
+
+function getCharacterInspectProjectedOverflow(bounds, center, direction, distance, baseFov, frame) {
+  characterInspectProjectionYaw.setFromAxisAngle(frame.up, cameraYawOffset);
+  characterInspectProjectionOffset.copy(direction)
+    .multiplyScalar(distance)
+    .applyQuaternion(characterInspectProjectionYaw);
+  characterInspectProjectionPitchAxis.copy(getCharacterInspectOrbitPitchAxis(frame, characterInspectProjectionOffset));
+  characterInspectProjectionPitch.setFromAxisAngle(characterInspectProjectionPitchAxis, cameraPitchOffset);
+  characterInspectProjectionOffset.applyQuaternion(characterInspectProjectionPitch);
+
+  characterInspectProjectionCamera.position.copy(center).add(characterInspectProjectionOffset);
+  characterInspectProjectionCamera.up.copy(frame.up);
+  characterInspectProjectionCamera.fov = baseFov;
+  characterInspectProjectionCamera.aspect = Math.max(0.2, camera.aspect || 1);
+  characterInspectProjectionCamera.near = 0.01;
+  characterInspectProjectionCamera.far = Math.max(50, distance + characterInspectSize.length() + 10);
+  characterInspectProjectionCamera.lookAt(center);
+  characterInspectProjectionCamera.updateProjectionMatrix();
+  characterInspectProjectionCamera.updateMatrixWorld(true);
+
+  let maxProjected = 0;
+  for (let x = 0; x <= 1; x += 1) {
+    for (let y = 0; y <= 1; y += 1) {
+      for (let z = 0; z <= 1; z += 1) {
+        characterInspectProjectionCorner.set(
+          x ? bounds.max.x : bounds.min.x,
+          y ? bounds.max.y : bounds.min.y,
+          z ? bounds.max.z : bounds.min.z,
+        ).project(characterInspectProjectionCamera);
+        if (!Number.isFinite(characterInspectProjectionCorner.x)
+          || !Number.isFinite(characterInspectProjectionCorner.y)) {
+          return Number.POSITIVE_INFINITY;
+        }
+        maxProjected = Math.max(
+          maxProjected,
+          Math.abs(characterInspectProjectionCorner.x),
+          Math.abs(characterInspectProjectionCorner.y),
+        );
+      }
+    }
+  }
+
+  return maxProjected / characterInspectProjectionSafety;
+}
+
+function refineCharacterInspectDistanceByProjection(bounds, center, direction, distance, minDistance, maxDistance, baseFov, frame) {
+  let refinedDistance = THREE.MathUtils.clamp(distance, minDistance, maxDistance);
+  for (let i = 0; i < characterInspectProjectionMaxIterations; i += 1) {
+    const overflow = getCharacterInspectProjectedOverflow(
+      bounds,
+      center,
+      direction,
+      refinedDistance,
+      baseFov,
+      frame,
+    );
+    if (Number.isFinite(overflow) && overflow <= 1) break;
+    const scale = Number.isFinite(overflow)
+      ? THREE.MathUtils.clamp(overflow * characterInspectProjectionDistancePadding, 1.06, 1.75)
+      : 1.35;
+    const nextDistance = THREE.MathUtils.clamp(refinedDistance * scale, minDistance, maxDistance);
+    if (Math.abs(nextDistance - refinedDistance) < 0.001) break;
+    refinedDistance = nextDistance;
+  }
+  return refinedDistance;
+}
+
+function getCharacterInspectAutoFrame(target, anglePreset, frame, baseFov) {
+  if (!currentStage.testRoom || !debugSettings.characterInspect) return null;
+
+  const bounds = getCharacterInspectBounds(target);
+  if (!bounds) return null;
+
+  bounds.getCenter(characterInspectCenter);
+  bounds.getSize(characterInspectSize);
+  const direction = characterInspectCameraDirection.copy(frame.tangent)
+    .multiplyScalar(anglePreset.tangent)
+    .addScaledVector(frame.right, anglePreset.right);
+  if (direction.lengthSq() < 0.001) {
+    direction.copy(frame.tangent).multiplyScalar(-1);
+  } else {
+    direction.normalize();
+  }
+  direction.addScaledVector(frame.up, anglePreset.up).normalize();
+
+  characterInspectCameraRight.crossVectors(frame.up, direction).normalize();
+  if (characterInspectCameraRight.lengthSq() < 0.001) {
+    characterInspectCameraRight.copy(frame.right);
+  }
+  characterInspectCameraUp.copy(frame.up);
+
+  let halfViewWidth = 0.05;
+  let halfViewHeight = 0.05;
+  for (let x = 0; x <= 1; x += 1) {
+    for (let y = 0; y <= 1; y += 1) {
+      for (let z = 0; z <= 1; z += 1) {
+        characterInspectWorldCorner.set(
+          x ? bounds.max.x : bounds.min.x,
+          y ? bounds.max.y : bounds.min.y,
+          z ? bounds.max.z : bounds.min.z,
+        ).sub(characterInspectCenter);
+        halfViewWidth = Math.max(
+          halfViewWidth,
+          Math.abs(characterInspectWorldCorner.dot(characterInspectCameraRight)),
+        );
+        halfViewHeight = Math.max(
+          halfViewHeight,
+          Math.abs(characterInspectWorldCorner.dot(characterInspectCameraUp)),
+        );
+      }
+    }
+  }
+
+  const fovRad = THREE.MathUtils.degToRad(baseFov);
+  const aspect = Math.max(0.2, camera.aspect || 1);
+  const verticalDistance = halfViewHeight / Math.tan(fovRad * 0.5);
+  const horizontalFovRad = 2 * Math.atan(Math.tan(fovRad * 0.5) * aspect);
+  const horizontalDistance = halfViewWidth / Math.tan(horizontalFovRad * 0.5);
+  const minDistance = characterInspectMinDistanceByTarget[target] ?? characterInspectMinDistance;
+  const baseDistance = THREE.MathUtils.clamp(
+    Math.max(verticalDistance, horizontalDistance) * characterInspectFramingMargin,
+    minDistance,
+    characterInspectMaxDistance,
+  );
+  const distance = refineCharacterInspectDistanceByProjection(
+    bounds,
+    characterInspectCenter,
+    direction,
+    baseDistance,
+    minDistance,
+    characterInspectMaxDistance,
+    baseFov,
+    frame,
+  );
+
+  return {
+    center: characterInspectCenter,
+    direction,
+    distance,
+  };
+}
+
+function getCharacterInspectStableFrameKey(target) {
+  return [
+    currentStageIndex,
+    target,
+    debugSettings.characterInspectAngle,
+    debugSettings.characterInspectMotion,
+    debugSettings.characterInspectMotionSpeed,
+    debugSettings.characterInspectMotionFreeze ? "freeze" : "play",
+    debugSettings.characterInspectMotionFreeze
+      ? THREE.MathUtils.clamp(debugSettings.characterInspectMotionPhase, 0, 1).toFixed(2)
+      : "-",
+    debugSettings.characterInspectJumpPose,
+  ].join("|");
+}
+
+function resetCharacterInspectStableFrame() {
+  characterInspectStableFrameValid = false;
+  characterInspectStableFrameKey = "";
+  characterInspectStableDistance = 0;
+}
+
+function getCharacterInspectStableAutoFrame(autoFrame, target, dt) {
+  if (!autoFrame) {
+    resetCharacterInspectStableFrame();
+    return null;
+  }
+
+  const frameKey = getCharacterInspectStableFrameKey(target);
+  if (!characterInspectStableFrameValid || characterInspectStableFrameKey !== frameKey) {
+    characterInspectStableCenter.copy(autoFrame.center);
+    characterInspectStableDirection.copy(autoFrame.direction);
+    characterInspectStableDistance = autoFrame.distance;
+    characterInspectStableFrameKey = frameKey;
+    characterInspectStableFrameValid = true;
+    return {
+      center: characterInspectStableCenter,
+      direction: characterInspectStableDirection,
+      distance: characterInspectStableDistance,
+    };
+  }
+
+  if (characterInspectStableCenter.distanceTo(autoFrame.center) > characterInspectStableCenterDeadZone) {
+    characterInspectStableCenter.lerp(
+      autoFrame.center,
+      1 - Math.exp(-characterInspectStableCenterLerp * dt),
+    );
+  }
+  if (Math.abs(characterInspectStableDistance - autoFrame.distance) > characterInspectStableDistanceDeadZone) {
+    characterInspectStableDistance = THREE.MathUtils.lerp(
+      characterInspectStableDistance,
+      autoFrame.distance,
+      1 - Math.exp(-characterInspectStableDistanceLerp * dt),
+    );
+  }
+  characterInspectStableDirection.copy(autoFrame.direction);
+
+  return {
+    center: characterInspectStableCenter,
+    direction: characterInspectStableDirection,
+    distance: characterInspectStableDistance,
+  };
+}
 
 function updateBoostCameraState(boostActive, dt) {
   if (boostActive && !boostCameraWasActive) {
@@ -12292,6 +13661,102 @@ function updateBoostCameraState(boostActive, dt) {
     boostCameraSustain,
     sustainTarget,
     1 - Math.exp(-sustainRate * dt),
+  );
+}
+
+function isCharacterInspectOrbitAvailable() {
+  return Boolean(currentStage.testRoom && debugSettings.characterInspect);
+}
+
+function setCharacterInspectOrbitActive(active) {
+  characterInspectOrbitState.active = active;
+  document.body.classList.toggle("test-room-inspect-orbiting", active);
+}
+
+function resetCharacterInspectOrbit() {
+  setCharacterInspectOrbitActive(false);
+  characterInspectOrbitState.pointerId = null;
+  cameraYawOffset = 0;
+  cameraPitchOffset = 0;
+  characterInspectZoomScale = 1;
+  resetCharacterInspectStableFrame();
+}
+
+function clampCharacterInspectOrbitPitch(value) {
+  return THREE.MathUtils.clamp(
+    value,
+    characterInspectOrbitMinPitch,
+    characterInspectOrbitMaxPitch,
+  );
+}
+
+function getCharacterInspectOrbitPitchAxis(frame, cameraOffset) {
+  characterInspectOrbitHorizontalOffset.copy(cameraOffset).projectOnPlane(frame.up);
+  if (characterInspectOrbitHorizontalOffset.lengthSq() < 0.0001) {
+    return characterInspectOrbitPitchAxis.copy(frame.right);
+  }
+  characterInspectOrbitHorizontalOffset.normalize();
+  return characterInspectOrbitPitchAxis
+    .crossVectors(characterInspectOrbitHorizontalOffset, frame.up)
+    .normalize();
+}
+
+function handleCharacterInspectOrbitPointerDown(event) {
+  if (!isCharacterInspectOrbitAvailable()) return;
+  if (event.pointerType && event.pointerType !== "mouse") return;
+  if (event.button !== 0 || event.target !== canvas) return;
+
+  event.preventDefault();
+  setCharacterInspectOrbitActive(true);
+  characterInspectOrbitState.pointerId = event.pointerId;
+  characterInspectOrbitState.lastX = event.clientX;
+  characterInspectOrbitState.lastY = event.clientY;
+  try {
+    canvas.setPointerCapture?.(event.pointerId);
+  } catch {
+    // Pointer capture can fail in some embedded browser states; dragging still works while over the canvas.
+  }
+}
+
+function handleCharacterInspectOrbitPointerMove(event) {
+  if (!characterInspectOrbitState.active || characterInspectOrbitState.pointerId !== event.pointerId) return;
+
+  event.preventDefault();
+  const deltaX = event.clientX - characterInspectOrbitState.lastX;
+  const deltaY = event.clientY - characterInspectOrbitState.lastY;
+  characterInspectOrbitState.lastX = event.clientX;
+  characterInspectOrbitState.lastY = event.clientY;
+
+  cameraYawOffset = THREE.MathUtils.euclideanModulo(
+    cameraYawOffset - deltaX * characterInspectOrbitYawSensitivity + Math.PI,
+    Math.PI * 2,
+  ) - Math.PI;
+  cameraPitchOffset = clampCharacterInspectOrbitPitch(
+    cameraPitchOffset + deltaY * characterInspectOrbitPitchSensitivity,
+  );
+}
+
+function handleCharacterInspectOrbitPointerEnd(event) {
+  if (characterInspectOrbitState.pointerId !== event.pointerId) return;
+
+  try {
+    canvas.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Safe to ignore when pointer capture was not granted.
+  }
+  characterInspectOrbitState.pointerId = null;
+  setCharacterInspectOrbitActive(false);
+}
+
+function handleCharacterInspectOrbitWheel(event) {
+  if (!isCharacterInspectOrbitAvailable()) return;
+  if (event.target !== canvas) return;
+
+  event.preventDefault();
+  characterInspectZoomScale = THREE.MathUtils.clamp(
+    characterInspectZoomScale * Math.exp(event.deltaY * characterInspectOrbitZoomSensitivity),
+    characterInspectOrbitMinZoom,
+    characterInspectOrbitMaxZoom,
   );
 }
 
@@ -12401,7 +13866,7 @@ function updateObjectGalleryCamera(dt) {
     .addScaledVector(frame.up, baseHeight + anglePreset.up * cameraDistance * 0.72);
   const yawRotation = new THREE.Quaternion().setFromAxisAngle(frame.up, cameraYawOffset);
   cameraOffset.applyQuaternion(yawRotation);
-  const pitchAxis = frame.right.clone().applyQuaternion(yawRotation).normalize();
+  const pitchAxis = getCharacterInspectOrbitPitchAxis(frame, cameraOffset).clone();
   cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
 
   const desired = targetWorld.clone().add(cameraOffset);
@@ -12442,8 +13907,7 @@ function updateManualCameraInput(dt) {
 }
 
 function resetCameraView() {
-  cameraYawOffset = 0;
-  cameraPitchOffset = 0;
+  resetCharacterInspectOrbit();
 }
 
 function setPaused(paused, reason = "manual") {
@@ -12581,7 +14045,7 @@ function updateMusicButton() {
 }
 
 function loadGraphicsSettings() {
-  if (isGraphicsResetRequested()) {
+  if (isGraphicsSafeResetRequested()) {
     const safeSettings = getSafeGraphicsSettings();
     try {
       window.localStorage.removeItem(graphicsStorageKey);
@@ -12592,16 +14056,38 @@ function loadGraphicsSettings() {
     return safeSettings;
   }
 
+  if (isGraphicsResetRequested()) {
+    const defaultSettings = getRouteDefaultGraphicsSettings();
+    try {
+      window.localStorage.removeItem(graphicsStorageKey);
+    } catch {
+      // Continue with route defaults even when localStorage is unavailable.
+    }
+    return defaultSettings;
+  }
+
   if (isGraphicsSafeModeRequested()) {
     return getSafeGraphicsSettings();
   }
 
   try {
-    const stored = JSON.parse(window.localStorage.getItem(graphicsStorageKey));
+    const storedRaw = window.localStorage.getItem(graphicsStorageKey);
+    if (!storedRaw) return getRouteDefaultGraphicsSettings();
+    const stored = JSON.parse(storedRaw);
     return normalizeGraphicsSettings(stored);
   } catch {
-    return normalizeGraphicsSettings();
+    return getRouteDefaultGraphicsSettings();
   }
+}
+
+function isGraphicsSafeResetRequested() {
+  const params = new URLSearchParams(window.location.search);
+  const graphicsMode = params.get("graphics");
+  const resetGraphics = params.get("resetGraphics");
+  return graphicsMode === "safe-reset"
+    || graphicsMode === "low-reset"
+    || resetGraphics === "low"
+    || resetGraphics === "safe";
 }
 
 function isGraphicsResetRequested() {
@@ -12625,6 +14111,18 @@ function isGraphicsSafeModeRequested() {
 
 function getSafeGraphicsSettings() {
   return normalizeGraphicsSettings({ preset: "low", ...graphicsPresets.low });
+}
+
+function getRouteDefaultGraphicsSettings() {
+  return isRequestedStageTestRoom()
+    ? normalizeGraphicsSettings({ preset: "ultra", ...graphicsPresets.ultra })
+    : normalizeGraphicsSettings();
+}
+
+function isRequestedStageTestRoom() {
+  const params = new URLSearchParams(window.location.search);
+  const stageRoute = String(params.get("stage") || "").trim().toLowerCase();
+  return ["test", "testroom", "test-room", "room"].includes(stageRoute);
 }
 
 function normalizeGraphicsSettings(source = {}) {
@@ -12683,6 +14181,312 @@ function getCharacterInspectMotionSpeed(source = {}) {
     : debugDefaults.characterInspectMotionSpeed;
 }
 
+function getCharacterInspectMotionPhase(source = {}) {
+  const phase = Number(source.characterInspectMotionPhase);
+  return Number.isFinite(phase)
+    ? THREE.MathUtils.clamp(phase, 0, 1)
+    : debugDefaults.characterInspectMotionPhase;
+}
+
+function getCharacterInspectMotionPhaseMarkers(mode = debugSettings.characterInspectMotion) {
+  return characterInspectMotionPhaseMarkers[mode] ?? [];
+}
+
+function setCharacterInspectMotionPhaseFromMarker(phase) {
+  debugSettings = normalizeDebugSettings({
+    ...debugSettings,
+    characterInspect: true,
+    characterInspectMotionFreeze: true,
+    characterInspectMotionPhase: phase,
+  });
+  resetCharacterInspectStableFrame();
+  saveDebugSettings();
+  syncDebugControls();
+}
+
+function getCharacterInspectMotionPhaseMarkerMatch(markers, currentPhase) {
+  let bestMarker = null;
+  let bestDistance = Infinity;
+  for (const marker of markers) {
+    const phase = THREE.MathUtils.clamp(marker.phase, 0, 1);
+    const distance = Math.abs(currentPhase - phase);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestMarker = marker;
+    }
+  }
+  return bestDistance <= 0.015 ? bestMarker : null;
+}
+
+function syncCharacterInspectMotionPointLabel(available, markers, currentPhase, activeMarker) {
+  if (!testRoomCharacterInspectMotionPointEl) return;
+
+  if (!available) {
+    testRoomCharacterInspectMotionPointEl.textContent = "Point: Live";
+    testRoomCharacterInspectMotionPointEl.classList.remove("is-marker");
+    return;
+  }
+
+  if (activeMarker) {
+    testRoomCharacterInspectMotionPointEl.textContent = `Point: ${activeMarker.label} ${formatPoseTunerNumber(activeMarker.phase)}`;
+    testRoomCharacterInspectMotionPointEl.classList.add("is-marker");
+    return;
+  }
+
+  const label = markers.length > 0 ? "Custom" : "No marker";
+  testRoomCharacterInspectMotionPointEl.textContent = `Point: ${label} ${formatPoseTunerNumber(currentPhase)}`;
+  testRoomCharacterInspectMotionPointEl.classList.remove("is-marker");
+}
+
+function syncCharacterInspectMotionPhaseMarkers(available) {
+  if (!testRoomCharacterInspectMotionMarkersEl) return;
+
+  const markers = getCharacterInspectMotionPhaseMarkers();
+  const markerKey = available
+    ? `${debugSettings.characterInspectMotion}:${markers.map((marker) => `${marker.label}:${formatPoseTunerNumber(marker.phase)}`).join("|")}`
+    : "";
+
+  if (markerKey !== characterInspectMotionMarkerKey) {
+    characterInspectMotionMarkerKey = markerKey;
+    testRoomCharacterInspectMotionMarkersEl.textContent = "";
+
+    if (available) {
+      for (const marker of markers) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "test-room-motion-phase-marker";
+        button.style.left = `${THREE.MathUtils.clamp(marker.phase, 0, 1) * 100}%`;
+        button.title = `${marker.label} (${formatPoseTunerNumber(marker.phase)})`;
+        button.dataset.phase = String(THREE.MathUtils.clamp(marker.phase, 0, 1));
+        button.setAttribute("aria-label", `Set phase to ${marker.label} ${formatPoseTunerNumber(marker.phase)}`);
+        button.addEventListener("click", () => {
+          setCharacterInspectMotionPhaseFromMarker(marker.phase);
+        });
+        testRoomCharacterInspectMotionMarkersEl.append(button);
+      }
+    }
+  }
+
+  const currentPhase = THREE.MathUtils.clamp(debugSettings.characterInspectMotionPhase, 0, 1);
+  if (!available) {
+    syncCharacterInspectMotionPointLabel(false, markers, currentPhase, null);
+    return;
+  }
+
+  const activeMarker = getCharacterInspectMotionPhaseMarkerMatch(markers, currentPhase);
+  for (const button of testRoomCharacterInspectMotionMarkersEl.querySelectorAll(".test-room-motion-phase-marker")) {
+    const phase = Number(button.dataset.phase);
+    const active = Number.isFinite(phase) && Math.abs(currentPhase - phase) <= 0.015;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+  syncCharacterInspectMotionPointLabel(available, markers, currentPhase, activeMarker);
+}
+
+function getCharacterInspectKeyPoseContext() {
+  if (!isCharacterInspectKeyPoseEditActive()) return null;
+
+  const markers = getCharacterInspectMotionPhaseMarkers();
+  const currentPhase = THREE.MathUtils.clamp(debugSettings.characterInspectMotionPhase, 0, 1);
+  const marker = getCharacterInspectMotionPhaseMarkerMatch(markers, currentPhase);
+  if (!marker) return null;
+
+  const phase = THREE.MathUtils.clamp(marker.phase, 0, 1);
+  const phaseLabel = formatPoseTunerNumber(phase);
+  return {
+    mode: debugSettings.characterInspectMotion,
+    marker,
+    phase,
+    phaseLabel,
+    label: `${marker.label} ${phaseLabel}`,
+    key: getCharacterInspectKeyPoseKey(debugSettings.characterInspectMotion, marker),
+  };
+}
+
+function getCharacterInspectKeyPoseKey(mode, marker) {
+  const phase = THREE.MathUtils.clamp(marker.phase, 0, 1);
+  return `${mode}:${formatPoseTunerNumber(phase)}:${marker.label}`;
+}
+
+function getCharacterInspectKeyPoseConfig() {
+  const context = getCharacterInspectKeyPoseContext();
+  return context ? characterInspectKeyPoseOverrides.get(context.key) ?? null : null;
+}
+
+function getCurrentMotionSavedKeyPoseCount() {
+  if (!currentStage.testRoom || !debugSettings.characterInspect) return 0;
+  if (debugSettings.characterInspectMotion === "live") return 0;
+  const markers = getCharacterInspectMotionPhaseMarkers();
+  return markers.reduce((count, marker) => (
+    characterInspectKeyPoseOverrides.has(getCharacterInspectKeyPoseKey(debugSettings.characterInspectMotion, marker))
+      ? count + 1
+      : count
+  ), 0);
+}
+
+function getCurrentMotionKeyPoseExportConfig() {
+  const mode = debugSettings.characterInspectMotion;
+  const markers = getCharacterInspectMotionPhaseMarkers();
+  return {
+    motion: mode,
+    motionName: getCharacterInspectMotionDisplayName(mode),
+    generatedFrom: "TEST ROOM",
+    points: markers.map((marker) => {
+      const phase = THREE.MathUtils.clamp(marker.phase, 0, 1);
+      const phaseLabel = formatPoseTunerNumber(phase);
+      const key = getCharacterInspectKeyPoseKey(mode, marker);
+      return {
+        label: marker.label,
+        phase,
+        phaseLabel,
+        key,
+        pose: characterInspectKeyPoseOverrides.get(key) ?? null,
+      };
+    }),
+  };
+}
+
+function getCharacterInspectMotionDisplayName(mode = debugSettings.characterInspectMotion) {
+  const names = {
+    live: "Live",
+    idle: "Idle",
+    walk: "Walk",
+    run: "Run",
+    boost: "Boost",
+    slide: "Slide",
+    quickstepLeft: "Quickstep L",
+    quickstepRight: "Quickstep R",
+    jump: "Jump",
+    landing: "Landing",
+    hitstun: "Hitstun",
+  };
+  return names[mode] ?? mode;
+}
+
+function isCharacterInspectKeyPoseEditActive() {
+  return Boolean(
+    currentStage.testRoom
+      && debugSettings.characterInspect
+      && debugSettings.characterInspectMotion !== "live"
+      && debugSettings.characterInspectMotionFreeze,
+  );
+}
+
+function getEditableCharacterInspectPoseConfig() {
+  const context = getCharacterInspectKeyPoseContext();
+  if (context && characterInspectKeyPoseOverrides.has(context.key)) {
+    return characterInspectKeyPoseOverrides.get(context.key);
+  }
+  if (debugSettings.characterInspectMotion === "jump") {
+    return getEditableCharacterJumpPoseConfig();
+  }
+  return null;
+}
+
+function getCharacterInspectPoseTunerContext() {
+  const keyPoseContext = getCharacterInspectKeyPoseContext();
+  if (keyPoseContext && characterInspectKeyPoseOverrides.has(keyPoseContext.key)) {
+    return {
+      type: "keyPose",
+      context: keyPoseContext,
+      config: characterInspectKeyPoseOverrides.get(keyPoseContext.key),
+      status: `${getCharacterInspectMotionDisplayName(keyPoseContext.mode)} ${keyPoseContext.label} selected pose`,
+    };
+  }
+
+  if (debugSettings.characterInspectMotion === "jump") {
+    const edited = characterInspectJumpPoseOverrides.has(debugSettings.characterInspectJumpPose);
+    return {
+      type: "jumpPose",
+      config: getCharacterJumpPoseConfig(debugSettings.characterInspectJumpPose),
+      status: `${debugSettings.characterInspectJumpPose} ${edited ? "edited" : "base"} jump pose`,
+    };
+  }
+
+  return null;
+}
+
+function captureCurrentCharacterPoseConfig() {
+  const fallback = cloneCharacterJumpPoseConfig(characterInspectJumpPoseConfigs[debugDefaults.characterInspectJumpPose]);
+  if (!player.parts?.model) return fallback;
+
+  const [armLeft, armRight] = player.parts.arms ?? [];
+  const [legLeft, legRight] = player.parts.legs ?? [];
+  return {
+    bodyX: player.parts.model.rotation.x,
+    arms: {
+      left: {
+        x: armLeft?.rotation.x ?? fallback.arms.left.x,
+        z: armLeft?.rotation.z ?? fallback.arms.left.z,
+        forearmX: armLeft?.forearm?.rotation.x ?? fallback.arms.left.forearmX,
+        handX: armLeft?.hand?.rotation.x ?? fallback.arms.left.handX,
+      },
+      right: {
+        x: armRight?.rotation.x ?? fallback.arms.right.x,
+        z: armRight?.rotation.z ?? fallback.arms.right.z,
+        forearmX: armRight?.forearm?.rotation.x ?? fallback.arms.right.forearmX,
+        handX: armRight?.hand?.rotation.x ?? fallback.arms.right.handX,
+      },
+    },
+    legs: {
+      left: {
+        x: legLeft?.rotation.x ?? fallback.legs.left.x,
+        z: legLeft?.rotation.z ?? fallback.legs.left.z,
+        lowerX: legLeft?.lower?.rotation.x ?? fallback.legs.left.lowerX,
+        shoeX: legLeft?.shoe?.rotation.x ?? fallback.legs.left.shoeX,
+      },
+      right: {
+        x: legRight?.rotation.x ?? fallback.legs.right.x,
+        z: legRight?.rotation.z ?? fallback.legs.right.z,
+        lowerX: legRight?.lower?.rotation.x ?? fallback.legs.right.lowerX,
+        shoeX: legRight?.shoe?.rotation.x ?? fallback.legs.right.shoeX,
+      },
+    },
+  };
+}
+
+function syncCharacterInspectKeyPoseControls() {
+  const context = getCharacterInspectKeyPoseContext();
+  const hasKeyPose = Boolean(context && characterInspectKeyPoseOverrides.has(context.key));
+  const motionSelected = Boolean(
+    currentStage.testRoom
+      && debugSettings.characterInspect
+      && debugSettings.characterInspectMotion !== "live",
+  );
+
+  if (testRoomCharacterInspectKeyPoseStatusEl) {
+    let text = "Key Pose: live motion";
+    if (motionSelected && !debugSettings.characterInspectMotionFreeze) {
+      text = "Key Pose: switch to Edit Key Pose";
+    } else if (motionSelected) {
+      text = context
+        ? `Key Pose: ${hasKeyPose ? "saved" : "not captured"} ${context.label}`
+        : "Key Pose: select phase marker";
+    }
+    testRoomCharacterInspectKeyPoseStatusEl.textContent = text;
+    testRoomCharacterInspectKeyPoseStatusEl.classList.toggle("is-saved", hasKeyPose);
+  }
+
+  if (testRoomCharacterInspectKeyPoseCaptureButton) {
+    testRoomCharacterInspectKeyPoseCaptureButton.disabled = !context;
+  }
+  if (testRoomCharacterInspectKeyPoseClearButton) {
+    testRoomCharacterInspectKeyPoseClearButton.disabled = !hasKeyPose;
+  }
+  if (testRoomCharacterInspectKeyPoseCopyButton) {
+    testRoomCharacterInspectKeyPoseCopyButton.disabled = !hasKeyPose;
+  }
+  if (testRoomCharacterInspectKeyPoseCopyMotionButton) {
+    testRoomCharacterInspectKeyPoseCopyMotionButton.disabled = getCurrentMotionSavedKeyPoseCount() <= 0;
+  }
+}
+
+function getCharacterInspectJumpPose(source = {}) {
+  return characterInspectJumpPosePresets.includes(source.characterInspectJumpPose)
+    ? source.characterInspectJumpPose
+    : debugDefaults.characterInspectJumpPose;
+}
+
 function getObjectGalleryItem(source = {}) {
   return objectGalleryItems.includes(source.objectGalleryItem)
     ? source.objectGalleryItem
@@ -12705,6 +14509,11 @@ function normalizeDebugSettings(source = {}) {
     characterInspectAngle: getLegacyCharacterInspectAngle(source),
     characterInspectMotion: getCharacterInspectMotionMode(source),
     characterInspectMotionSpeed: getCharacterInspectMotionSpeed(source),
+    characterInspectMotionFreeze: typeof source.characterInspectMotionFreeze === "boolean"
+      ? source.characterInspectMotionFreeze
+      : debugDefaults.characterInspectMotionFreeze,
+    characterInspectMotionPhase: getCharacterInspectMotionPhase(source),
+    characterInspectJumpPose: getCharacterInspectJumpPose(source),
     objectGallery: typeof source.objectGallery === "boolean"
       ? source.objectGallery
       : debugDefaults.objectGallery,
@@ -12810,6 +14619,7 @@ function bindDebugControls() {
       ...debugSettings,
       characterInspectMotion: debugCharacterInspectMotionSelect.value,
     });
+    resetCameraView();
     saveDebugSettings();
     syncDebugControls();
   });
@@ -12821,6 +14631,164 @@ function bindDebugControls() {
     });
     saveDebugSettings();
     syncDebugControls();
+  });
+
+  testRoomCharacterInspectToggle?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: testRoomCharacterInspectToggle.checked,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectTargetSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectTarget: testRoomCharacterInspectTargetSelect.value,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectAngleSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectAngle: testRoomCharacterInspectAngleSelect.value,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectMotionSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectMotion: testRoomCharacterInspectMotionSelect.value,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectMotionSpeedSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectMotionSpeed: testRoomCharacterInspectMotionSpeedSelect.value,
+    });
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectPreviewPlayButton?.addEventListener("click", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectMotionFreeze: false,
+    });
+    resetCharacterInspectStableFrame();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectPreviewEditButton?.addEventListener("click", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectMotionFreeze: true,
+    });
+    resetCharacterInspectStableFrame();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectMotionPhaseInput?.addEventListener("input", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectMotionFreeze: true,
+      characterInspectMotionPhase: testRoomCharacterInspectMotionPhaseInput.value,
+    });
+    resetCharacterInspectStableFrame();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectKeyPoseCaptureButton?.addEventListener("click", () => {
+    const context = getCharacterInspectKeyPoseContext();
+    if (!context) return;
+    characterInspectKeyPoseOverrides.set(context.key, captureCurrentCharacterPoseConfig());
+    updatePoseTunerStatus(`${context.mode} ${context.label} captured`);
+    syncDebugControls();
+    syncPoseTunerControls();
+  });
+
+  testRoomCharacterInspectKeyPoseClearButton?.addEventListener("click", () => {
+    const context = getCharacterInspectKeyPoseContext();
+    if (!context) return;
+    characterInspectKeyPoseOverrides.delete(context.key);
+    updatePoseTunerStatus(`${context.mode} ${context.label} cleared`);
+    syncDebugControls();
+    syncPoseTunerControls();
+  });
+
+  testRoomCharacterInspectKeyPoseCopyButton?.addEventListener("click", async () => {
+    const context = getCharacterInspectKeyPoseContext();
+    const config = context ? characterInspectKeyPoseOverrides.get(context.key) : null;
+    if (!context || !config) return;
+    const text = serializeJumpPoseConfig(config);
+    if (testRoomPoseTunerOutputEl) {
+      testRoomPoseTunerOutputEl.value = text;
+      testRoomPoseTunerOutputEl.focus();
+      testRoomPoseTunerOutputEl.select();
+    }
+    try {
+      const copied = await copyTunerTextToClipboard(text, testRoomPoseTunerOutputEl);
+      updatePoseTunerStatus(copied ? `${context.mode} ${context.label} copied` : "manual copy");
+    } catch {
+      updatePoseTunerStatus("manual copy");
+    }
+  });
+
+  testRoomCharacterInspectKeyPoseCopyMotionButton?.addEventListener("click", async () => {
+    const savedCount = getCurrentMotionSavedKeyPoseCount();
+    if (savedCount <= 0) return;
+    const exportConfig = getCurrentMotionKeyPoseExportConfig();
+    const text = JSON.stringify(exportConfig, null, 2);
+    if (testRoomPoseTunerOutputEl) {
+      testRoomPoseTunerOutputEl.value = text;
+      testRoomPoseTunerOutputEl.focus();
+      testRoomPoseTunerOutputEl.select();
+    }
+    const label = `${getCharacterInspectMotionDisplayName(exportConfig.motion)} ${savedCount}/${exportConfig.points.length} key poses`;
+    try {
+      const copied = await copyTunerTextToClipboard(text, testRoomPoseTunerOutputEl);
+      updatePoseTunerStatus(copied ? `${label} copied` : `${label} manual copy`);
+    } catch {
+      updatePoseTunerStatus(`${label} manual copy`);
+    }
+  });
+
+  testRoomCharacterInspectJumpPoseSelect?.addEventListener("change", () => {
+    debugSettings = normalizeDebugSettings({
+      ...debugSettings,
+      characterInspect: true,
+      characterInspectMotion: "jump",
+      characterInspectJumpPose: testRoomCharacterInspectJumpPoseSelect.value,
+    });
+    resetCameraView();
+    saveDebugSettings();
+    syncDebugControls();
+  });
+
+  testRoomCharacterInspectResetViewButton?.addEventListener("click", () => {
+    resetCameraView();
   });
 
   debugObjectGalleryItemSelect?.addEventListener("change", () => {
@@ -12835,6 +14803,247 @@ function bindDebugControls() {
   });
 }
 
+function initializePoseTunerControls() {
+  if (poseTunerControlsInitialized || !testRoomPoseTunerControlsEl) return;
+
+  let currentGroup = "";
+  for (const field of characterInspectPoseTunerFields) {
+    if (field.group && field.group !== currentGroup) {
+      currentGroup = field.group;
+      const groupEl = document.createElement("div");
+      groupEl.className = "pose-tuner-group";
+      groupEl.textContent = field.group;
+      testRoomPoseTunerControlsEl.append(groupEl);
+    }
+
+    const row = document.createElement("label");
+    row.className = "pose-tuner-row";
+    const text = document.createElement("span");
+    text.textContent = field.label;
+    const range = document.createElement("input");
+    range.type = "range";
+    range.step = String(field.step);
+    range.dataset.posePath = field.path.join(".");
+    range.dataset.poseInput = "range";
+    const number = document.createElement("input");
+    number.type = "number";
+    number.step = String(field.step);
+    number.dataset.posePath = field.path.join(".");
+    number.dataset.poseInput = "number";
+    row.append(text, range, number);
+    testRoomPoseTunerControlsEl.append(row);
+
+    const handleInput = (event) => {
+      if (poseTunerSyncing) return;
+      const value = Number(event.currentTarget.value);
+      if (!Number.isFinite(value)) return;
+      const config = getEditableCharacterInspectPoseConfig();
+      if (!config) return;
+      setPoseConfigValue(config, field.path, value);
+      syncPoseTunerControls({ preserveFocus: true });
+    };
+    range.addEventListener("input", handleInput);
+    number.addEventListener("input", handleInput);
+  }
+
+  testRoomPoseTunerResetButton?.addEventListener("click", () => {
+    const keyPoseContext = getCharacterInspectKeyPoseContext();
+    if (keyPoseContext && characterInspectKeyPoseOverrides.has(keyPoseContext.key)) {
+      characterInspectKeyPoseOverrides.delete(keyPoseContext.key);
+    } else {
+      characterInspectJumpPoseOverrides.delete(debugSettings.characterInspectJumpPose);
+    }
+    syncPoseTunerControls();
+    syncCharacterInspectKeyPoseControls();
+  });
+
+  testRoomPoseTunerRangeModeSelect?.addEventListener("change", () => {
+    poseTunerRangeMode = testRoomPoseTunerRangeModeSelect.value === "wide" ? "wide" : "safe";
+    if (poseTunerRangeMode === "safe") {
+      const config = getEditableCharacterInspectPoseConfig();
+      if (config) clampPoseConfigToCurrentRange(config);
+    }
+    syncPoseTunerControls();
+  });
+
+  testRoomPoseTunerCopyButton?.addEventListener("click", async () => {
+    const context = getCharacterInspectPoseTunerContext();
+    const config = context?.config ?? getCharacterJumpPoseConfig(debugSettings.characterInspectJumpPose);
+    const text = serializeJumpPoseConfig(config);
+    if (testRoomPoseTunerOutputEl) {
+      testRoomPoseTunerOutputEl.value = text;
+      testRoomPoseTunerOutputEl.focus();
+      testRoomPoseTunerOutputEl.select();
+    }
+    try {
+      const copied = await copyTunerTextToClipboard(text, testRoomPoseTunerOutputEl);
+      updatePoseTunerStatus(copied ? "copied" : "manual copy");
+    } catch {
+      updatePoseTunerStatus("manual copy");
+    }
+  });
+
+  poseTunerControlsInitialized = true;
+}
+
+function syncPoseTunerControls({ preserveFocus = false } = {}) {
+  initializePoseTunerControls();
+  if (!testRoomPoseTunerEl || !testRoomPoseTunerControlsEl) return;
+
+  const available = Boolean(currentStage.testRoom)
+    && debugSettings.characterInspect
+    && Boolean(getCharacterInspectPoseTunerContext());
+  testRoomPoseTunerEl.classList.toggle("hidden", !available);
+  if (!available) return;
+
+  if (testRoomPoseTunerRangeModeSelect) {
+    testRoomPoseTunerRangeModeSelect.value = poseTunerRangeMode;
+  }
+  const context = getCharacterInspectPoseTunerContext();
+  const config = context.config;
+  if (testRoomPoseTunerTitleText) {
+    testRoomPoseTunerTitleText.textContent = context.type === "keyPose"
+      ? "KEY POSE TUNER"
+      : "JUMP POSE TUNER";
+  }
+  poseTunerSyncing = true;
+  for (const field of characterInspectPoseTunerFields) {
+    const value = getPoseConfigValue(config, field.path);
+    const path = field.path.join(".");
+    const range = getPoseTunerFieldRange(field);
+    const controls = testRoomPoseTunerControlsEl.querySelectorAll(`[data-pose-path="${path}"]`);
+    controls.forEach((control) => {
+      control.min = String(range.min);
+      control.max = String(range.max);
+      control.title = `${field.label}: ${range.min} to ${range.max}`;
+      if (preserveFocus && control === document.activeElement) return;
+      control.value = formatPoseTunerNumber(value);
+    });
+  }
+  poseTunerSyncing = false;
+
+  if (testRoomPoseTunerOutputEl) {
+    testRoomPoseTunerOutputEl.value = serializeJumpPoseConfig(config);
+  }
+  updatePoseTunerStatus(`${context.status} / ${poseTunerRangeMode}`);
+}
+
+function updatePoseTunerStatus(text) {
+  if (!testRoomPoseTunerStatusEl) return;
+  testRoomPoseTunerStatusEl.textContent = text;
+}
+
+function initializeMotionTunerControls() {
+  if (motionTunerControlsInitialized || !testRoomMotionTunerControlsEl) return;
+
+  let currentGroup = "";
+  for (const field of characterMotionTunerFields) {
+    if (field.group && field.group !== currentGroup) {
+      currentGroup = field.group;
+      const groupEl = document.createElement("div");
+      groupEl.className = "pose-tuner-group";
+      groupEl.textContent = field.group;
+      testRoomMotionTunerControlsEl.append(groupEl);
+    }
+
+    const row = document.createElement("label");
+    row.className = "pose-tuner-row";
+    const text = document.createElement("span");
+    text.textContent = field.label;
+    const range = document.createElement("input");
+    range.type = "range";
+    range.step = String(field.step);
+    range.dataset.motionTuneKey = field.key;
+    range.dataset.motionTuneInput = "range";
+    const number = document.createElement("input");
+    number.type = "number";
+    number.step = String(field.step);
+    number.dataset.motionTuneKey = field.key;
+    number.dataset.motionTuneInput = "number";
+    row.append(text, range, number);
+    testRoomMotionTunerControlsEl.append(row);
+
+    const handleInput = (event) => {
+      if (motionTunerSyncing) return;
+      const value = Number(event.currentTarget.value);
+      if (!Number.isFinite(value)) return;
+      characterMotionTunerValues[field.key] = value;
+      syncMotionTunerControls({ preserveFocus: true });
+    };
+    range.addEventListener("input", handleInput);
+    number.addEventListener("input", handleInput);
+  }
+
+  testRoomMotionTunerResetButton?.addEventListener("click", () => {
+    resetMotionTuneValues();
+    syncMotionTunerControls();
+  });
+
+  testRoomMotionTunerRangeModeSelect?.addEventListener("change", () => {
+    motionTunerRangeMode = testRoomMotionTunerRangeModeSelect.value === "wide" ? "wide" : "safe";
+    if (motionTunerRangeMode === "safe") {
+      clampMotionTuneValuesToCurrentRange();
+    }
+    syncMotionTunerControls();
+  });
+
+  testRoomMotionTunerCopyButton?.addEventListener("click", async () => {
+    const text = serializeMotionTuneConfig();
+    if (testRoomMotionTunerOutputEl) {
+      testRoomMotionTunerOutputEl.value = text;
+      testRoomMotionTunerOutputEl.focus();
+      testRoomMotionTunerOutputEl.select();
+    }
+    try {
+      const copied = await copyTunerTextToClipboard(text, testRoomMotionTunerOutputEl);
+      updateMotionTunerStatus(copied ? "copied" : "manual copy");
+    } catch {
+      updateMotionTunerStatus("manual copy");
+    }
+  });
+
+  motionTunerControlsInitialized = true;
+}
+
+function syncMotionTunerControls({ preserveFocus = false } = {}) {
+  initializeMotionTunerControls();
+  if (!testRoomMotionTunerEl || !testRoomMotionTunerControlsEl) return;
+
+  const available = isCharacterMotionTunerAvailable();
+  testRoomMotionTunerEl.classList.toggle("hidden", !available);
+  if (!available) return;
+
+  if (testRoomMotionTunerRangeModeSelect) {
+    testRoomMotionTunerRangeModeSelect.value = motionTunerRangeMode;
+  }
+  motionTunerSyncing = true;
+  for (const field of characterMotionTunerFields) {
+    const value = characterMotionTunerValues[field.key];
+    const range = getMotionTunerFieldRange(field);
+    const controls = testRoomMotionTunerControlsEl.querySelectorAll(`[data-motion-tune-key="${field.key}"]`);
+    controls.forEach((control) => {
+      control.min = String(range.min);
+      control.max = String(range.max);
+      control.title = `${field.label}: ${range.min} to ${range.max}`;
+      if (preserveFocus && control === document.activeElement) return;
+      control.value = formatPoseTunerNumber(value);
+    });
+  }
+  motionTunerSyncing = false;
+
+  if (testRoomMotionTunerOutputEl) {
+    testRoomMotionTunerOutputEl.value = serializeMotionTuneConfig();
+  }
+  updateMotionTunerStatus(
+    `${getCharacterInspectMotionDisplayName(debugSettings.characterInspectMotion)} whole motion / ${motionTunerRangeMode}`
+  );
+}
+
+function updateMotionTunerStatus(text) {
+  if (!testRoomMotionTunerStatusEl) return;
+  testRoomMotionTunerStatusEl.textContent = text;
+}
+
 function syncGraphicsControls() {
   for (const [key, control] of Object.entries(graphicsControls)) {
     if (!control) continue;
@@ -12846,6 +15055,10 @@ function syncDebugControls() {
   const objectGalleryAvailable = Boolean(currentStage.testRoom);
   const objectGalleryActive = objectGalleryAvailable && debugSettings.objectGallery;
   const inspectAngleActive = debugSettings.characterInspect || objectGalleryActive;
+  const testRoomInspectAvailable = Boolean(currentStage.testRoom);
+  const testRoomMotionScrubAvailable = testRoomInspectAvailable
+    && debugSettings.characterInspect
+    && debugSettings.characterInspectMotion !== "live";
   for (const [key, control] of Object.entries(debugControls)) {
     if (!control) continue;
     control.checked = key === "objectGallery"
@@ -12875,6 +15088,66 @@ function syncDebugControls() {
     debugCharacterInspectMotionSpeedSelect.disabled = !debugSettings.characterInspect
       || debugSettings.characterInspectMotion === "live";
   }
+  if (testRoomInspectPanel) {
+    testRoomInspectPanel.classList.toggle("hidden", !testRoomInspectAvailable);
+  }
+  if (testRoomCharacterInspectToggle) {
+    testRoomCharacterInspectToggle.checked = Boolean(debugSettings.characterInspect);
+    testRoomCharacterInspectToggle.disabled = !testRoomInspectAvailable;
+  }
+  if (testRoomCharacterInspectTargetSelect) {
+    testRoomCharacterInspectTargetSelect.value = debugSettings.characterInspectTarget;
+    testRoomCharacterInspectTargetSelect.disabled = !testRoomInspectAvailable;
+  }
+  if (testRoomCharacterInspectAngleSelect) {
+    testRoomCharacterInspectAngleSelect.value = debugSettings.characterInspectAngle;
+    testRoomCharacterInspectAngleSelect.disabled = !testRoomInspectAvailable;
+  }
+  if (testRoomCharacterInspectMotionSelect) {
+    testRoomCharacterInspectMotionSelect.value = debugSettings.characterInspectMotion;
+    testRoomCharacterInspectMotionSelect.disabled = !testRoomInspectAvailable;
+  }
+  if (testRoomCharacterInspectMotionSpeedSelect) {
+    testRoomCharacterInspectMotionSpeedSelect.value = debugSettings.characterInspectMotionSpeed;
+    testRoomCharacterInspectMotionSpeedSelect.disabled = !testRoomInspectAvailable
+      || debugSettings.characterInspectMotion === "live";
+  }
+  if (testRoomCharacterInspectPreviewPlayButton) {
+    const playActive = !debugSettings.characterInspectMotionFreeze;
+    testRoomCharacterInspectPreviewPlayButton.disabled = !testRoomMotionScrubAvailable;
+    testRoomCharacterInspectPreviewPlayButton.classList.toggle("is-active", playActive);
+    testRoomCharacterInspectPreviewPlayButton.setAttribute("aria-pressed", playActive ? "true" : "false");
+  }
+  if (testRoomCharacterInspectPreviewEditButton) {
+    const editActive = Boolean(debugSettings.characterInspectMotionFreeze);
+    testRoomCharacterInspectPreviewEditButton.disabled = !testRoomMotionScrubAvailable;
+    testRoomCharacterInspectPreviewEditButton.classList.toggle("is-active", editActive);
+    testRoomCharacterInspectPreviewEditButton.setAttribute("aria-pressed", editActive ? "true" : "false");
+  }
+  if (testRoomCharacterInspectMotionPhaseInput) {
+    testRoomCharacterInspectMotionPhaseInput.value = formatPoseTunerNumber(debugSettings.characterInspectMotionPhase);
+    testRoomCharacterInspectMotionPhaseInput.disabled = !testRoomMotionScrubAvailable;
+  }
+  if (testRoomCharacterInspectMotionPhaseValue) {
+    testRoomCharacterInspectMotionPhaseValue.textContent = formatPoseTunerNumber(debugSettings.characterInspectMotionPhase);
+  }
+  syncCharacterInspectMotionPhaseMarkers(testRoomMotionScrubAvailable);
+  syncCharacterInspectKeyPoseControls();
+  if (testRoomCharacterInspectJumpPoseSelect) {
+    testRoomCharacterInspectJumpPoseSelect.value = debugSettings.characterInspectJumpPose;
+    testRoomCharacterInspectJumpPoseSelect.disabled = !testRoomInspectAvailable
+      || debugSettings.characterInspectMotion !== "jump";
+  }
+  if (testRoomCharacterInspectResetViewButton) {
+    testRoomCharacterInspectResetViewButton.disabled = !testRoomInspectAvailable
+      || !debugSettings.characterInspect;
+  }
+  document.body.classList.toggle("test-room-inspect-orbit", testRoomInspectAvailable && debugSettings.characterInspect);
+  if (!testRoomInspectAvailable || !debugSettings.characterInspect) {
+    setCharacterInspectOrbitActive(false);
+  }
+  syncPoseTunerControls();
+  syncMotionTunerControls();
   if (debugObjectGalleryItemSelect) {
     debugObjectGalleryItemSelect.value = debugSettings.objectGalleryItem;
     debugObjectGalleryItemSelect.disabled = !objectGalleryActive;
@@ -13158,12 +15431,24 @@ function updateCharacterInspectCamera(dt, frame) {
     || characterInspectTargetPresets.full;
   const anglePreset = characterInspectAnglePresets[debugSettings.characterInspectAngle]
     || characterInspectAnglePresets.back;
-  const targetWorld = toWorldPosition(new THREE.Vector3(
+  const targetFov = targetPreset.fov + anglePreset.fovAdd;
+  const rawAutoFrame = getCharacterInspectAutoFrame(
+    debugSettings.characterInspectTarget,
+    anglePreset,
+    frame,
+    targetFov,
+  );
+  const autoFrame = getCharacterInspectStableAutoFrame(
+    rawAutoFrame,
+    debugSettings.characterInspectTarget,
+    dt,
+  );
+  const targetWorld = autoFrame?.center.clone() ?? toWorldPosition(new THREE.Vector3(
     player.position.x,
     player.position.y + targetPreset.focusLift,
     player.position.z,
   ));
-  const horizontalDirection = frame.tangent.clone()
+  const horizontalDirection = autoFrame?.direction.clone() ?? frame.tangent.clone()
     .multiplyScalar(anglePreset.tangent)
     .addScaledVector(frame.right, anglePreset.right);
   if (horizontalDirection.lengthSq() < 0.001) {
@@ -13171,12 +15456,16 @@ function updateCharacterInspectCamera(dt, frame) {
   } else {
     horizontalDirection.normalize();
   }
+  const cameraDistance = (autoFrame?.distance ?? targetPreset.distance) * characterInspectZoomScale;
+  const inspectHeightOffset = autoFrame
+    ? 0
+    : targetPreset.heightOffset + anglePreset.up * targetPreset.distance * characterInspectZoomScale;
   const cameraOffset = horizontalDirection
-    .multiplyScalar(targetPreset.distance)
-    .addScaledVector(frame.up, targetPreset.heightOffset + anglePreset.up * targetPreset.distance);
+    .multiplyScalar(cameraDistance)
+    .addScaledVector(frame.up, inspectHeightOffset);
   const yawRotation = new THREE.Quaternion().setFromAxisAngle(frame.up, cameraYawOffset);
   cameraOffset.applyQuaternion(yawRotation);
-  const pitchAxis = frame.right.clone().applyQuaternion(yawRotation).normalize();
+  const pitchAxis = getCharacterInspectOrbitPitchAxis(frame, cameraOffset).clone();
   cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
 
   const desired = targetWorld.clone().add(cameraOffset);
@@ -13184,7 +15473,7 @@ function updateCharacterInspectCamera(dt, frame) {
 
   camera.up.lerp(frame.up, 1 - Math.exp(-10 * dt)).normalize();
   camera.lookAt(targetWorld);
-  camera.fov = THREE.MathUtils.lerp(camera.fov, targetPreset.fov + anglePreset.fovAdd, 1 - Math.exp(-8 * dt));
+  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-8 * dt));
   camera.updateProjectionMatrix();
 }
 
@@ -13321,10 +15610,14 @@ function updateFullscreenButton() {
   if (!fullscreenButton) return;
 
   const available = Boolean(document.fullscreenEnabled);
+  const active = Boolean(document.fullscreenElement);
+  const label = !available
+    ? "Fullscreen unavailable"
+    : active ? "Exit fullscreen" : "Enter fullscreen";
   fullscreenButton.disabled = !available;
-  fullscreenButton.textContent = !available
-    ? "Unavailable"
-    : document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+  fullscreenButton.classList.toggle("is-active", active);
+  fullscreenButton.setAttribute("aria-label", label);
+  fullscreenButton.setAttribute("title", label);
 }
 
 function isGameplayKey(code) {
@@ -13333,6 +15626,7 @@ function isGameplayKey(code) {
     "KeyA",
     "KeyS",
     "KeyD",
+    "KeyC",
     "KeyQ",
     "KeyE",
     "KeyI",
@@ -13374,7 +15668,10 @@ function refillBoostGauge() {
 }
 
 function warpToGoalProgress(progress) {
-  const targetZ = getStageZAtGoalProgress(THREE.MathUtils.clamp(progress, 0, 0.98));
+  const normalizedProgress = THREE.MathUtils.clamp(progress, 0, 1);
+  const targetZ = normalizedProgress >= 1
+    ? goalZ + 4
+    : getStageZAtGoalProgress(THREE.MathUtils.clamp(normalizedProgress, 0, 0.98));
   const sample = getGroundSample(0, targetZ);
   if (!sample) return;
 
@@ -13383,6 +15680,10 @@ function warpToGoalProgress(progress) {
   hitCooldown = 0;
   jumpQueued = false;
   jumpHoldRemaining = 0;
+  slideQueued = false;
+  slideTimer = 0;
+  slideCooldown = 0;
+  slidePoseAmount = 0;
   quickStepQueued = 0;
   quickStepTimer = 0;
   quickStepCooldown = 0;
@@ -13430,6 +15731,10 @@ function resetGame(options = {}) {
   jumpQueued = false;
   jumpHoldRemaining = 0;
   jumpImpact = 0;
+  slideQueued = false;
+  slideTimer = 0;
+  slideCooldown = 0;
+  slidePoseAmount = 0;
   hitCooldown = 0;
   hitStun = 0;
   runPhase = 0;

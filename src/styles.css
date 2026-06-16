@@ -323,6 +323,10 @@ body.touch-enabled #game {
   pointer-events: none;
 }
 
+body.test-room-active .hud {
+  display: none;
+}
+
 .stat {
   min-height: 58px;
   padding: 9px 12px;
@@ -576,32 +580,6 @@ body.touch-enabled #game {
   font-weight: 800;
 }
 
-.settings-action {
-  display: grid;
-  grid-template-columns: 1fr minmax(132px, 48%);
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 10px 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: rgba(241, 249, 255, 0.78);
-}
-
-.settings-action button {
-  min-width: 0;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 6px;
-  font-size: 0.76rem;
-}
-
-.settings-action button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
 .pause-menu {
   position: fixed;
   inset: 0;
@@ -630,20 +608,6 @@ body.touch-enabled #game {
 
 .pause-panel .panel-title {
   margin-bottom: 0;
-}
-
-.pause-help-toggle {
-  min-width: 38px;
-  width: 38px;
-  min-height: 38px;
-  padding: 0;
-  border-radius: 50%;
-  font-size: 1rem;
-}
-
-.pause-help-toggle[aria-expanded="true"] {
-  background: #ffd344;
-  color: #181100;
 }
 
 .resume-game {
@@ -716,6 +680,520 @@ body.game-paused .help-panel {
   width: 20px;
   height: 20px;
   accent-color: #ffd344;
+}
+
+.test-room-inspect-panel {
+  position: fixed;
+  top: auto;
+  right: 18px;
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 68px));
+  z-index: 6;
+  display: grid;
+  gap: 8px;
+  width: min(286px, calc(100vw - 36px));
+  padding: 12px;
+  border: 1px solid rgba(120, 214, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(2, 8, 15, 0.68);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+  color: #f8fbff;
+  backdrop-filter: blur(10px);
+}
+
+.test-room-inspect-panel:focus-within,
+.test-room-pose-tuner:focus-within {
+  z-index: 12;
+}
+
+.test-room-panel-front {
+  z-index: 14;
+}
+
+.test-room-inspect-panel.hidden {
+  display: none;
+}
+
+.test-room-inspect-title,
+.test-room-inspect-panel label {
+  display: grid;
+  grid-template-columns: minmax(74px, 1fr) minmax(132px, 1.35fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.test-room-inspect-title {
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.test-room-inspect-title strong {
+  color: #ffd86a;
+  font-size: 0.84rem;
+  letter-spacing: 0;
+}
+
+.test-room-inspect-title label {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  color: rgba(241, 249, 255, 0.78);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.test-room-inspect-title input {
+  width: 18px;
+  height: 18px;
+  accent-color: #52d6ff;
+}
+
+.test-room-inspect-panel label span {
+  color: rgba(241, 249, 255, 0.74);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.test-room-inspect-panel select {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.72);
+  color: #f8fbff;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.test-room-preview-mode-row {
+  display: grid;
+  grid-template-columns: minmax(74px, 1fr) minmax(132px, 1.35fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.test-room-preview-mode-row > span {
+  color: rgba(241, 249, 255, 0.74);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.test-room-preview-mode-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid rgba(120, 214, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(4, 13, 22, 0.52);
+}
+
+.test-room-preview-mode-control button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(241, 249, 255, 0.72);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.test-room-preview-mode-control button:hover,
+.test-room-preview-mode-control button:focus-visible {
+  border-color: rgba(120, 214, 255, 0.44);
+  color: #f8fbff;
+}
+
+.test-room-preview-mode-control button.is-active {
+  border-color: rgba(82, 214, 255, 0.58);
+  background: rgba(32, 119, 158, 0.62);
+  color: #f8fbff;
+  box-shadow: 0 0 12px rgba(82, 214, 255, 0.18);
+}
+
+.test-room-preview-mode-control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.test-room-motion-phase-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 3px 8px;
+}
+
+.test-room-motion-phase-control input[type="range"] {
+  min-width: 0;
+  accent-color: #52d6ff;
+}
+
+.test-room-motion-phase-control output {
+  color: rgba(241, 249, 255, 0.76);
+  font: 800 0.68rem/1 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  text-align: right;
+}
+
+.test-room-motion-phase-markers {
+  position: relative;
+  grid-column: 1 / 2;
+  height: 15px;
+  min-width: 0;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.test-room-motion-phase-marker {
+  position: absolute;
+  top: 2px;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
+  min-width: 11px;
+  min-height: 11px;
+  max-width: 11px;
+  max-height: 11px;
+  padding: 0;
+  border: 1px solid rgba(248, 251, 255, 0.78);
+  border-radius: 50%;
+  background: rgba(4, 13, 22, 0.82);
+  box-shadow: 0 0 0 2px rgba(2, 8, 15, 0.5);
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+  touch-action: manipulation;
+  transform: translateX(-50%);
+}
+
+.test-room-motion-phase-marker:hover,
+.test-room-motion-phase-marker:focus-visible {
+  border-color: #ffd86a;
+  background: rgba(255, 216, 106, 0.48);
+  box-shadow: 0 0 0 2px rgba(2, 8, 15, 0.62), 0 0 12px rgba(255, 216, 106, 0.52);
+}
+
+.test-room-motion-phase-marker.is-active {
+  border-color: #52d6ff;
+  background: #52d6ff;
+  box-shadow: 0 0 0 2px rgba(2, 8, 15, 0.64), 0 0 12px rgba(82, 214, 255, 0.58);
+}
+
+.test-room-motion-point {
+  grid-column: 1 / -1;
+  min-height: 18px;
+  padding: 3px 7px;
+  border: 1px solid rgba(82, 214, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(3, 12, 20, 0.54);
+  color: rgba(241, 249, 255, 0.82);
+  font: 800 0.66rem/1.15 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  text-align: left;
+}
+
+.test-room-motion-point.is-marker {
+  border-color: rgba(82, 214, 255, 0.36);
+  color: #9eeeff;
+  background: rgba(20, 75, 102, 0.34);
+}
+
+.test-room-key-pose-row {
+  display: grid;
+  grid-template-columns: minmax(74px, 1fr) minmax(132px, 1.35fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.test-room-key-pose-row > span {
+  color: rgba(241, 249, 255, 0.74);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.test-room-key-pose-control {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.test-room-key-pose-control output {
+  min-height: 18px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 216, 106, 0.16);
+  border-radius: 6px;
+  background: rgba(3, 12, 20, 0.54);
+  color: rgba(241, 249, 255, 0.8);
+  font: 800 0.64rem/1.15 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.test-room-key-pose-control output.is-saved {
+  border-color: rgba(255, 216, 106, 0.4);
+  color: #ffe48c;
+  background: rgba(94, 70, 18, 0.3);
+}
+
+.test-room-key-pose-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.test-room-key-pose-actions button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(8, 25, 38, 0.78);
+  color: #f8fbff;
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 900;
+}
+
+.test-room-key-pose-actions button:hover,
+.test-room-key-pose-actions button:focus-visible {
+  border-color: rgba(255, 216, 106, 0.68);
+  background: rgba(96, 72, 19, 0.74);
+}
+
+.test-room-key-pose-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.test-room-key-pose-copy-motion {
+  grid-column: 1 / -1;
+  font-size: 0.62rem;
+}
+
+.test-room-inspect-actions {
+  display: grid;
+  grid-template-columns: minmax(94px, auto) 1fr;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.test-room-inspect-actions button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(120, 214, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(120, 214, 255, 0.16);
+  color: #f8fbff;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.test-room-inspect-actions button:hover,
+.test-room-inspect-actions button:focus-visible {
+  background: rgba(120, 214, 255, 0.28);
+}
+
+.test-room-inspect-actions span {
+  color: rgba(241, 249, 255, 0.64);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+body.test-room-inspect-orbit #game {
+  cursor: grab;
+}
+
+body.test-room-inspect-orbiting #game {
+  cursor: grabbing;
+}
+
+.test-room-pose-tuner {
+  position: fixed;
+  left: 18px;
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 68px));
+  z-index: 6;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 8px;
+  width: min(388px, calc(100vw - 36px));
+  max-height: min(calc(100vh - 118px), 680px);
+  padding: 12px;
+  border: 1px solid rgba(82, 214, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(2, 8, 15, 0.72);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+  color: #f8fbff;
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.test-room-motion-tuner {
+  border-color: rgba(255, 216, 106, 0.24);
+}
+
+.test-room-pose-tuner.hidden {
+  display: none;
+}
+
+.test-room-pose-tuner-title,
+.test-room-pose-tuner-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.test-room-pose-tuner-title {
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.test-room-pose-tuner-title strong {
+  color: #7be7ff;
+  font-size: 0.84rem;
+  letter-spacing: 0;
+}
+
+.test-room-pose-tuner-title span {
+  color: rgba(241, 249, 255, 0.66);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.test-room-pose-tuner-actions button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(8, 25, 38, 0.78);
+  color: #f8fbff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.pose-tuner-range-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: rgba(241, 249, 255, 0.74);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.pose-tuner-range-mode select {
+  min-width: 78px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.74);
+  color: #f8fbff;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.test-room-pose-tuner-actions button:hover,
+.test-room-pose-tuner-actions button:focus-visible,
+.pose-tuner-range-mode select:focus-visible {
+  border-color: rgba(123, 231, 255, 0.68);
+  background: rgba(19, 72, 96, 0.78);
+}
+
+.test-room-pose-tuner-controls {
+  display: grid;
+  gap: 5px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 16px;
+  scrollbar-color: rgba(123, 231, 255, 0.62) rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+
+.test-room-pose-tuner-controls::-webkit-scrollbar {
+  width: 8px;
+}
+
+.test-room-pose-tuner-controls::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.test-room-pose-tuner-controls::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(123, 231, 255, 0.62);
+}
+
+.pose-tuner-group {
+  margin-top: 6px;
+  color: #ffd86a;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.pose-tuner-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(96px, 1.45fr) 58px;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.pose-tuner-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(241, 249, 255, 0.75);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.pose-tuner-row input[type="range"] {
+  min-width: 0;
+  accent-color: #52d6ff;
+}
+
+.pose-tuner-row input[type="number"] {
+  width: 58px;
+  min-height: 28px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.74);
+  color: #f8fbff;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.test-room-pose-tuner-output {
+  min-height: 70px;
+  max-height: 120px;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(3, 10, 18, 0.78);
+  color: rgba(241, 249, 255, 0.82);
+  font: 700 0.66rem/1.35 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
 .help-panel dl {
@@ -1033,6 +1511,30 @@ body.touch-enabled:not(.portrait-touch) .touch-controls {
   border-left: 8px solid transparent;
 }
 
+.touch-icon-slide::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 18px;
+  width: 24px;
+  height: 4px;
+  border-radius: 4px;
+  background: currentColor;
+}
+
+.touch-icon-slide::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 10px;
+  width: 18px;
+  height: 8px;
+  border-radius: 8px 8px 3px 3px;
+  border: 3px solid currentColor;
+  border-bottom: 0;
+  transform: skewX(-18deg);
+}
+
 .touch-icon-jump::before {
   content: "";
   position: absolute;
@@ -1213,6 +1715,83 @@ body.touch-enabled:not(.portrait-touch) .performance-hud {
   grid-template-columns: repeat(2, minmax(70px, 1fr));
   width: min(220px, 34vw);
   padding: 7px 8px;
+  font-size: 0.54rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-panel {
+  top: auto;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(42px, calc(env(safe-area-inset-bottom) + 38px));
+  width: min(270px, 36vw);
+  gap: 6px;
+  padding: 8px;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-title,
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-panel label {
+  grid-template-columns: minmax(58px, 0.78fr) minmax(108px, 1.28fr);
+  gap: 6px;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-panel select {
+  min-height: 28px;
+  font-size: 0.62rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-actions {
+  grid-template-columns: minmax(76px, auto) 1fr;
+  gap: 6px;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-actions button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.58rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-inspect-actions span {
+  font-size: 0.54rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-pose-tuner {
+  left: max(8px, env(safe-area-inset-left));
+  bottom: max(42px, calc(env(safe-area-inset-bottom) + 38px));
+  width: min(352px, 46vw);
+  max-height: min(70vh, 390px);
+  gap: 6px;
+  padding: 8px;
+}
+
+body.touch-enabled:not(.portrait-touch) .pose-tuner-row {
+  grid-template-columns: minmax(56px, 0.8fr) minmax(86px, 1.3fr) 52px;
+  gap: 6px;
+}
+
+body.touch-enabled:not(.portrait-touch) .pose-tuner-row span,
+body.touch-enabled:not(.portrait-touch) .pose-tuner-row input[type="number"],
+body.touch-enabled:not(.portrait-touch) .test-room-pose-tuner-title span {
+  font-size: 0.58rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-pose-tuner-actions button {
+  min-width: 84px;
+  min-height: 28px;
+  font-size: 0.58rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .pose-tuner-range-mode,
+body.touch-enabled:not(.portrait-touch) .pose-tuner-range-mode select {
+  font-size: 0.58rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .pose-tuner-range-mode select {
+  min-width: 66px;
+  min-height: 28px;
+}
+
+body.touch-enabled:not(.portrait-touch) .test-room-pose-tuner-output {
+  min-height: 48px;
+  max-height: 76px;
   font-size: 0.54rem;
 }
 
@@ -1458,11 +2037,6 @@ body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
     gap: 6px;
   }
 
-  .settings-action {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
   .debug-check {
     grid-template-columns: 1fr auto;
   }
@@ -1546,11 +2120,119 @@ body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
   padding: 6px;
 }
 
+.quick-actions {
+  position: fixed;
+  top: 18px;
+  right: 182px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-action-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(8, 20, 30, 0.64);
+  color: #f8fbff;
+  box-shadow: 0 10px 28px rgba(4, 20, 40, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.quick-action-button:hover,
+.quick-action-button[aria-expanded="true"],
+.quick-action-button.is-active {
+  background: #ffd344;
+  color: #181100;
+}
+
+.quick-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.help-toggle {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.fullscreen-icon {
+  position: relative;
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+
+.fullscreen-icon span {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: currentColor;
+  border-style: solid;
+}
+
+.fullscreen-icon span:nth-child(1) {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+}
+
+.fullscreen-icon span:nth-child(2) {
+  top: 0;
+  right: 0;
+  border-width: 2px 2px 0 0;
+}
+
+.fullscreen-icon span:nth-child(3) {
+  right: 0;
+  bottom: 0;
+  border-width: 0 2px 2px 0;
+}
+
+.fullscreen-icon span:nth-child(4) {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2px 2px;
+}
+
 body.touch-enabled:not(.portrait-touch) .main-menu {
   top: max(8px, env(safe-area-inset-top));
   right: max(8px, env(safe-area-inset-right));
   width: 118px;
   gap: 5px;
+}
+
+body.touch-enabled:not(.portrait-touch) .quick-actions {
+  top: max(8px, env(safe-area-inset-top));
+  right: calc(max(8px, env(safe-area-inset-right)) + 126px);
+  gap: 5px;
+}
+
+body.touch-enabled:not(.portrait-touch) .quick-action-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 7px;
+}
+
+body.touch-enabled:not(.portrait-touch) .fullscreen-icon {
+  width: 15px;
+  height: 15px;
+}
+
+body.touch-enabled:not(.portrait-touch) .fullscreen-icon span {
+  width: 7px;
+  height: 7px;
+}
+
+body.touch-enabled:not(.portrait-touch) .help-toggle {
+  font-size: 0.82rem;
 }
 
 body.touch-enabled:not(.portrait-touch) .menu-toggle,
@@ -1585,6 +2267,13 @@ body.touch-enabled:not(.portrait-touch) .main-menu .stage-menu {
     right: 12px;
     bottom: 12px;
     width: 132px;
+  }
+
+  .quick-actions {
+    top: auto;
+    right: 152px;
+    bottom: 12px;
+    gap: 6px;
   }
 
   .menu-toggle,

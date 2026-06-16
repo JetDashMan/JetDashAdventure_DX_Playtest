@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=debug-console-069" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp110a-preview-mode" />
     <script type="importmap">
       {
         "imports": {
@@ -29,7 +29,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-079C: Stage 2 밀도를 유지하면서 대형 랜드마크 위치를 재배치합니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-110A: Preview Mode에서 모션 재생과 Key Pose 편집을 선택합니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -104,6 +104,160 @@
         </button>
       </div>
     </div>
+
+    <div class="quick-actions" aria-label="Quick actions">
+      <button id="fullscreen-toggle" class="quick-action-button fullscreen-toggle" type="button" aria-label="Enter fullscreen" title="Enter fullscreen">
+        <span class="fullscreen-icon" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </button>
+      <button id="help-toggle" class="quick-action-button help-toggle" type="button" aria-label="Key guide" aria-expanded="false" title="Key guide">?</button>
+    </div>
+
+    <section id="test-room-inspect-panel" class="test-room-inspect-panel hidden" aria-label="Test room inspect controls">
+      <div class="test-room-inspect-title">
+        <strong>JET INSPECT</strong>
+        <label>
+          <span>ON</span>
+          <input id="test-room-character-inspect" type="checkbox" />
+        </label>
+      </div>
+      <label>
+        <span>Target</span>
+        <select id="test-room-character-inspect-target">
+          <option value="full">Full Body</option>
+          <option value="face">Face</option>
+          <option value="upper">Upper Body</option>
+          <option value="lower">Lower Body</option>
+          <option value="foot">Foot</option>
+        </select>
+      </label>
+      <label>
+        <span>Angle</span>
+        <select id="test-room-character-inspect-angle">
+          <option value="front">Front</option>
+          <option value="back">Back</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+          <option value="frontLeft">Front Left</option>
+          <option value="frontRight">Front Right</option>
+          <option value="backLeft">Back Left</option>
+          <option value="backRight">Back Right</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+        </select>
+      </label>
+      <label>
+        <span>Motion</span>
+        <select id="test-room-character-inspect-motion">
+          <option value="live">Live</option>
+          <option value="idle">Idle</option>
+          <option value="walk">Light Run</option>
+          <option value="run">Run</option>
+          <option value="boost">Boost Run</option>
+          <option value="slide">Slide</option>
+          <option value="quickstepLeft">Quickstep Left</option>
+          <option value="quickstepRight">Quickstep Right</option>
+          <option value="jump">Jump</option>
+          <option value="landing">Landing</option>
+          <option value="hitstun">Hitstun</option>
+        </select>
+      </label>
+      <label>
+        <span>Speed</span>
+        <select id="test-room-character-inspect-motion-speed">
+          <option value="slow">Slow</option>
+          <option value="normal">Normal</option>
+          <option value="fast">Fast</option>
+        </select>
+      </label>
+      <div class="test-room-preview-mode-row">
+        <span>Preview</span>
+        <div class="test-room-preview-mode-control" role="group" aria-label="Preview mode">
+          <button id="test-room-character-inspect-preview-play" type="button">Play Motion</button>
+          <button id="test-room-character-inspect-preview-edit" type="button">Edit Key Pose</button>
+        </div>
+      </div>
+      <label class="test-room-motion-phase-row">
+        <span>Phase</span>
+        <div class="test-room-motion-phase-control">
+          <input id="test-room-character-inspect-motion-phase" type="range" min="0" max="1" step="0.01" value="0" />
+          <output id="test-room-character-inspect-motion-phase-value">0.00</output>
+          <div id="test-room-character-inspect-motion-markers" class="test-room-motion-phase-markers" aria-label="Motion phase points"></div>
+          <output id="test-room-character-inspect-motion-point" class="test-room-motion-point" aria-live="polite">Point: Live</output>
+        </div>
+      </label>
+      <div class="test-room-key-pose-row">
+        <span>Key Pose</span>
+        <div class="test-room-key-pose-control">
+          <output id="test-room-character-inspect-key-pose-status" aria-live="polite">Key Pose: Live</output>
+          <div class="test-room-key-pose-actions">
+            <button id="test-room-character-inspect-key-pose-capture" type="button">Capture Pose</button>
+            <button id="test-room-character-inspect-key-pose-clear" type="button">Clear Pose</button>
+            <button id="test-room-character-inspect-key-pose-copy" type="button">Copy Pose</button>
+            <button id="test-room-character-inspect-key-pose-copy-motion" class="test-room-key-pose-copy-motion" type="button">Copy Current Motion Key Poses</button>
+          </div>
+        </div>
+      </div>
+      <label>
+        <span>Jump Pose</span>
+        <select id="test-room-character-inspect-jump-pose">
+          <option value="exp096c">EXP-096C Tuck</option>
+          <option value="exp096d">EXP-096D Sprinter</option>
+          <option value="exp096e">EXP-096E Aero</option>
+          <option value="exp096f">EXP-096F Vault</option>
+        </select>
+      </label>
+      <div class="test-room-inspect-actions">
+        <button id="test-room-character-inspect-reset-view" type="button">Reset View</button>
+        <span>Drag rotate / Wheel zoom</span>
+      </div>
+    </section>
+
+    <section id="test-room-pose-tuner" class="test-room-pose-tuner hidden" aria-label="Test room pose tuner">
+      <div class="test-room-pose-tuner-title">
+        <strong id="test-room-pose-tuner-title-text">KEY POSE TUNER</strong>
+        <span id="test-room-pose-tuner-status">selected pose</span>
+      </div>
+      <div class="test-room-pose-tuner-actions">
+        <label class="pose-tuner-range-mode">
+          <span>Range</span>
+          <select id="test-room-pose-tuner-range-mode">
+            <option value="safe">Safe</option>
+            <option value="wide">Wide</option>
+          </select>
+        </label>
+        <button id="test-room-pose-tuner-reset" type="button">Reset</button>
+        <button id="test-room-pose-tuner-copy" type="button">Copy Values</button>
+      </div>
+      <div id="test-room-pose-tuner-controls" class="test-room-pose-tuner-controls"></div>
+      <textarea id="test-room-pose-tuner-output" class="test-room-pose-tuner-output" readonly spellcheck="false" aria-label="Current pose values"></textarea>
+    </section>
+
+    <section id="test-room-motion-tuner" class="test-room-pose-tuner test-room-motion-tuner hidden" aria-label="Test room motion tuner">
+      <div class="test-room-pose-tuner-title">
+        <strong>MOTION TUNER</strong>
+        <span id="test-room-motion-tuner-status">whole motion</span>
+      </div>
+      <div class="test-room-pose-tuner-actions">
+        <label class="pose-tuner-range-mode">
+          <span>Range</span>
+          <select id="test-room-motion-tuner-range-mode">
+            <option value="safe">Safe</option>
+            <option value="wide">Wide</option>
+          </select>
+        </label>
+        <button id="test-room-motion-tuner-reset" type="button">Reset</button>
+        <button id="test-room-motion-tuner-copy" type="button">Copy Values</button>
+      </div>
+      <div id="test-room-motion-tuner-controls" class="test-room-pose-tuner-controls"></div>
+      <textarea id="test-room-motion-tuner-output" class="test-room-pose-tuner-output" readonly spellcheck="false" aria-label="Current motion values"></textarea>
+    </section>
 
     <section id="graphics-panel" class="settings-panel hidden" aria-label="Graphics settings">
       <div class="panel-title">
@@ -211,10 +365,6 @@
           <option value="unlimited">Unlimited</option>
         </select>
       </label>
-      <div class="settings-action">
-        <span>Display</span>
-        <button id="fullscreen-toggle" type="button">Fullscreen</button>
-      </div>
     </section>
 
     <section id="debug-panel" class="settings-panel debug-panel hidden" aria-label="Debug settings">
@@ -225,10 +375,17 @@
       <div class="debug-block">
         <span>Progress Warp</span>
         <div class="debug-progress-grid">
+          <button type="button" data-debug-progress="0">0%</button>
+          <button type="button" data-debug-progress="10">10%</button>
           <button type="button" data-debug-progress="20">20%</button>
+          <button type="button" data-debug-progress="30">30%</button>
           <button type="button" data-debug-progress="40">40%</button>
+          <button type="button" data-debug-progress="50">50%</button>
           <button type="button" data-debug-progress="60">60%</button>
+          <button type="button" data-debug-progress="70">70%</button>
           <button type="button" data-debug-progress="80">80%</button>
+          <button type="button" data-debug-progress="90">90%</button>
+          <button type="button" data-debug-progress="100">100%</button>
         </div>
       </div>
       <div class="debug-block debug-status">
@@ -298,6 +455,7 @@
           <option value="walk">Light Run</option>
           <option value="run">Run</option>
           <option value="boost">Boost Run</option>
+          <option value="slide">Slide</option>
           <option value="quickstepLeft">Quickstep Left</option>
           <option value="quickstepRight">Quickstep Right</option>
           <option value="jump">Jump</option>
@@ -343,7 +501,6 @@
       <div class="pause-panel">
         <div class="panel-title">
           <strong>PAUSED</strong>
-          <button id="help-toggle" class="pause-help-toggle" type="button" aria-label="Key guide" aria-expanded="false">?</button>
         </div>
         <button id="resume-game" class="resume-game" type="button">Resume Game</button>
       </div>
@@ -359,6 +516,7 @@
         <dt>S / Down</dt><dd>Brake / Reverse</dd>
         <dt>A,D / Left,Right</dt><dd>Move</dd>
         <dt>Q / E</dt><dd>Quick Step</dd>
+        <dt>C</dt><dd>Slide</dd>
         <dt>Space</dt><dd>Jump</dd>
         <dt>Shift</dt><dd>Boost</dd>
         <dt>P / Esc</dt><dd>Pause</dd>
@@ -399,6 +557,9 @@
         <button class="touch-btn touch-btn-small" type="button" data-touch-control="brake" aria-label="Brake or reverse">
           <span class="touch-icon touch-icon-brake" aria-hidden="true"></span>
         </button>
+        <button class="touch-btn touch-btn-small" type="button" data-touch-control="slide" aria-label="Slide">
+          <span class="touch-icon touch-icon-slide" aria-hidden="true"></span>
+        </button>
       </div>
       <div class="touch-cluster touch-cluster-right">
         <button class="touch-btn touch-btn-large" type="button" data-touch-control="jump" aria-label="Jump">
@@ -422,6 +583,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js"></script>
+    <script type="module" src="./src/main.js?v=exp110a-preview-mode"></script>
   </body>
 </html>
