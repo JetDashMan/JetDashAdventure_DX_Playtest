@@ -351,6 +351,7 @@ const characterInspectMotionModes = [
   "hitstun",
 ];
 const characterInspectMotionSpeeds = ["slow", "normal", "fast"];
+const characterInspectPreviewModes = ["playMotion", "editKeyPose"];
 const characterInspectMotionSpeedScale = {
   slow: 0.45,
   normal: 1,
@@ -453,6 +454,32 @@ const characterInspectJumpPoseConfigs = Object.freeze({
     },
   },
 });
+const characterRunDrivePoseConfigs = Object.freeze({
+  driveA: {
+    phase: 0.25,
+    bodyX: -0.58,
+    arms: {
+      left: { x: 1.1841555555555556, z: -0.28, forearmX: 0.94, handX: 0.1 },
+      right: { x: -1.5441555555555557, z: 0.46, forearmX: 1.4577333333333335, handX: 0.34 },
+    },
+    legs: {
+      left: { x: -0.6605333333333332, z: 0, lowerX: -0.9570666666666667, shoeX: -0.17 },
+      right: { x: 1.3705333333333334, z: 0, lowerX: -0.06742222222222227, shoeX: 0.11 },
+    },
+  },
+  driveB: {
+    phase: 0.75,
+    bodyX: -0.58,
+    arms: {
+      left: { x: -1.744, z: -0.46, forearmX: 1.4577333333333335, handX: 0.34 },
+      right: { x: 1.384, z: 0.28, forearmX: 0.94, handX: 0.1 },
+    },
+    legs: {
+      left: { x: 1.4305333333333332, z: 0, lowerX: -0.11742222222222232, shoeX: -0.04 },
+      right: { x: -0.5105333333333333, z: 0, lowerX: -1.3170666666666668, shoeX: -0.22 },
+    },
+  },
+});
 const characterInspectPoseTunerFields = Object.freeze([
   { group: "Body", label: "Body X", path: ["bodyX"], min: -1.8, max: 0.8, wideMin: -2.4, wideMax: 1.2, step: 0.01 },
   { group: "Left Arm", label: "Upper X", path: ["arms", "left", "x"], min: -2.2, max: 1.4, wideMin: -3.0, wideMax: 2.2, step: 0.01 },
@@ -485,6 +512,15 @@ const characterMotionTuneDefaults = Object.freeze({
   runLegSwing: 1.14,
   runKneeLift: 1.24,
   runKneePush: 0.48,
+  runLegSpread: 0,
+  runLeftThighXOffset: 0,
+  runRightThighXOffset: 0,
+  runLeftThighZOffset: 0,
+  runRightThighZOffset: 0,
+  runLeftKneeXOffset: 0,
+  runRightKneeXOffset: 0,
+  runLeftShoeXOffset: 0,
+  runRightShoeXOffset: 0,
   boostForwardReach: 1.32,
   boostGroundKick: 1.04,
   boostKneeLift: 0.58,
@@ -502,6 +538,15 @@ const characterMotionTunerFields = Object.freeze([
   { group: "Legs", label: "Run Swing", key: "runLegSwing", min: 0.4, max: 1.9, wideMin: 0, wideMax: 3.0, step: 0.01 },
   { label: "Run Knee Lift", key: "runKneeLift", min: 0.4, max: 2.1, wideMin: 0, wideMax: 3.2, step: 0.01 },
   { label: "Run Knee Push", key: "runKneePush", min: 0, max: 1.2, wideMin: 0, wideMax: 2.4, step: 0.01 },
+  { group: "Leg Fine Tune", label: "Leg Spread", key: "runLegSpread", min: -0.45, max: 0.45, wideMin: -1.2, wideMax: 1.2, step: 0.01 },
+  { label: "Left Thigh X", key: "runLeftThighXOffset", min: -0.8, max: 0.8, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Right Thigh X", key: "runRightThighXOffset", min: -0.8, max: 0.8, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Left Thigh Z", key: "runLeftThighZOffset", min: -0.55, max: 0.55, wideMin: -1.4, wideMax: 1.4, step: 0.01 },
+  { label: "Right Thigh Z", key: "runRightThighZOffset", min: -0.55, max: 0.55, wideMin: -1.4, wideMax: 1.4, step: 0.01 },
+  { label: "Left Knee X", key: "runLeftKneeXOffset", min: -0.8, max: 0.8, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Right Knee X", key: "runRightKneeXOffset", min: -0.8, max: 0.8, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Left Shoe X", key: "runLeftShoeXOffset", min: -0.8, max: 0.8, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
+  { label: "Right Shoe X", key: "runRightShoeXOffset", min: -0.8, max: 0.8, wideMin: -1.8, wideMax: 1.8, step: 0.01 },
   { label: "Boost Reach", key: "boostForwardReach", min: 0.4, max: 2.2, wideMin: 0, wideMax: 3.4, step: 0.01 },
   { label: "Boost Kick", key: "boostGroundKick", min: 0.3, max: 2.0, wideMin: 0, wideMax: 3.2, step: 0.01 },
   { label: "Boost Knee Lift", key: "boostKneeLift", min: 0, max: 1.4, wideMin: 0, wideMax: 2.6, step: 0.01 },
@@ -531,7 +576,7 @@ const debugDefaults = {
   characterInspectAngle: "back",
   characterInspectMotion: "live",
   characterInspectMotionSpeed: "normal",
-  characterInspectMotionFreeze: false,
+  characterInspectPreviewMode: "playMotion",
   characterInspectMotionPhase: 0,
   characterInspectJumpPose: "exp096c",
   objectGallery: false,
@@ -1141,6 +1186,14 @@ let boostCameraWasActive = false;
 let cameraLateralFocusX = 0;
 let cameraYawOffset = 0;
 let cameraPitchOffset = 0;
+const harborGantryIntroCinematic = {
+  state: "idle",
+  timer: 0,
+  played: false,
+  cameraStart: new THREE.Vector3(),
+  cameraUpStart: new THREE.Vector3(),
+  fovStart: 67,
+};
 let characterInspectZoomScale = 1;
 const characterInspectOrbitState = {
   active: false,
@@ -2256,8 +2309,12 @@ const harborWheelGeometry = new THREE.CylinderGeometry(0.42, 0.42, 0.42, 18);
 const harborCraneWarningLightGeometry = new THREE.SphereGeometry(0.44, 18, 10);
 const harborCraneWarningGlowGeometry = new THREE.SphereGeometry(1.08, 18, 10);
 const harborCraneWarningBaseGeometry = new THREE.BoxGeometry(0.82, 0.18, 0.82);
+const harborImpactDustGeometry = new THREE.SphereGeometry(0.46, 8, 6);
+const harborImpactDebrisGeometry = new THREE.BoxGeometry(0.46, 0.2, 0.3);
+const harborImpactSparkGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.95);
 const harborAnimatedCranes = [];
 const harborCraneDropEvents = [];
+const harborImpactEffects = [];
 const harborCargoTrucks = [];
 const harborExcavators = [];
 const harborContainerChunks = [];
@@ -2275,18 +2332,44 @@ const harborCraneDropLaneTriplet5Centers = [
   harborCraneDropLane5Centers[3],
 ];
 const harborCraneDropBaseConfig = {
-  triggerLead: 650,
+  triggerLead: 520,
   urgentLead: 300,
   fallStartLead: 210,
   fallDuration: 0.78,
+  swingEnabled: true,
+  swingFrequency: 1.15,
+  swingAmplitudeZ: 0.17,
+  swingAmplitudeX: 0.045,
   landedBeaconIntensity: 0.44,
   landedDuration: Number.POSITIVE_INFINITY,
+  impactScale: 2.2,
+};
+const harborImpactEffectConfig = {
+  cameraShakeDuration: 0.42,
+  cameraShakeStrength: 0.44,
+  cameraShakeNearDistance: 140,
+  cameraShakeMaxDistance: 620,
+  dustCount: 10,
+  debrisCount: 7,
+  sparkCount: 9,
+};
+const harborImpactCameraShake = {
+  timer: 0,
+  duration: harborImpactEffectConfig.cameraShakeDuration,
+  strength: 0,
+  phase: 0,
 };
 const harborCraneDropConfigs = [
-  {
+  { z: -5480, seed: 240, phase: 0.45 },
+  { z: -5900, seed: 257, phase: 0.82 },
+  { z: -6350, seed: 254, phase: 1.19 },
+  { z: -6800, seed: 247, phase: 1.56 },
+  { z: -7250, seed: 263, phase: 1.93 },
+  { z: -7650, seed: 273, phase: 2.3 },
+].map((config) => ({
     ...harborCraneDropBaseConfig,
-    z: -5480,
-    laneTriplet5: 1,
+    ...config,
+    randomLaneTriplet5: true,
     containerType: "long",
     containerYaw: Math.PI * 0.5,
     containerScaleX: 1,
@@ -2295,10 +2378,23 @@ const harborCraneDropConfigs = [
     collisionScaleX: 1,
     collisionScaleY: 1,
     collisionScaleZ: 0.92,
-    phase: 0.45,
-    seed: 240,
-  },
-];
+  }));
+const harborGantryIntroCinematicConfig = {
+  enabled: true,
+  eventIndex: 0,
+  triggerLead: 420,
+  minEventLead: 230,
+  approachDuration: 3,
+  holdDuration: 2,
+  returnDuration: 3,
+  cameraBack: 43,
+  cameraRight: 16,
+  cameraLift: 10.5,
+  focusLift: 16.8,
+  focusForward: 2.8,
+  fov: 47,
+  playerDecel: 180,
+};
 const harborRoadContainerObstacleConfigs = [
   { z: -900, span: 2, lanePair5: 1, guideLane5: 3, seed: 505 },
   { z: -1260, span: 2, lanePair5: 3, guideLane5: 2, seed: 508 },
@@ -2358,6 +2454,9 @@ const harborRelaxedObstacleSingleLineDnaSpacing = 9.0;
 const harborRelaxedObstaclePostClearGap = 50;
 const harborRelaxedObstacleRowSuppressPadding = 160;
 const harborMajorEventDnaSuppressRadius = 180;
+const harborGantryDropDnaGuideStart = 172;
+const harborGantryDropDnaGuideCount = 11;
+const harborGantryDropDnaGuideSpacing = 9.0;
 const harborVisibilityState = {
   frame: 0,
   lastPlayerZ: Number.NaN,
@@ -2992,13 +3091,13 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { lane: 2, lane5: 4, z: -3180 },
         { lane: 2, z: -4080 },
         { lane: 0, z: -4520 },
-        { lane: 1, z: -4980 },
-        { lane: 2, z: -5220 },
-        { lane: 0, z: -5860 },
-        { lane: 1, z: -6320 },
-        { lane: 2, z: -6760 },
-        { lane: 0, z: -7240 },
-        { lane: 1, z: -7680 },
+        { lane: 0, lane5: 1, z: -4980 },
+        { lane: 2, lane5: 3, z: -5600 },
+        { lane: 2, lane5: 4, z: -6020 },
+        { lane: 0, lane5: 1, z: -6470 },
+        { lane: 2, lane5: 3, z: -6920 },
+        { lane: 2, lane5: 4, z: -7370 },
+        { lane: 1, z: -7900 },
         { lane: 2, z: -8120 },
         { lane: 0, z: -8560 },
         { lane: 1, z: -8860 },
@@ -3022,14 +3121,9 @@ function createStageThreeDefinition(label = "STAGE 3") {
         { type: "rows", zStart: -540, rowCount: 3, spacing: 18.0 },
         { type: "trail", lane: 2, zStart: -650, count: 8, spacing: 7.5 },
         { type: "trail", lane: 1, zStart: -4590, count: 8, spacing: 10.0 },
-        { type: "trail", lane: 1, zStart: -4820, count: 8, spacing: 9.0 },
-        { type: "trail", lane: 1, zStart: -4882, count: 8, spacing: 8.0 },
-        { type: "trail", lane: 2, zStart: -5120, count: 8, spacing: 8.0 },
-        { type: "trail", lane: 0, zStart: -5740, count: 8, spacing: 9.0 },
-        { type: "trail", lane: 1, zStart: -6200, count: 8, spacing: 9.0 },
-        { type: "trail", lane: 2, zStart: -6640, count: 8, spacing: 9.0 },
-        { type: "trail", lane: 0, zStart: -7120, count: 8, spacing: 9.0 },
-        { type: "trail", lane: 1, zStart: -7560, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -4820, count: 8, spacing: 9.0 },
+        { type: "trail", lane: 0, zStart: -4882, count: 8, spacing: 8.0 },
+        { type: "trail", lane: 0, zStart: -5120, count: 8, spacing: 8.0 },
         { type: "trail", lane: 2, zStart: -8000, count: 8, spacing: 9.0 },
         { type: "trail", lane: 0, zStart: -8440, count: 8, spacing: 9.0 },
         { type: "trail", lane: 1, zStart: -8740, count: 8, spacing: 8.5 },
@@ -9142,6 +9236,8 @@ function addHarborCraneWarningBeacon(parent, x, y, z, options = {}) {
   group.position.set(x, y, z);
   if (options.primary) {
     group.scale.setScalar(1.18);
+  } else if (options.auxiliary) {
+    group.scale.setScalar(0.82);
   }
 
   const base = new THREE.Mesh(harborCraneWarningBaseGeometry, materials.craneDark);
@@ -9162,7 +9258,14 @@ function addHarborCraneWarningBeacon(parent, x, y, z, options = {}) {
   group.add(light);
 
   parent.add(group);
-  return { group, light, glow, primary: Boolean(options.primary) };
+  return {
+    group,
+    light,
+    glow,
+    primary: Boolean(options.primary),
+    auxiliary: Boolean(options.auxiliary),
+    intensityScale: Number.isFinite(options.intensityScale) ? options.intensityScale : 1,
+  };
 }
 
 function getStableRandomUnit(seed, salt = 0) {
@@ -9187,6 +9290,10 @@ function getHarborCraneDropLaneTriplet5Index(config) {
     return THREE.MathUtils.clamp(config.laneTriplet5, 0, harborCraneDropLaneTriplet5Centers.length - 1);
   }
 
+  if (config.randomLaneTriplet5) {
+    return Math.floor(getStableRandomUnit(config.seed ?? 0, 91) * harborCraneDropLaneTriplet5Centers.length);
+  }
+
   return -1;
 }
 
@@ -9204,6 +9311,25 @@ function getHarborCraneDropX(config) {
     return harborCraneDropLane5Centers[THREE.MathUtils.clamp(config.lane5, 0, harborCraneDropLane5Centers.length - 1)] ?? 0;
   }
   return lanes[config.lane] ?? 0;
+}
+
+function getHarborCraneDropBlockedLane5Centers(config) {
+  const laneTriplet5Index = getHarborCraneDropLaneTriplet5Index(config);
+  if (laneTriplet5Index >= 0) {
+    return harborCraneDropLane5Centers.slice(laneTriplet5Index, laneTriplet5Index + 3);
+  }
+
+  const lanePair5Index = getHarborCraneDropLanePair5Index(config);
+  if (lanePair5Index >= 0) {
+    return harborCraneDropLane5Centers.slice(lanePair5Index, lanePair5Index + 2);
+  }
+
+  if (Number.isInteger(config.lane5)) {
+    const index = THREE.MathUtils.clamp(config.lane5, 0, harborCraneDropLane5Centers.length - 1);
+    return [harborCraneDropLane5Centers[index] ?? 0];
+  }
+
+  return [lanes[config.lane] ?? 0];
 }
 
 function addHarborCraneDropEvent(config) {
@@ -9261,6 +9387,12 @@ function addHarborCraneDropEvent(config) {
     addHarborCraneWarningBeacon(crane, 13.2, 20.25, -4.25),
     addHarborCraneWarningBeacon(crane, -13.2, 20.25, 4.25),
     addHarborCraneWarningBeacon(crane, 13.2, 20.25, 4.25),
+    ...getHarborCraneDropBlockedLane5Centers(config)
+      .filter((laneX) => Math.abs(laneX - dropX) > 0.01)
+      .map((laneX) => addHarborCraneWarningBeacon(crane, laneX, 20.52, 0, {
+        auxiliary: true,
+        intensityScale: 0.42,
+      })),
     addHarborCraneWarningBeacon(crane, dropX, 20.65, 0, { primary: true }),
   ];
 
@@ -9298,8 +9430,18 @@ function addHarborCraneDropEvent(config) {
     urgentLead: config.urgentLead,
     fallStartLead: config.fallStartLead,
     fallDuration: config.fallDuration,
+    swingEnabled: config.swingEnabled !== false,
+    swingFrequency: config.swingFrequency ?? 1.15,
+    swingAmplitudeZ: config.swingAmplitudeZ ?? 0.17,
+    swingAmplitudeX: config.swingAmplitudeX ?? 0.045,
+    swingPhase: config.phase ?? 0,
+    swingZ: 0,
+    swingX: 0,
     landedBeaconIntensity: config.landedBeaconIntensity,
     landedDuration: config.landedDuration,
+    impactScale: config.impactScale ?? 1,
+    impactShakeScale: config.impactShakeScale ?? 1,
+    blockedLane5Centers: getHarborCraneDropBlockedLane5Centers(config),
     phase: config.phase,
     groundY: sample.y,
     startCenterY,
@@ -9559,14 +9701,20 @@ function updateHarborCraneWarningSignal(event, intensity) {
   const glowScale = 0.72 + amount * 1.15;
 
   for (const beacon of event.warningBeacons ?? []) {
-    const beaconAmount = beacon.primary ? amount : 0;
+    const beaconAmount = beacon.primary
+      ? amount
+      : beacon.auxiliary
+      ? amount * (beacon.intensityScale ?? 0.42)
+      : 0;
     const beaconActive = beaconAmount > 0.015;
+    const beaconLightOpacity = active ? THREE.MathUtils.lerp(0.2, 0.78, beaconAmount) : 0;
+    const beaconGlowOpacity = active ? THREE.MathUtils.lerp(0.02, 0.24, beaconAmount) : 0;
     beacon.light.visible = beaconActive;
     beacon.glow.visible = beaconActive;
-    beacon.light.material.opacity = beacon.primary ? lightOpacity : 0;
-    beacon.glow.material.opacity = beacon.primary ? glowOpacity : 0;
-    beacon.light.scale.setScalar(beacon.primary ? lightScale : 1);
-    beacon.glow.scale.setScalar(beacon.primary ? glowScale : 1);
+    beacon.light.material.opacity = beacon.primary ? lightOpacity : beaconLightOpacity;
+    beacon.glow.material.opacity = beacon.primary ? glowOpacity : beaconGlowOpacity;
+    beacon.light.scale.setScalar(beacon.primary ? lightScale : 1 + beaconAmount * 0.14);
+    beacon.glow.scale.setScalar(beacon.primary ? glowScale : 0.66 + beaconAmount * 0.58);
   }
 }
 
@@ -9580,6 +9728,241 @@ function updateHarborCraneWarningBloomStrength(target, dt) {
 
   if (target <= 0 && harborCraneWarningBloomStrength < 0.02) {
     harborCraneWarningBloomStrength = 0;
+  }
+}
+
+function harborImpactSeededRandom(seed, index) {
+  return THREE.MathUtils.euclideanModulo(Math.sin((seed + 1) * 12.9898 + (index + 1) * 78.233) * 43758.5453, 1);
+}
+
+function makeHarborImpactMaterial(type) {
+  if (type === "dust") {
+    return new THREE.MeshBasicMaterial({
+      color: 0x9d968b,
+      transparent: true,
+      opacity: 0.32,
+      depthWrite: false,
+    });
+  }
+
+  if (type === "spark") {
+    return new THREE.MeshBasicMaterial({
+      color: 0xffb13b,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    });
+  }
+
+  return new THREE.MeshStandardMaterial({
+    color: 0x3c4146,
+    roughness: 0.58,
+    metalness: 0.34,
+    transparent: true,
+    opacity: 0.88,
+  });
+}
+
+function spawnHarborImpactParticle(type, localPosition, velocity, life, seed, index) {
+  const geometry = type === "dust"
+    ? harborImpactDustGeometry
+    : type === "spark"
+    ? harborImpactSparkGeometry
+    : harborImpactDebrisGeometry;
+  const mesh = new THREE.Mesh(geometry, makeHarborImpactMaterial(type));
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  scene.add(mesh);
+  setStageObjectTransform(mesh, localPosition, 0, 0, false);
+
+  const spin = new THREE.Vector3(
+    harborImpactSeededRandom(seed, index + 90) * 6 - 3,
+    harborImpactSeededRandom(seed, index + 120) * 6 - 3,
+    harborImpactSeededRandom(seed, index + 150) * 6 - 3,
+  );
+  const particle = {
+    type,
+    mesh,
+    localPosition: localPosition.clone(),
+    velocity: velocity.clone(),
+    life,
+    maxLife: life,
+    spin,
+    seed,
+    index,
+    rotationZ: harborImpactSeededRandom(seed, index + 180) * Math.PI * 2,
+  };
+  harborImpactEffects.push(particle);
+  return particle;
+}
+
+function triggerHarborImpactCameraShake(event) {
+  const distance = Math.abs(player.position.z - event.z);
+  const distanceFactor = 1 - THREE.MathUtils.smoothstep(
+    distance,
+    harborImpactEffectConfig.cameraShakeNearDistance,
+    harborImpactEffectConfig.cameraShakeMaxDistance,
+  );
+  if (distanceFactor <= 0) return;
+
+  const speedFactor = THREE.MathUtils.lerp(0.62, 1, THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1));
+  harborImpactCameraShake.duration = harborImpactEffectConfig.cameraShakeDuration;
+  harborImpactCameraShake.timer = Math.max(harborImpactCameraShake.timer, harborImpactCameraShake.duration);
+  harborImpactCameraShake.strength = Math.max(
+    harborImpactCameraShake.strength,
+    harborImpactEffectConfig.cameraShakeStrength * distanceFactor * speedFactor * (event.impactShakeScale ?? 1),
+  );
+  harborImpactCameraShake.phase = event.phase ?? harborImpactCameraShake.phase;
+}
+
+function triggerHarborDropImpact(event) {
+  triggerHarborImpactCameraShake(event);
+
+  const baseSeed = event.seed ?? Math.abs(Math.round(event.z));
+  const origin = new THREE.Vector3(event.dropX, event.groundY + 0.18, event.z);
+  const cargoWidth = Math.max(4.8, event.obstacle?.size?.x ?? event.containerSize?.length ?? harborLongContainerSize.length);
+  const halfWidth = cargoWidth * 0.5;
+  const impactScale = Math.max(1, event.impactScale ?? 1);
+  const impactBoost = THREE.MathUtils.clamp(impactScale - 1, 0, 1);
+  const dustCount = Math.round(harborImpactEffectConfig.dustCount * THREE.MathUtils.lerp(1, 1.55, impactBoost));
+  const debrisCount = Math.round(harborImpactEffectConfig.debrisCount * THREE.MathUtils.lerp(1, 1.35, impactBoost));
+  const sparkCount = Math.round(harborImpactEffectConfig.sparkCount * THREE.MathUtils.lerp(1, 1.55, impactBoost));
+  const dustLiftScale = THREE.MathUtils.lerp(1, 1.85, impactBoost);
+  const sparkLiftScale = THREE.MathUtils.lerp(1, 1.32, impactBoost);
+  const dustLifeScale = THREE.MathUtils.lerp(1, 1.42, impactBoost);
+  const sparkLifeScale = THREE.MathUtils.lerp(1, 1.18, impactBoost);
+
+  for (let i = 0; i < dustCount; i++) {
+    const side = harborImpactSeededRandom(baseSeed, i) < 0.5 ? -1 : 1;
+    const spreadX = THREE.MathUtils.lerp(0.2, halfWidth, harborImpactSeededRandom(baseSeed, i + 10)) * side;
+    const spreadZ = THREE.MathUtils.lerp(-1.1, 1.1, harborImpactSeededRandom(baseSeed, i + 20));
+    const direction = new THREE.Vector3(
+      THREE.MathUtils.lerp(1.4, 5.5, harborImpactSeededRandom(baseSeed, i + 30)) * side,
+      THREE.MathUtils.lerp(1.0, 3.2, harborImpactSeededRandom(baseSeed, i + 40)) * dustLiftScale,
+      THREE.MathUtils.lerp(-2.4, 2.4, harborImpactSeededRandom(baseSeed, i + 50)),
+    );
+    const particle = spawnHarborImpactParticle(
+      "dust",
+      origin.clone().add(new THREE.Vector3(spreadX, 0, spreadZ)),
+      direction,
+      THREE.MathUtils.lerp(0.55, 0.92, harborImpactSeededRandom(baseSeed, i + 60)) * dustLifeScale,
+      baseSeed,
+      i,
+    );
+    particle.mesh.userData.impactScale = impactScale;
+  }
+
+  for (let i = 0; i < debrisCount; i++) {
+    const side = harborImpactSeededRandom(baseSeed, i + 100) < 0.5 ? -1 : 1;
+    const offsetX = THREE.MathUtils.lerp(0.35, halfWidth * 0.92, harborImpactSeededRandom(baseSeed, i + 110)) * side;
+    const velocity = new THREE.Vector3(
+      THREE.MathUtils.lerp(2.6, 8.2, harborImpactSeededRandom(baseSeed, i + 120)) * side,
+      THREE.MathUtils.lerp(3.4, 8.8, harborImpactSeededRandom(baseSeed, i + 130)) * THREE.MathUtils.lerp(1, 1.22, impactBoost),
+      THREE.MathUtils.lerp(-3.1, 3.1, harborImpactSeededRandom(baseSeed, i + 140)),
+    );
+    const particle = spawnHarborImpactParticle(
+      "debris",
+      origin.clone().add(new THREE.Vector3(offsetX, 0.08, THREE.MathUtils.lerp(-0.9, 0.9, harborImpactSeededRandom(baseSeed, i + 150)))),
+      velocity,
+      THREE.MathUtils.lerp(0.72, 1.15, harborImpactSeededRandom(baseSeed, i + 160)),
+      baseSeed,
+      i + 100,
+    );
+    particle.mesh.userData.impactScale = impactScale;
+    const scale = THREE.MathUtils.lerp(0.72, 1.35, harborImpactSeededRandom(baseSeed, i + 170));
+    particle.mesh.scale.set(
+      scale * THREE.MathUtils.lerp(1, 1.16, impactBoost),
+      THREE.MathUtils.lerp(0.6, 1.1, harborImpactSeededRandom(baseSeed, i + 171)),
+      scale * THREE.MathUtils.lerp(1, 1.16, impactBoost),
+    );
+  }
+
+  for (let i = 0; i < sparkCount; i++) {
+    const side = harborImpactSeededRandom(baseSeed, i + 200) < 0.5 ? -1 : 1;
+    const velocity = new THREE.Vector3(
+      THREE.MathUtils.lerp(6.8, 15.5, harborImpactSeededRandom(baseSeed, i + 210)) * side,
+      THREE.MathUtils.lerp(1.6, 5.4, harborImpactSeededRandom(baseSeed, i + 220)) * sparkLiftScale,
+      THREE.MathUtils.lerp(-4.6, 4.6, harborImpactSeededRandom(baseSeed, i + 230)),
+    );
+    const particle = spawnHarborImpactParticle(
+      "spark",
+      origin.clone().add(new THREE.Vector3(THREE.MathUtils.lerp(-halfWidth, halfWidth, harborImpactSeededRandom(baseSeed, i + 240)), 0.5, 0)),
+      velocity,
+      THREE.MathUtils.lerp(0.2, 0.34, harborImpactSeededRandom(baseSeed, i + 250)) * sparkLifeScale,
+      baseSeed,
+      i + 200,
+    );
+    particle.mesh.userData.impactScale = impactScale;
+    particle.mesh.scale.set(
+      THREE.MathUtils.lerp(0.7, 0.95, impactBoost),
+      THREE.MathUtils.lerp(0.7, 0.95, impactBoost),
+      THREE.MathUtils.lerp(0.8, 1.7, harborImpactSeededRandom(baseSeed, i + 260)) * THREE.MathUtils.lerp(1, 1.28, impactBoost),
+    );
+  }
+}
+
+function disposeHarborImpactMesh(mesh) {
+  if (!mesh) return;
+  scene.remove(mesh);
+  const material = mesh.material;
+  if (Array.isArray(material)) {
+    for (const item of material) item.dispose?.();
+  } else {
+    material?.dispose?.();
+  }
+}
+
+function clearHarborImpactEffects() {
+  for (const effect of harborImpactEffects) {
+    disposeHarborImpactMesh(effect.mesh);
+  }
+  harborImpactEffects.length = 0;
+}
+
+function resetHarborImpactCameraShake() {
+  harborImpactCameraShake.timer = 0;
+  harborImpactCameraShake.strength = 0;
+  harborImpactCameraShake.phase = 0;
+}
+
+function updateHarborImpactEffects(dt) {
+  for (let i = harborImpactEffects.length - 1; i >= 0; i--) {
+    const effect = harborImpactEffects[i];
+    effect.life -= dt;
+    if (effect.life <= 0) {
+      disposeHarborImpactMesh(effect.mesh);
+      harborImpactEffects.splice(i, 1);
+      continue;
+    }
+
+    const age = 1 - effect.life / effect.maxLife;
+    const fade = THREE.MathUtils.clamp(effect.life / effect.maxLife, 0, 1);
+    const gravity = effect.type === "dust" ? 4.2 : effect.type === "spark" ? 18 : 24;
+    effect.velocity.y -= gravity * dt;
+    effect.localPosition.addScaledVector(effect.velocity, dt);
+    effect.rotationZ += (effect.spin.z + effect.spin.x * 0.35) * dt;
+
+    setStageObjectTransform(effect.mesh, effect.localPosition, effect.rotationZ, 0, false);
+    effect.mesh.rotateX(effect.spin.x * age);
+    effect.mesh.rotateY(effect.spin.y * age);
+
+    const impactVisualScale = Math.max(1, effect.mesh.userData.impactScale ?? 1);
+    const impactVisualBoost = THREE.MathUtils.clamp(impactVisualScale - 1, 0, 1);
+    if (effect.type === "dust") {
+      const scale = THREE.MathUtils.lerp(0.7, 3.2, age);
+      effect.mesh.scale.set(
+        scale * THREE.MathUtils.lerp(1.35, 1.72, impactVisualBoost),
+        scale * THREE.MathUtils.lerp(0.58, 0.75, impactVisualBoost),
+        scale * THREE.MathUtils.lerp(1, 1.25, impactVisualBoost),
+      );
+      effect.mesh.material.opacity = THREE.MathUtils.lerp(0.34, 0.42, impactVisualBoost) * fade * fade;
+    } else if (effect.type === "spark") {
+      effect.mesh.material.opacity = THREE.MathUtils.lerp(0.95, 1, impactVisualBoost) * fade;
+      effect.mesh.scale.x = THREE.MathUtils.lerp(0.55, 0.18, age);
+      effect.mesh.scale.y = effect.mesh.scale.x;
+    } else {
+      effect.mesh.material.opacity = 0.86 * Math.min(1, fade * 1.4);
+    }
   }
 }
 
@@ -9622,6 +10005,7 @@ function updateHarborCraneDropEvents(dt) {
       );
       updateHarborCraneWarningSignal(event, beaconIntensity);
       warningBloomTarget = Math.max(warningBloomTarget, THREE.MathUtils.lerp(0.35, 2.2, warningProgress) * beaconIntensity);
+      updateHarborDropSwing(event, dt, warningProgress, urgentProgress);
       updateHarborDropCargoTransform(event, event.startCenterY, 0);
       const shouldForceFall = distanceToDrop <= event.fallStartLead;
       if (shouldForceFall) {
@@ -9645,6 +10029,7 @@ function updateHarborCraneDropEvents(dt) {
         event.timer = 0;
         updateHarborCraneWarningSignal(event, event.landedBeaconIntensity);
         warningBloomTarget = Math.max(warningBloomTarget, event.landedBeaconIntensity);
+        triggerHarborDropImpact(event);
         registerHarborDropObstacle(event);
       }
       continue;
@@ -9662,10 +10047,30 @@ function updateHarborCraneDropEvents(dt) {
   updateHarborCraneWarningBloomStrength(warningBloomTarget, dt);
 }
 
+function updateHarborDropSwing(event, dt, warningProgress, urgentProgress) {
+  if (!event.swingEnabled) {
+    event.swingX = 0;
+    event.swingZ = 0;
+    return;
+  }
+
+  const progressAmount = THREE.MathUtils.lerp(0.34, 1.0, warningProgress);
+  const urgentAmount = THREE.MathUtils.lerp(1.0, 1.26, urgentProgress);
+  const swingSpeed = event.swingFrequency * THREE.MathUtils.lerp(1.0, 1.48, urgentProgress);
+  event.swingPhase += swingSpeed * Math.PI * 2 * dt;
+  event.swingZ = Math.sin(event.swingPhase) * event.swingAmplitudeZ * progressAmount * urgentAmount;
+  event.swingX = Math.sin(event.swingPhase * 0.72 + (event.phase ?? 0)) * event.swingAmplitudeX * progressAmount;
+}
+
 function updateHarborDropCargoTransform(event, centerY, fallProgress) {
   event.localPosition.set(event.dropX, centerY, event.z);
   setStageObjectTransform(event.cargo, event.localPosition, 0, 0, true);
   event.cargo.rotateY(event.cargoYaw ?? 0);
+  const swingDecay = fallProgress > 0 ? Math.pow(1 - THREE.MathUtils.clamp(fallProgress, 0, 1), 2) : 1;
+  if (swingDecay > 0) {
+    event.cargo.rotateX((event.swingX ?? 0) * swingDecay);
+    event.cargo.rotateZ((event.swingZ ?? 0) * swingDecay);
+  }
   const fallWobble = Math.sin(fallProgress * Math.PI);
   event.cargo.rotateX(fallWobble * -0.12);
   event.cargo.rotateZ(fallWobble * 0.08);
@@ -9918,7 +10323,7 @@ function mergeColoredGeometries(parts) {
 
 function addDnaItems() {
   const addDnaItem = (x, z, lift = 1.42, options = {}) => {
-    if (shouldSuppressHarborMajorEventDna(z)) return;
+    if (!options.harborMajorEventGuide && shouldSuppressHarborMajorEventDna(z)) return;
     if (!options.harborObstacleGuide && shouldSuppressHarborRelaxedObstacleBaseDna(z)) return;
     if (shouldSuppressDashPadInlineDna(x, z)) return;
     if (shouldSuppressDashPadOffLaneDna(x, z)) return;
@@ -9982,6 +10387,7 @@ function addDnaItems() {
 
   if (currentStage.harborTheme) {
     addHarborContainerObstacleDnaGuides(addDnaItem);
+    addHarborGantryDropDnaGuides(addDnaItem);
   }
 
   dnaInstances = new THREE.InstancedMesh(dnaGeometry, materials.dna, dnaItems.length);
@@ -10101,6 +10507,45 @@ function addHarborContainerObstacleDnaGuides(addDnaItem) {
       });
     }
   }
+}
+
+function addHarborGantryDropDnaGuides(addDnaItem) {
+  const dropEvents = harborCraneDropEvents
+    .slice()
+    .sort((a, b) => b.z - a.z);
+  let previousGuideX = Number.NaN;
+
+  for (const event of dropEvents) {
+    const guideX = getHarborGantryDropGuideLaneX(event, previousGuideX);
+    if (!Number.isFinite(guideX)) continue;
+    previousGuideX = guideX;
+
+    const guideStartZ = event.z + harborGantryDropDnaGuideStart;
+    for (let i = 0; i < harborGantryDropDnaGuideCount; i += 1) {
+      addDnaItem(guideX, guideStartZ - i * harborGantryDropDnaGuideSpacing, 1.5, {
+        harborObstacleGuide: true,
+        harborMajorEventGuide: true,
+      });
+    }
+  }
+}
+
+function getHarborGantryDropGuideLaneX(event, previousGuideX = Number.NaN) {
+  const blockedCenters = event.blockedLane5Centers ?? [];
+  const openCenters = harborCraneDropLane5Centers.filter((laneX) => (
+    !blockedCenters.some((blockedX) => Math.abs(blockedX - laneX) <= 0.01)
+  ));
+  if (openCenters.length === 0) return Number.NaN;
+
+  if (Number.isFinite(previousGuideX)) {
+    return openCenters.reduce((best, laneX) => (
+      Math.abs(laneX - previousGuideX) < Math.abs(best - previousGuideX) ? laneX : best
+    ), openCenters[0]);
+  }
+
+  return openCenters.reduce((best, laneX) => (
+    Math.abs(laneX) < Math.abs(best) ? laneX : best
+  ), openCenters[0]);
 }
 
 function getHarborContainerObstacleGuideLaneX(obstacle) {
@@ -11716,6 +12161,84 @@ function syncTouchControls() {
   });
 }
 
+function getHarborGantryIntroCinematicEvent() {
+  return harborCraneDropEvents[harborGantryIntroCinematicConfig.eventIndex] ?? null;
+}
+
+function isHarborGantryIntroCinematicActive() {
+  return harborGantryIntroCinematic.state === "active";
+}
+
+function resetHarborGantryIntroCinematic(options = {}) {
+  harborGantryIntroCinematic.state = "idle";
+  harborGantryIntroCinematic.timer = 0;
+  if (options.clearPlayed) {
+    harborGantryIntroCinematic.played = false;
+  }
+}
+
+function getHarborGantryIntroCinematicDuration() {
+  return Math.max(
+    0.1,
+    harborGantryIntroCinematicConfig.approachDuration
+      + harborGantryIntroCinematicConfig.holdDuration
+      + harborGantryIntroCinematicConfig.returnDuration,
+  );
+}
+
+function updateHarborGantryIntroCinematic(dt) {
+  if (!currentStage.harborTheme || currentStage.testRoom || finished || !harborGantryIntroCinematicConfig.enabled) {
+    return;
+  }
+
+  if (harborGantryIntroCinematic.state === "idle" && !harborGantryIntroCinematic.played) {
+    const event = getHarborGantryIntroCinematicEvent();
+    if (event) {
+      const triggerZ = event.z + harborGantryIntroCinematicConfig.triggerLead;
+      const minZ = event.z + harborGantryIntroCinematicConfig.minEventLead;
+      if (player.position.z <= triggerZ && player.position.z >= minZ) {
+        startHarborGantryIntroCinematic();
+      }
+    }
+  }
+
+  if (!isHarborGantryIntroCinematicActive()) return;
+
+  harborGantryIntroCinematic.timer += dt;
+  const duration = getHarborGantryIntroCinematicDuration();
+  if (harborGantryIntroCinematic.timer >= duration) {
+    harborGantryIntroCinematic.state = "done";
+    harborGantryIntroCinematic.timer = duration;
+  }
+}
+
+function startHarborGantryIntroCinematic() {
+  harborGantryIntroCinematic.state = "active";
+  harborGantryIntroCinematic.timer = 0;
+  harborGantryIntroCinematic.played = true;
+  harborGantryIntroCinematic.cameraStart.copy(camera.position);
+  harborGantryIntroCinematic.cameraUpStart.copy(camera.up);
+  harborGantryIntroCinematic.fovStart = camera.fov;
+  quickStepQueued = 0;
+  slideQueued = false;
+  jumpQueued = false;
+}
+
+function updatePlayerDuringHarborGantryIntroCinematic(dt) {
+  updateBoostCameraState(false, dt);
+  quickStepQueued = 0;
+  slideQueued = false;
+  slideTimer = 0;
+  playerBoostEffectActive = false;
+  player.velocity.x = moveToward(player.velocity.x, 0, 80 * dt);
+  player.velocity.z = moveToward(player.velocity.z, 0, harborGantryIntroCinematicConfig.playerDecel * dt);
+  player.velocity.y -= 82 * dt;
+  player.position.addScaledVector(player.velocity, dt);
+  snapToGround();
+  player.yaw = THREE.MathUtils.lerp(player.yaw, 0, 1 - Math.exp(-8 * dt));
+  velocityMotionBlurTarget = 0;
+}
+
 async function tryLockLandscape() {
   if (!touchControlsEnabled || !screen.orientation?.lock) return false;
   try {
@@ -11754,6 +12277,7 @@ function updateGame(dt) {
   updateObstacles(dt);
   updateDashPads(dt);
   updateStageThreeHarbor(dt);
+  updateHarborImpactEffects(dt);
   updateGwangalliTourBoats(dt);
   updateObjectGallery(dt);
   updateWater(dt);
@@ -11769,7 +12293,12 @@ function updateGame(dt) {
   playerBoostEffectActive = false;
 
   if (!finished) {
-    updatePlayer(dt);
+    updateHarborGantryIntroCinematic(dt);
+    if (isHarborGantryIntroCinematicActive()) {
+      updatePlayerDuringHarborGantryIntroCinematic(dt);
+    } else {
+      updatePlayer(dt);
+    }
     checkGoal();
   } else {
     updateBoostCameraState(false, dt);
@@ -12674,7 +13203,7 @@ function getCharacterInspectMotionPreviewState() {
     ? debugSettings.characterInspectMotion
     : debugDefaults.characterInspectMotion;
   const timeScale = characterInspectMotionSpeedScale[debugSettings.characterInspectMotionSpeed] ?? 1;
-  const frozen = Boolean(debugSettings.characterInspectMotionFreeze);
+  const frozen = isCharacterInspectEditKeyPoseMode();
   const phase = THREE.MathUtils.clamp(debugSettings.characterInspectMotionPhase, 0, 1);
   const time = frozen ? phase * Math.PI * 2 : performance.now() * 0.001 * timeScale;
   const runPhaseOverride = frozen ? phase * Math.PI * 2 : null;
@@ -12894,6 +13423,27 @@ function resetMotionTuneValues() {
   Object.assign(characterMotionTunerValues, characterMotionTuneDefaults);
 }
 
+function getCharacterRunDrivePoseBlend(phaseRadians) {
+  const cyclePhase = ((phaseRadians / (Math.PI * 2)) % 1 + 1) % 1;
+  const drivePoses = [characterRunDrivePoseConfigs.driveA, characterRunDrivePoseConfigs.driveB];
+  let bestPose = null;
+  let bestDistance = Infinity;
+  for (const pose of drivePoses) {
+    const distance = Math.abs(cyclePhase - pose.phase);
+    const wrappedDistance = Math.min(distance, 1 - distance);
+    if (wrappedDistance < bestDistance) {
+      bestDistance = wrappedDistance;
+      bestPose = pose;
+    }
+  }
+  const driveBlendWidth = 0.22;
+  const rawWeight = 1 - THREE.MathUtils.clamp(bestDistance / driveBlendWidth, 0, 1);
+  return {
+    pose: bestPose,
+    weight: THREE.MathUtils.smoothstep(rawWeight, 0, 1),
+  };
+}
+
 function animatePlayerModel(dt) {
   if (!player.parts) return;
 
@@ -12917,13 +13467,27 @@ function animatePlayerModel(dt) {
     : 0;
   const sideStepDirection = motionPreview?.quickStepDirection ?? (quickStepDirection === 0 ? 1 : quickStepDirection);
   const lateralVelocity = motionPreview?.lateralVelocity ?? player.velocity.x;
+  const displayedMotionSpeed = speed * speedDisplayScale;
+  const longStrideSpeedAmount = THREE.MathUtils.smoothstep(displayedMotionSpeed, 60, 150);
+  const highSpeedStrideExtra = THREE.MathUtils.smoothstep(displayedMotionSpeed, 145, 260) * 0.16;
+  const boostLongStrideAmount = motionBoostActive
+    ? THREE.MathUtils.smoothstep(displayedMotionSpeed, 110, 240)
+    : 0;
+  const boostCadenceAmount = motionBoostActive
+    ? THREE.MathUtils.smoothstep(displayedMotionSpeed, 110, 240)
+    : 0;
+  const boostLegDriveAmount = motionBoostActive
+    ? THREE.MathUtils.smoothstep(displayedMotionSpeed, 110, 220)
+    : 0;
+  const longStrideCadenceScale = THREE.MathUtils.lerp(1.06, 0.88, longStrideSpeedAmount)
+    + boostCadenceAmount * 0.34;
   const runAmount = THREE.MathUtils.clamp(speed / 54, 0, 1.8);
   const cappedCadenceSpeed = Math.min(speed, runTopSpeed * 1.25);
   const motionTimeScale = motionPreview?.timeScale ?? 1;
   if (Number.isFinite(motionPreview?.runPhaseOverride)) {
     runPhase = motionPreview.runPhaseOverride;
   } else {
-    runPhase += cappedCadenceSpeed * dt * 0.4 * motionTimeScale;
+    runPhase += cappedCadenceSpeed * dt * 0.34 * longStrideCadenceScale * motionTimeScale;
   }
 
   const motionTune = getCharacterMotionTuneConfig();
@@ -12939,7 +13503,18 @@ function animatePlayerModel(dt) {
   const airborne = !motionGrounded;
   const jumpPoseConfig = airborne ? getCharacterJumpPoseConfig(motionPreview?.jumpPosePreset) : null;
   const keyPoseConfig = motionPreview ? getCharacterInspectKeyPoseConfig() : null;
+  const runDrivePoseBlend = getCharacterRunDrivePoseBlend(runPhase);
+  const runDrivePoseBaseWeight = !keyPoseConfig && moving && motionGrounded && !motionSlideActive && stationaryQuickStepAmount <= 0.001
+    ? runDrivePoseBlend.weight
+    : 0;
+  const runDriveUpperPoseWeight = runDrivePoseBaseWeight * longStrideSpeedAmount * (1 - boostPoseAmount);
+  const runDriveLowerPoseWeight = runDrivePoseBaseWeight * THREE.MathUtils.clamp(
+    Math.max(longStrideSpeedAmount, boostLongStrideAmount) + highSpeedStrideExtra,
+    0,
+    THREE.MathUtils.lerp(1.16, 1.0, boostLegDriveAmount),
+  );
   const limbBlend = 1 - Math.exp(-15 * dt);
+  const legLimbBlend = 1 - Math.exp(-26 * dt);
   const runBodyBob = moving && motionGrounded ? Math.abs(Math.sin(runPhase * 2)) * motionTune.bodyBob : 0;
   const slideBlendRate = motionSlideActive ? 18 : 14;
   slidePoseAmount = THREE.MathUtils.lerp(
@@ -12965,21 +13540,25 @@ function animatePlayerModel(dt) {
     + (airborne ? 0.04 : 0)
     + (motionPreview?.verticalLift ?? 0)
     - (motionPreview?.jumpImpact ?? 0) * 0.05;
+  const runBodyTargetX = THREE.MathUtils.lerp(
+    THREE.MathUtils.lerp(
+      -THREE.MathUtils.lerp(0, motionTune.runLean, sprintAmount),
+      -motionTune.boostLean,
+      boostPoseAmount,
+    ),
+    1.46,
+    slideAmount,
+  );
+  const driveBodyTargetX = runDriveUpperPoseWeight > 0 && runDrivePoseBlend.pose
+    ? THREE.MathUtils.lerp(runBodyTargetX, runDrivePoseBlend.pose.bodyX, runDriveUpperPoseWeight)
+    : runBodyTargetX;
   player.parts.model.rotation.x = THREE.MathUtils.lerp(
     player.parts.model.rotation.x,
     keyPoseConfig
       ? keyPoseConfig.bodyX
       : motionPreview?.hitstunAmount
       ? -0.42
-      : airborne ? jumpPoseConfig.bodyX : THREE.MathUtils.lerp(
-        THREE.MathUtils.lerp(
-          -THREE.MathUtils.lerp(0, motionTune.runLean, sprintAmount),
-          -motionTune.boostLean,
-          boostPoseAmount,
-        ),
-        1.46,
-        slideAmount,
-      ),
+      : airborne ? jumpPoseConfig.bodyX : driveBodyTargetX,
     1 - Math.exp(-9 * dt),
   );
   player.parts.model.rotation.y = THREE.MathUtils.lerp(
@@ -13067,31 +13646,48 @@ function animatePlayerModel(dt) {
     const runArmZ = side * (motionTune.runArmSide + elbowDrive * 0.18);
     const boostArmX = -motionTune.boostArmBack - boostStartFlare * 0.18;
     const boostArmZ = side * (motionTune.boostArmSide + boostStartFlare * 0.16);
+    let targetArmX = THREE.MathUtils.lerp(runArmX, boostArmX, boostPoseAmount);
+    let targetArmZ = THREE.MathUtils.lerp(runArmZ, boostArmZ, boostPoseAmount);
+    let targetForearmX = THREE.MathUtils.lerp(
+      0.78 + elbowDrive * 0.78 * runStrength + forwardDrive * 0.16,
+      0.18 + boostStartFlare * 0.18,
+      boostPoseAmount,
+    );
+    let targetHandX = THREE.MathUtils.lerp(
+      0.1 + elbowDrive * 0.24,
+      -0.04 + boostStartFlare * 0.08,
+      boostPoseAmount,
+    );
+    if (runDriveUpperPoseWeight > 0 && runDrivePoseBlend.pose) {
+      const drivePose = side < 0
+        ? runDrivePoseBlend.pose.arms.left
+        : runDrivePoseBlend.pose.arms.right;
+      targetArmX = THREE.MathUtils.lerp(targetArmX, drivePose.x, runDriveUpperPoseWeight);
+      targetArmZ = THREE.MathUtils.lerp(targetArmZ, drivePose.z, runDriveUpperPoseWeight);
+      targetForearmX = THREE.MathUtils.lerp(targetForearmX, drivePose.forearmX, runDriveUpperPoseWeight);
+      targetHandX = THREE.MathUtils.lerp(targetHandX, drivePose.handX, runDriveUpperPoseWeight);
+    }
     arm.rotation.x = THREE.MathUtils.lerp(
       arm.rotation.x,
-      THREE.MathUtils.lerp(runArmX, boostArmX, boostPoseAmount),
+      targetArmX,
       limbBlend,
     );
     arm.rotation.z = THREE.MathUtils.lerp(
       arm.rotation.z,
-      THREE.MathUtils.lerp(runArmZ, boostArmZ, boostPoseAmount),
+      targetArmZ,
       limbBlend,
     );
     if (arm.forearm) {
-      const runForearmX = 0.78 + elbowDrive * 0.78 * runStrength + forwardDrive * 0.16;
-      const boostForearmX = 0.18 + boostStartFlare * 0.18;
       arm.forearm.rotation.x = THREE.MathUtils.lerp(
         arm.forearm.rotation.x,
-        THREE.MathUtils.lerp(runForearmX, boostForearmX, boostPoseAmount),
+        targetForearmX,
         limbBlend,
       );
     }
     if (arm.hand) {
-      const runHandX = 0.1 + elbowDrive * 0.24;
-      const boostHandX = -0.04 + boostStartFlare * 0.08;
       arm.hand.rotation.x = THREE.MathUtils.lerp(
         arm.hand.rotation.x,
-        THREE.MathUtils.lerp(runHandX, boostHandX, boostPoseAmount),
+        targetHandX,
         limbBlend,
       );
     }
@@ -13102,16 +13698,17 @@ function animatePlayerModel(dt) {
     if (keyPoseConfig || airborne) {
       const sourcePose = keyPoseConfig ?? jumpPoseConfig;
       const pose = side < 0 ? sourcePose.legs.left : sourcePose.legs.right;
-      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, pose.x, limbBlend);
-      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, pose.z, limbBlend);
+      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, pose.x, legLimbBlend);
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, pose.z, legLimbBlend);
       if (leg.lower) {
         leg.lower.rotation.x = THREE.MathUtils.lerp(
           leg.lower.rotation.x,
           pose.lowerX,
-          limbBlend,
+          legLimbBlend,
         );
       }
-      if (leg.shoe) leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, pose.shoeX, limbBlend);
+      if (leg.shoe) leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, pose.shoeX, legLimbBlend);
+      if (leg.shoe) leg.shoe.rotation.z = THREE.MathUtils.lerp(leg.shoe.rotation.z, 0, legLimbBlend);
       if (leg.shoe) leg.shoe.scale.setScalar(1);
       return;
     }
@@ -13120,22 +13717,23 @@ function animatePlayerModel(dt) {
       leg.rotation.x = THREE.MathUtils.lerp(
         leg.rotation.x,
         -0.18,
-        limbBlend,
+        legLimbBlend,
       );
-      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, side * 0.08, limbBlend);
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, side * 0.08, legLimbBlend);
       if (leg.lower) {
         leg.lower.rotation.x = THREE.MathUtils.lerp(
           leg.lower.rotation.x,
           0.08,
-          limbBlend,
+          legLimbBlend,
         );
       }
       if (leg.shoe) {
         leg.shoe.rotation.x = THREE.MathUtils.lerp(
           leg.shoe.rotation.x,
           -0.08,
-          limbBlend,
+          legLimbBlend,
         );
+        leg.shoe.rotation.z = THREE.MathUtils.lerp(leg.shoe.rotation.z, 0, legLimbBlend);
         leg.shoe.scale.set(1, 1, 1.08);
       }
       return;
@@ -13147,37 +13745,39 @@ function animatePlayerModel(dt) {
       leg.rotation.x = THREE.MathUtils.lerp(
         leg.rotation.x,
         leadLeg ? 0.16 * legAmount : -0.42 * legAmount,
-        limbBlend,
+        legLimbBlend,
       );
       leg.rotation.z = THREE.MathUtils.lerp(
         leg.rotation.z,
         side * (leadLeg ? 0.24 : -0.14) * legAmount,
-        limbBlend,
+        legLimbBlend,
       );
       if (leg.lower) {
         leg.lower.rotation.x = THREE.MathUtils.lerp(
           leg.lower.rotation.x,
           leadLeg ? -0.42 - legAmount * 0.14 : -0.72 - legAmount * 0.16,
-          limbBlend,
+          legLimbBlend,
         );
       }
       if (leg.shoe) {
         leg.shoe.rotation.x = THREE.MathUtils.lerp(
           leg.shoe.rotation.x,
           leadLeg ? 0.16 : 0.28,
-          limbBlend,
+          legLimbBlend,
         );
+        leg.shoe.rotation.z = THREE.MathUtils.lerp(leg.shoe.rotation.z, 0, legLimbBlend);
         leg.shoe.scale.setScalar(1);
       }
       return;
     }
 
     if (!moving) {
-      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.02, limbBlend);
-      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, limbBlend);
-      if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.08, limbBlend);
+      leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, 0.02, legLimbBlend);
+      leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, legLimbBlend);
+      if (leg.lower) leg.lower.rotation.x = THREE.MathUtils.lerp(leg.lower.rotation.x, -0.08, legLimbBlend);
       if (leg.shoe) {
-        leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0, limbBlend);
+        leg.shoe.rotation.x = THREE.MathUtils.lerp(leg.shoe.rotation.x, 0, legLimbBlend);
+        leg.shoe.rotation.z = THREE.MathUtils.lerp(leg.shoe.rotation.z, 0, legLimbBlend);
         leg.shoe.scale.setScalar(1);
       }
       return;
@@ -13186,33 +13786,72 @@ function animatePlayerModel(dt) {
     const wave = Math.sin(phase);
     const lift = Math.max(0, wave);
     const push = Math.max(0, -wave);
-    const runKneeFlex = -(0.28 + lift * motionTune.runKneeLift * runStrength + push * motionTune.runKneePush * runStrength);
+    const legRunStrength = Math.min(runAmount, THREE.MathUtils.lerp(1.72, 1.08, boostLegDriveAmount));
+    const runKneeFlex = -(0.28 + lift * motionTune.runKneeLift * legRunStrength + push * motionTune.runKneePush * legRunStrength);
     const boostForwardReach = lift * motionTune.boostForwardReach * runStrength;
     const boostGroundKick = push * motionTune.boostGroundKick * runStrength;
     const boostKneeFlex = -(0.18 + lift * motionTune.boostKneeLift * runStrength + push * motionTune.boostKneePush * runStrength);
-    const runLegX = wave * motionTune.runLegSwing * runStrength;
+    const runLegX = wave * motionTune.runLegSwing * legRunStrength;
     const boostLegX = boostForwardReach - boostGroundKick;
+    const runShoeX = 0.2 + lift * 0.34 - push * 0.25;
+    const boostShoeX = 0.14 + lift * 0.42 - push * 0.3;
+    const sideOffsets = side < 0
+      ? {
+        thighX: motionTune.runLeftThighXOffset,
+        thighZ: motionTune.runLeftThighZOffset,
+        kneeX: motionTune.runLeftKneeXOffset,
+        shoeX: motionTune.runLeftShoeXOffset,
+      }
+      : {
+        thighX: motionTune.runRightThighXOffset,
+        thighZ: motionTune.runRightThighZOffset,
+        kneeX: motionTune.runRightKneeXOffset,
+        shoeX: motionTune.runRightShoeXOffset,
+      };
+    const boostLegShapeAmount = 0;
+    let targetLegX = THREE.MathUtils.lerp(runLegX, boostLegX, boostLegShapeAmount) + sideOffsets.thighX;
+    let targetLegZ = side * motionTune.runLegSpread + sideOffsets.thighZ;
+    let targetKneeX = THREE.MathUtils.lerp(runKneeFlex, boostKneeFlex, boostLegShapeAmount) + sideOffsets.kneeX;
+    let targetShoeX = THREE.MathUtils.lerp(runShoeX, boostShoeX, boostLegShapeAmount) + sideOffsets.shoeX;
+    if (runDriveLowerPoseWeight > 0 && runDrivePoseBlend.pose) {
+      const drivePose = side < 0
+        ? runDrivePoseBlend.pose.legs.left
+        : runDrivePoseBlend.pose.legs.right;
+      targetLegX = THREE.MathUtils.lerp(targetLegX, drivePose.x, runDriveLowerPoseWeight);
+      targetLegZ = THREE.MathUtils.lerp(targetLegZ, drivePose.z, runDriveLowerPoseWeight);
+      targetKneeX = THREE.MathUtils.lerp(targetKneeX, drivePose.lowerX, runDriveLowerPoseWeight);
+      targetShoeX = THREE.MathUtils.lerp(targetShoeX, drivePose.shoeX, runDriveLowerPoseWeight);
+    }
+    if (boostLegDriveAmount > 0) {
+      const boostRearLegLimit = THREE.MathUtils.lerp(-1.35, -0.68, boostLegDriveAmount);
+      const boostKneeFlexLimit = THREE.MathUtils.lerp(-2.0, -1.42, boostLegDriveAmount);
+      targetLegX = Math.max(targetLegX, boostRearLegLimit);
+      targetKneeX = Math.max(targetKneeX, boostKneeFlexLimit);
+    }
     leg.rotation.x = THREE.MathUtils.lerp(
       leg.rotation.x,
-      THREE.MathUtils.lerp(runLegX, boostLegX, boostPoseAmount),
-      limbBlend,
+      targetLegX,
+      legLimbBlend,
     );
-    leg.rotation.z = THREE.MathUtils.lerp(leg.rotation.z, 0, limbBlend);
+    leg.rotation.z = THREE.MathUtils.lerp(
+      leg.rotation.z,
+      targetLegZ,
+      legLimbBlend,
+    );
     if (leg.lower) {
       leg.lower.rotation.x = THREE.MathUtils.lerp(
         leg.lower.rotation.x,
-        THREE.MathUtils.lerp(runKneeFlex, boostKneeFlex, boostPoseAmount),
-        limbBlend,
+        targetKneeX,
+        legLimbBlend,
       );
     }
     if (leg.shoe) {
-      const runShoeX = 0.2 + lift * 0.34 - push * 0.25;
-      const boostShoeX = 0.14 + lift * 0.42 - push * 0.3;
       leg.shoe.rotation.x = THREE.MathUtils.lerp(
         leg.shoe.rotation.x,
-        THREE.MathUtils.lerp(runShoeX, boostShoeX, boostPoseAmount),
-        limbBlend,
+        targetShoeX,
+        legLimbBlend,
       );
+      leg.shoe.rotation.z = THREE.MathUtils.lerp(leg.shoe.rotation.z, side * motionTune.runLegSpread * 0.35, legLimbBlend);
       leg.shoe.scale.set(1, 1, moving ? shoePulse : 1);
     }
   };
@@ -13591,8 +14230,8 @@ function getCharacterInspectStableFrameKey(target) {
     debugSettings.characterInspectAngle,
     debugSettings.characterInspectMotion,
     debugSettings.characterInspectMotionSpeed,
-    debugSettings.characterInspectMotionFreeze ? "freeze" : "play",
-    debugSettings.characterInspectMotionFreeze
+    debugSettings.characterInspectPreviewMode,
+    isCharacterInspectEditKeyPoseMode()
       ? THREE.MathUtils.clamp(debugSettings.characterInspectMotionPhase, 0, 1).toFixed(2)
       : "-",
     debugSettings.characterInspectJumpPose,
@@ -13760,9 +14399,141 @@ function handleCharacterInspectOrbitWheel(event) {
   );
 }
 
-function updateCamera(dt) {
-  updateManualCameraInput(dt);
+function getRunCameraTargetState(frame) {
+  const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
+  const boostCameraSustainEase = boostCameraSustain;
+  const centerWorld = toWorldPosition(new THREE.Vector3(cameraLateralFocusX, player.position.y, player.position.z));
+  const cameraBack = runCameraPreset.back
+    + boostCameraKickPreset.back * boostCameraKickEase
+    + boostCameraHoldPreset.back * boostCameraSustainEase;
+  const cameraLift = runCameraPreset.lift
+    + boostCameraKickPreset.lift * boostCameraKickEase
+    + boostCameraHoldPreset.lift * boostCameraSustainEase;
+  const cameraOffset = frame.tangent.clone()
+    .multiplyScalar(-cameraBack)
+    .addScaledVector(frame.up, cameraLift);
+  const yawRotation = new THREE.Quaternion().setFromAxisAngle(frame.up, cameraYawOffset);
+  cameraOffset.applyQuaternion(yawRotation);
+  const pitchAxis = frame.right.clone().applyQuaternion(yawRotation).normalize();
+  cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
+  const desired = centerWorld.clone().add(cameraOffset);
+  const lookAt = centerWorld.clone()
+    .addScaledVector(
+      frame.tangent,
+      runCameraPreset.lookAhead
+        + boostCameraKickPreset.lookAhead * boostCameraKickEase
+        + boostCameraHoldPreset.lookAhead * boostCameraSustainEase,
+    )
+    .addScaledVector(frame.up, 1.05);
+  const targetFov = runCameraPreset.fov
+    + boostCameraKickPreset.fov * boostCameraKickEase
+    + boostCameraHoldPreset.fov * boostCameraSustainEase
+    + jumpImpact * 2.5
+    + quickStepFlash * 1.5;
+
+  return {
+    desired,
+    lookAt,
+    up: frame.up.clone(),
+    fov: targetFov,
+  };
+}
+
+function getHarborGantryIntroCameraState() {
+  const event = getHarborGantryIntroCinematicEvent();
+  if (!event) return null;
+
+  event.cargo?.updateMatrixWorld(true);
+  const frame = getStageFrame(event.z, true);
+  const focus = event.cargo
+    ? event.cargo.getWorldPosition(new THREE.Vector3())
+    : toWorldPosition(new THREE.Vector3(event.dropX, event.startCenterY, event.z), true);
+  focus
+    .addScaledVector(frame.up, harborGantryIntroCinematicConfig.focusLift - event.startCenterY)
+    .addScaledVector(frame.tangent, harborGantryIntroCinematicConfig.focusForward);
+
+  const desired = focus.clone()
+    .addScaledVector(frame.tangent, -harborGantryIntroCinematicConfig.cameraBack)
+    .addScaledVector(frame.right, harborGantryIntroCinematicConfig.cameraRight)
+    .addScaledVector(frame.up, harborGantryIntroCinematicConfig.cameraLift);
+
+  return {
+    desired,
+    lookAt: focus,
+    up: frame.up.clone(),
+    fov: harborGantryIntroCinematicConfig.fov,
+  };
+}
+
+function updateHarborGantryIntroCinematicCamera(dt) {
+  const closeState = getHarborGantryIntroCameraState();
+  if (!closeState) {
+    resetHarborGantryIntroCinematic();
+    return false;
+  }
+
   const frame = getStageFrame(player.position.z);
+  const normalState = getRunCameraTargetState(frame);
+  const approachDuration = Math.max(0.1, harborGantryIntroCinematicConfig.approachDuration);
+  const holdDuration = Math.max(0, harborGantryIntroCinematicConfig.holdDuration);
+  const returnDuration = Math.max(0.1, harborGantryIntroCinematicConfig.returnDuration);
+  const returnStartTime = approachDuration + holdDuration;
+  const elapsed = harborGantryIntroCinematic.timer;
+  const enterAmount = THREE.MathUtils.smoothstep(THREE.MathUtils.clamp(elapsed / approachDuration, 0, 1), 0, 1);
+  const returnAmount = THREE.MathUtils.smoothstep(
+    THREE.MathUtils.clamp((elapsed - returnStartTime) / returnDuration, 0, 1),
+    0,
+    1,
+  );
+
+  const closeDesired = harborGantryIntroCinematic.cameraStart.clone().lerp(closeState.desired, enterAmount);
+  const desired = closeDesired.lerp(normalState.desired, returnAmount);
+  const closeLookAt = normalState.lookAt.clone().lerp(closeState.lookAt, enterAmount);
+  const lookAt = closeLookAt.lerp(normalState.lookAt, returnAmount);
+  const closeUp = harborGantryIntroCinematic.cameraUpStart.clone().lerp(closeState.up, enterAmount).normalize();
+  const up = closeUp.lerp(normalState.up, returnAmount).normalize();
+  const closeFov = THREE.MathUtils.lerp(harborGantryIntroCinematic.fovStart, closeState.fov, enterAmount);
+  const targetFov = THREE.MathUtils.lerp(closeFov, normalState.fov, returnAmount);
+
+  camera.position.lerp(desired, 1 - Math.exp(-18 * dt));
+  camera.up.lerp(up, 1 - Math.exp(-12 * dt)).normalize();
+  camera.lookAt(lookAt);
+  applyHarborImpactCameraShake(dt, frame);
+  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-10 * dt));
+  camera.updateProjectionMatrix();
+  return true;
+}
+
+function applyHarborImpactCameraShake(dt, frame) {
+  if (harborImpactCameraShake.timer <= 0 || harborImpactCameraShake.strength <= 0) return;
+
+  harborImpactCameraShake.timer = Math.max(0, harborImpactCameraShake.timer - dt);
+  harborImpactCameraShake.phase += dt * 58;
+  const amount = harborImpactCameraShake.duration > 0
+    ? harborImpactCameraShake.timer / harborImpactCameraShake.duration
+    : 0;
+  const eased = amount * amount;
+  const strength = harborImpactCameraShake.strength * eased;
+  const horizontal = Math.sin(harborImpactCameraShake.phase * 1.7) * strength * 0.42;
+  const vertical = Math.cos(harborImpactCameraShake.phase * 2.25) * strength * 0.28;
+  const forward = Math.sin(harborImpactCameraShake.phase * 1.1) * strength * 0.12;
+  camera.position
+    .addScaledVector(frame.right, horizontal)
+    .addScaledVector(frame.up, vertical)
+    .addScaledVector(frame.tangent, forward);
+
+  if (harborImpactCameraShake.timer <= 0) {
+    harborImpactCameraShake.strength = 0;
+  }
+}
+
+function updateCamera(dt) {
+  const frame = getStageFrame(player.position.z);
+  if (isHarborGantryIntroCinematicActive() && updateHarborGantryIntroCinematicCamera(dt)) {
+    return;
+  }
+
+  updateManualCameraInput(dt);
   if (currentStage.testRoom && debugSettings.objectGallery) {
     updateObjectGalleryCamera(dt);
     return;
@@ -13801,41 +14572,12 @@ function updateCamera(dt) {
     lateralTargetX,
     1 - Math.exp(-lateralFollowRate * dt),
   );
-  const centerWorld = toWorldPosition(new THREE.Vector3(cameraLateralFocusX, player.position.y, player.position.z));
-  const cameraBack = runCameraPreset.back
-    + boostCameraKickPreset.back * boostCameraKickEase
-    + boostCameraHoldPreset.back * boostCameraSustainEase;
-  const cameraLift = runCameraPreset.lift
-    + boostCameraKickPreset.lift * boostCameraKickEase
-    + boostCameraHoldPreset.lift * boostCameraSustainEase;
-  const cameraOffset = frame.tangent.clone()
-    .multiplyScalar(-cameraBack)
-    .addScaledVector(frame.up, cameraLift);
-  const yawRotation = new THREE.Quaternion().setFromAxisAngle(frame.up, cameraYawOffset);
-  cameraOffset.applyQuaternion(yawRotation);
-  const pitchAxis = frame.right.clone().applyQuaternion(yawRotation).normalize();
-  cameraOffset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(pitchAxis, cameraPitchOffset));
-  const desired = centerWorld.clone().add(cameraOffset);
-
-  camera.position.lerp(desired, 1 - Math.exp(-getDebugTuneValue("camera.followLerp") * dt));
-
-  const lookAt = centerWorld.clone()
-    .addScaledVector(
-      frame.tangent,
-      runCameraPreset.lookAhead
-        + boostCameraKickPreset.lookAhead * boostCameraKickEase
-        + boostCameraHoldPreset.lookAhead * boostCameraSustainEase,
-    )
-    .addScaledVector(frame.up, 1.05);
-  camera.up.lerp(frame.up, 1 - Math.exp(-5.2 * dt)).normalize();
-  camera.lookAt(lookAt);
-
-  const targetFov = runCameraPreset.fov
-    + boostCameraKickPreset.fov * boostCameraKickEase
-    + boostCameraHoldPreset.fov * boostCameraSustainEase
-    + jumpImpact * 2.5
-    + quickStepFlash * 1.5;
-  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-4.2 * dt));
+  const cameraState = getRunCameraTargetState(frame);
+  camera.position.lerp(cameraState.desired, 1 - Math.exp(-getDebugTuneValue("camera.followLerp") * dt));
+  camera.up.lerp(cameraState.up, 1 - Math.exp(-5.2 * dt)).normalize();
+  camera.lookAt(cameraState.lookAt);
+  applyHarborImpactCameraShake(dt, frame);
+  camera.fov = THREE.MathUtils.lerp(camera.fov, cameraState.fov, 1 - Math.exp(-4.2 * dt));
   camera.updateProjectionMatrix();
 }
 
@@ -14181,6 +14923,20 @@ function getCharacterInspectMotionSpeed(source = {}) {
     : debugDefaults.characterInspectMotionSpeed;
 }
 
+function getCharacterInspectPreviewMode(source = {}) {
+  if (characterInspectPreviewModes.includes(source.characterInspectPreviewMode)) {
+    return source.characterInspectPreviewMode;
+  }
+  if (typeof source.characterInspectMotionFreeze === "boolean") {
+    return source.characterInspectMotionFreeze ? "editKeyPose" : "playMotion";
+  }
+  return debugDefaults.characterInspectPreviewMode;
+}
+
+function isCharacterInspectEditKeyPoseMode(source = debugSettings) {
+  return getCharacterInspectPreviewMode(source) === "editKeyPose";
+}
+
 function getCharacterInspectMotionPhase(source = {}) {
   const phase = Number(source.characterInspectMotionPhase);
   return Number.isFinite(phase)
@@ -14196,7 +14952,7 @@ function setCharacterInspectMotionPhaseFromMarker(phase) {
   debugSettings = normalizeDebugSettings({
     ...debugSettings,
     characterInspect: true,
-    characterInspectMotionFreeze: true,
+    characterInspectPreviewMode: "editKeyPose",
     characterInspectMotionPhase: phase,
   });
   resetCharacterInspectStableFrame();
@@ -14368,7 +15124,7 @@ function isCharacterInspectKeyPoseEditActive() {
     currentStage.testRoom
       && debugSettings.characterInspect
       && debugSettings.characterInspectMotion !== "live"
-      && debugSettings.characterInspectMotionFreeze,
+      && isCharacterInspectEditKeyPoseMode(),
   );
 }
 
@@ -14456,7 +15212,7 @@ function syncCharacterInspectKeyPoseControls() {
 
   if (testRoomCharacterInspectKeyPoseStatusEl) {
     let text = "Key Pose: live motion";
-    if (motionSelected && !debugSettings.characterInspectMotionFreeze) {
+    if (motionSelected && !isCharacterInspectEditKeyPoseMode()) {
       text = "Key Pose: switch to Edit Key Pose";
     } else if (motionSelected) {
       text = context
@@ -14509,9 +15265,7 @@ function normalizeDebugSettings(source = {}) {
     characterInspectAngle: getLegacyCharacterInspectAngle(source),
     characterInspectMotion: getCharacterInspectMotionMode(source),
     characterInspectMotionSpeed: getCharacterInspectMotionSpeed(source),
-    characterInspectMotionFreeze: typeof source.characterInspectMotionFreeze === "boolean"
-      ? source.characterInspectMotionFreeze
-      : debugDefaults.characterInspectMotionFreeze,
+    characterInspectPreviewMode: getCharacterInspectPreviewMode(source),
     characterInspectMotionPhase: getCharacterInspectMotionPhase(source),
     characterInspectJumpPose: getCharacterInspectJumpPose(source),
     objectGallery: typeof source.objectGallery === "boolean"
@@ -14690,7 +15444,7 @@ function bindDebugControls() {
     debugSettings = normalizeDebugSettings({
       ...debugSettings,
       characterInspect: true,
-      characterInspectMotionFreeze: false,
+      characterInspectPreviewMode: "playMotion",
     });
     resetCharacterInspectStableFrame();
     saveDebugSettings();
@@ -14701,7 +15455,7 @@ function bindDebugControls() {
     debugSettings = normalizeDebugSettings({
       ...debugSettings,
       characterInspect: true,
-      characterInspectMotionFreeze: true,
+      characterInspectPreviewMode: "editKeyPose",
     });
     resetCharacterInspectStableFrame();
     saveDebugSettings();
@@ -14712,7 +15466,7 @@ function bindDebugControls() {
     debugSettings = normalizeDebugSettings({
       ...debugSettings,
       characterInspect: true,
-      characterInspectMotionFreeze: true,
+      characterInspectPreviewMode: "editKeyPose",
       characterInspectMotionPhase: testRoomCharacterInspectMotionPhaseInput.value,
     });
     resetCharacterInspectStableFrame();
@@ -15113,13 +15867,13 @@ function syncDebugControls() {
       || debugSettings.characterInspectMotion === "live";
   }
   if (testRoomCharacterInspectPreviewPlayButton) {
-    const playActive = !debugSettings.characterInspectMotionFreeze;
+    const playActive = !isCharacterInspectEditKeyPoseMode();
     testRoomCharacterInspectPreviewPlayButton.disabled = !testRoomMotionScrubAvailable;
     testRoomCharacterInspectPreviewPlayButton.classList.toggle("is-active", playActive);
     testRoomCharacterInspectPreviewPlayButton.setAttribute("aria-pressed", playActive ? "true" : "false");
   }
   if (testRoomCharacterInspectPreviewEditButton) {
-    const editActive = Boolean(debugSettings.characterInspectMotionFreeze);
+    const editActive = isCharacterInspectEditKeyPoseMode();
     testRoomCharacterInspectPreviewEditButton.disabled = !testRoomMotionScrubAvailable;
     testRoomCharacterInspectPreviewEditButton.classList.toggle("is-active", editActive);
     testRoomCharacterInspectPreviewEditButton.setAttribute("aria-pressed", editActive ? "true" : "false");
@@ -15694,6 +16448,9 @@ function warpToGoalProgress(progress) {
   velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
   harborCraneWarningBloomStrength = 0;
+  clearHarborImpactEffects();
+  resetHarborImpactCameraShake();
+  resetHarborGantryIntroCinematic({ clearPlayed: true });
   playerBoostEffectActive = false;
   boostCameraKick = 0;
   boostCameraSustain = 0;
@@ -15752,6 +16509,9 @@ function resetGame(options = {}) {
   velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
   harborCraneWarningBloomStrength = 0;
+  clearHarborImpactEffects();
+  resetHarborImpactCameraShake();
+  resetHarborGantryIntroCinematic({ clearPlayed: true });
   playerBoostEffectActive = false;
   boostCameraKick = 0;
   boostCameraSustain = 0;
