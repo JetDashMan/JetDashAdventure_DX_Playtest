@@ -1119,6 +1119,7 @@ window.sessionStorage.removeItem("dx-speed-stage-score");
 const trackSegments = [];
 const dnaItems = [];
 const dashPads = [];
+// Obstacle position is stage-local for gameplay; basePosition/baseQuaternion are world-space render anchors.
 const obstacles = [];
 const looseDnaItems = [];
 const quickStepAfterimages = [];
@@ -2312,11 +2313,17 @@ const harborCraneWarningBaseGeometry = new THREE.BoxGeometry(0.82, 0.18, 0.82);
 const harborImpactDustGeometry = new THREE.SphereGeometry(0.46, 8, 6);
 const harborImpactDebrisGeometry = new THREE.BoxGeometry(0.46, 0.2, 0.3);
 const harborImpactSparkGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.95);
+const harborInfectedDroneBodyGeometry = new THREE.BoxGeometry(2.2, 0.58, 1.48);
+const harborInfectedDroneCoreGeometry = new THREE.SphereGeometry(0.42, 18, 10);
+const harborInfectedDroneGlowGeometry = new THREE.SphereGeometry(0.96, 18, 10);
+const harborInfectedDroneWingGeometry = new THREE.BoxGeometry(1.18, 0.12, 0.26);
+const harborInfectedDroneCableGeometry = new THREE.CylinderGeometry(0.035, 0.035, 1.1, 8);
 const harborAnimatedCranes = [];
 const harborCraneDropEvents = [];
 const harborImpactEffects = [];
 const harborCargoTrucks = [];
 const harborExcavators = [];
+const harborInfectedDrones = [];
 const harborContainerChunks = [];
 const harborContainerChunkSize = 420;
 const harborCraneDropLane5Centers = [-quickStepDistance * 2, -quickStepDistance, 0, quickStepDistance, quickStepDistance * 2];
@@ -2447,6 +2454,13 @@ const harborSpecialTrailerBackgroundConfigs = [
     seed: 614,
     yaw: Math.PI * 0.5,
   },
+];
+const harborInfectedDroneConfigs = [
+  { z: -620, lane5: 2, seed: 701, phase: 0.2 },
+  { z: -1510, lane5: 4, seed: 704, phase: 1.3 },
+  { z: -4700, lane5: 1, seed: 707, phase: 2.1 },
+  { z: -6150, lane5: 0, seed: 710, phase: 2.8 },
+  { z: -8220, lane5: 3, seed: 713, phase: 3.5 },
 ];
 const harborRelaxedObstacleSingleLineDnaStart = 110;
 const harborRelaxedObstacleSingleLineDnaCount = 10;
@@ -6946,6 +6960,7 @@ function addStageThreeHarbor() {
   addHarborCraneField(harborEndZ);
   addHarborCraneDropEvents(harborEndZ);
   addHarborRoadContainerObstacles(harborEndZ);
+  addHarborInfectedDrones(harborEndZ);
   addHarborRoadSlideObstacles(harborEndZ);
   addHarborSpecialTrailerBackgroundProps(harborEndZ);
   addHarborRoadProps();
@@ -6998,6 +7013,12 @@ function addHarborRoadContainerObstacles(harborEndZ) {
     }))
     .filter(({ z }) => z > harborEndZ + 160)
     .forEach(addHarborRoadContainerObstacle);
+}
+
+function addHarborInfectedDrones(harborEndZ) {
+  harborInfectedDroneConfigs
+    .filter(({ z }) => z > harborEndZ + 160)
+    .forEach(addHarborInfectedDrone);
 }
 
 function addHarborRoadSlideObstacles(harborEndZ) {
@@ -8046,6 +8067,121 @@ function createHarborForkliftObstacle(seed) {
     group,
     debugName: "Harbor Background Prop - Port Forklift",
   };
+}
+
+function addHarborInfectedDrone(config) {
+  const laneIndex = THREE.MathUtils.clamp(config.lane5 ?? 2, 0, harborCraneDropLane5Centers.length - 1);
+  const laneX = harborCraneDropLane5Centers[laneIndex] ?? 0;
+  const sample = getGroundSample(laneX, config.z);
+  if (!sample) return;
+
+  const visualScale = config.visualScale ?? 2.0;
+  const group = createHarborInfectedDrone(config.seed ?? 0);
+  group.scale.setScalar(visualScale);
+  group.userData.debugName = "Infected Surveillance Drone";
+  const homePosition = new THREE.Vector3(laneX, sample.y + 3.05, config.z);
+  setStageObjectTransform(group, homePosition, 0, 0, true);
+  scene.add(group);
+
+  const obstacle = {
+    mesh: group,
+    position: homePosition.clone(),
+    basePosition: group.position.clone(),
+    baseQuaternion: group.quaternion.clone(),
+    baseScale: group.scale.clone(),
+    size: new THREE.Vector3(4.2, 4.9, 3.0),
+    noIdleMotion: true,
+    harborInfectedDrone: true,
+    dnaFrontClearance: 42,
+    dnaRearClearance: 34,
+  };
+  obstacles.push(obstacle);
+  harborInfectedDrones.push({
+    group,
+    obstacle,
+    homePosition,
+    z: config.z,
+    phase: config.phase ?? 0,
+    active: true,
+    core: group.userData.core,
+    glow: group.userData.glow,
+    rotors: group.userData.rotors ?? [],
+  });
+}
+
+function createHarborInfectedDrone(seed) {
+  const group = new THREE.Group();
+
+  const body = new THREE.Mesh(harborInfectedDroneBodyGeometry, materials.craneDark);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.34, 1.05), materials.containerTrim);
+  shell.position.set(0, 0.03, 0.08);
+  shell.castShadow = true;
+  shell.receiveShadow = true;
+  group.add(shell);
+
+  const coreMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff2b18,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff2412,
+    transparent: true,
+    opacity: 0.24,
+    depthWrite: false,
+    toneMapped: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const core = new THREE.Mesh(harborInfectedDroneCoreGeometry, coreMaterial);
+  core.position.set(0, 0.02, -0.78);
+  group.add(core);
+  const glow = new THREE.Mesh(harborInfectedDroneGlowGeometry, glowMaterial);
+  glow.position.copy(core.position);
+  group.add(glow);
+
+  const rotors = [];
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(harborInfectedDroneWingGeometry, materials.harborRail);
+    wing.position.set(side * 1.42, 0.03, -0.08);
+    wing.castShadow = true;
+    group.add(wing);
+
+    const rotorBase = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.18, 16), materials.containerTrim);
+    rotorBase.position.set(side * 2.0, 0.02, -0.08);
+    rotorBase.rotation.z = Math.PI * 0.5;
+    rotorBase.castShadow = true;
+    group.add(rotorBase);
+
+    const rotor = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.035, 0.16), materials.craneWarningGlow.clone());
+    rotor.material.opacity = 0.38;
+    rotor.position.copy(rotorBase.position);
+    rotor.rotation.y = (seed % 3) * 0.2;
+    rotor.castShadow = false;
+    group.add(rotor);
+    rotors.push(rotor);
+
+    const claw = new THREE.Mesh(harborInfectedDroneCableGeometry, materials.containerTrim);
+    claw.position.set(side * 0.58, -0.64, 0.42);
+    claw.rotation.x = 0.12 * side;
+    claw.castShadow = true;
+    group.add(claw);
+  }
+
+  const topSensor = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.28, 0.42), materials.tourBoatRed);
+  topSensor.position.set(0, 0.46, 0.18);
+  topSensor.castShadow = true;
+  group.add(topSensor);
+
+  group.userData.core = core;
+  group.userData.glow = glow;
+  group.userData.rotors = rotors;
+  return group;
 }
 
 function addHarborTrailerParking({ x, z, side, seed }) {
@@ -9639,6 +9775,10 @@ function updateHarborVisibility(force = false) {
     excavator.active = isHarborZVisible(excavator.z, playerZ, distanceConfig.harborAnimatedForward, distanceConfig.harborAnimatedBackward);
     excavator.group.visible = excavator.active;
   }
+  for (const drone of harborInfectedDrones) {
+    drone.active = isHarborZVisible(drone.z, playerZ, distanceConfig.harborAnimatedForward, distanceConfig.harborAnimatedBackward);
+    drone.group.visible = drone.active;
+  }
 }
 
 function isHarborZVisible(z, playerZ, forwardRange, backwardRange) {
@@ -9675,6 +9815,7 @@ function updateStageThreeHarbor(dt) {
   }
 
   updateHarborCraneDropEvents(dt);
+  updateHarborInfectedDrones(dt);
 
   for (const truck of harborCargoTrucks) {
     advanceHarborTruckRoute(truck, dt);
@@ -9689,6 +9830,37 @@ function updateStageThreeHarbor(dt) {
     if (!excavator.active) continue;
     excavator.bodyPivot.rotation.y = Math.sin(harborTime * 0.34 + excavator.phase) * 0.28;
     excavator.armPivot.rotation.x = -0.18 + Math.sin(harborTime * 0.72 + excavator.phase) * 0.18;
+  }
+}
+
+function updateHarborInfectedDrones(dt) {
+  for (const drone of harborInfectedDrones) {
+    const bob = Math.sin(harborTime * 2.1 + drone.phase) * 0.28;
+    const sway = Math.sin(harborTime * 1.35 + drone.phase * 1.7) * 0.22;
+
+    // position is stage-local for gameplay collision; basePosition is world-space for rendering.
+    drone.obstacle.position.set(
+      drone.homePosition.x + sway,
+      drone.homePosition.y + bob,
+      drone.homePosition.z,
+    );
+    setStageObjectTransform(drone.group, drone.obstacle.position, 0, 0, true);
+    drone.group.rotateY(Math.sin(harborTime * 0.92 + drone.phase) * 0.18);
+    drone.group.rotateZ(Math.sin(harborTime * 1.65 + drone.phase) * 0.045);
+    drone.obstacle.basePosition.copy(drone.group.position);
+    drone.obstacle.baseQuaternion.copy(drone.group.quaternion);
+
+    const pulse = 0.5 + Math.sin(harborTime * 6.8 + drone.phase) * 0.5;
+    if (drone.core) {
+      drone.core.scale.setScalar(0.9 + pulse * 0.18);
+    }
+    if (drone.glow) {
+      drone.glow.material.opacity = drone.active ? 0.16 + pulse * 0.2 : 0;
+      drone.glow.scale.setScalar(0.86 + pulse * 0.36);
+    }
+    for (const rotor of drone.rotors) {
+      rotor.rotation.y += dt * 24;
+    }
   }
 }
 
