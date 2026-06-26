@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=exp110a-preview-mode" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp120a-start-gate" />
     <script type="importmap">
       {
         "imports": {
@@ -15,6 +15,33 @@
     </script>
   </head>
   <body>
+    <section id="opening-trailer" class="opening-trailer" aria-label="Opening trailer" aria-modal="true" role="dialog">
+      <video
+        id="opening-trailer-video"
+        class="opening-trailer-video"
+        src="./assets/video/JetDashAdventure_Opening_Trailer_HD_25MB.mp4"
+        preload="auto"
+        playsinline
+      ></video>
+      <div id="opening-trailer-gate" class="opening-trailer-gate">
+        <div class="opening-trailer-gate-panel">
+          <p>JETDASH ADVENTURE</p>
+          <strong>OPENING</strong>
+          <output id="opening-trailer-gate-status">PRESS START</output>
+          <div class="opening-trailer-gate-actions">
+            <button id="opening-trailer-start-fullscreen" type="button">START FULLSCREEN</button>
+            <button id="opening-trailer-start-windowed" type="button">PLAY WINDOWED</button>
+          </div>
+        </div>
+      </div>
+      <div class="opening-trailer-chrome">
+        <div class="opening-trailer-title">
+          <span>JETDASH ADVENTURE</span>
+          <strong>OPENING</strong>
+          <output id="opening-trailer-status">READY</output>
+        </div>
+      </div>
+    </section>
     <canvas id="game"></canvas>
     <div id="mouse-object-label" class="mouse-object-label hidden" aria-live="polite"></div>
     <div id="performance-hud" class="performance-hud hidden" aria-live="off" aria-label="Performance debug"></div>
@@ -29,7 +56,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-118C: 감염 감시 드론의 시각 위치와 충돌 위치를 동기화합니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-120A: 게임 시작 전에 임시 오프닝 트레일러를 먼저 보여줍니다.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -583,6 +610,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js?v=exp118c-drone-coordinate-sync"></script>
+    <script type="module" src="./src/main.js?v=exp120a-start-gate"></script>
   </body>
 </html>

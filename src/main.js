@@ -1,6 +1,13 @@
 ﻿import * as THREE from "three";
 
 const canvas = document.querySelector("#game");
+const openingTrailerEl = document.querySelector("#opening-trailer");
+const openingTrailerGateEl = document.querySelector("#opening-trailer-gate");
+const openingTrailerVideo = document.querySelector("#opening-trailer-video");
+const openingTrailerStartFullscreenButton = document.querySelector("#opening-trailer-start-fullscreen");
+const openingTrailerStartWindowedButton = document.querySelector("#opening-trailer-start-windowed");
+const openingTrailerStatusEl = document.querySelector("#opening-trailer-status");
+const openingTrailerGateStatusEl = document.querySelector("#opening-trailer-gate-status");
 const dnaEl = document.querySelector("#dna");
 const speedEl = document.querySelector("#speed");
 const timeEl = document.querySelector("#time");
@@ -1064,6 +1071,7 @@ const stageRoutes = ["1", "2", "test-room"];
 const defaultStageRoute = "1";
 const playableStageCount = 2;
 const urlParams = new URLSearchParams(window.location.search);
+const openingTrailerSkipRequested = isOpeningTrailerSkipRequested();
 const requestedStageRoute = urlParams.get("stage") || defaultStageRoute;
 const debugStartZParam = urlParams.get("debugStartZ");
 const debugStartZ = debugStartZParam === null ? Number.NaN : Number(debugStartZParam);
@@ -1224,6 +1232,9 @@ let musicWasPlayingBeforePause = false;
 let mobileStartDismissed = false;
 let mobileFullscreenPreferred = false;
 let mobileFullscreenRecoveryActive = false;
+let openingTrailerActive = false;
+let openingTrailerDismissed = false;
+let openingTrailerStarted = false;
 let hemiLight;
 let sunLight;
 let sunTarget;
@@ -2502,6 +2513,7 @@ function init() {
   resize();
   resetGame({ scoreOverride: carriedStageScore });
   activateInitialMobileFullscreenRecovery();
+  setupOpeningTrailer();
 }
 
 function addLights() {
@@ -11843,8 +11855,163 @@ function handleDebugProgressWarpShortcut(event) {
   return false;
 }
 
+function isOpeningTrailerSkipRequested() {
+  const introValue = String(urlParams.get("intro") || "").trim().toLowerCase();
+  const skipValue = String(urlParams.get("skipIntro") || "").trim().toLowerCase();
+  return introValue === "0" || introValue === "false" || skipValue === "1" || skipValue === "true";
+}
+
+function setupOpeningTrailer() {
+  if (!openingTrailerEl) return;
+
+  openingTrailerStartFullscreenButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: true }));
+  openingTrailerStartWindowedButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: false }));
+  openingTrailerVideo?.addEventListener("ended", dismissOpeningTrailer);
+  openingTrailerVideo?.addEventListener("error", () => {
+    if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "VIDEO ERROR";
+    if (openingTrailerGateStatusEl) openingTrailerGateStatusEl.textContent = "VIDEO ERROR";
+  });
+
+  if (openingTrailerSkipRequested || !openingTrailerVideo) {
+    dismissOpeningTrailer();
+    return;
+  }
+
+  openingTrailerActive = true;
+  openingTrailerDismissed = false;
+  openingTrailerEl.classList.remove("hidden");
+  openingTrailerEl.setAttribute("aria-hidden", "false");
+  document.body.classList.add("opening-trailer-active");
+  if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "READY";
+  if (openingTrailerGateStatusEl) openingTrailerGateStatusEl.textContent = "PRESS START";
+}
+
+function isOpeningTrailerActive() {
+  return openingTrailerActive && !openingTrailerDismissed;
+}
+
+async function startOpeningTrailer({ fullscreen = false } = {}) {
+  if (!isOpeningTrailerActive() || !openingTrailerVideo) return;
+  if (openingTrailerStarted) return;
+
+  openingTrailerStarted = true;
+  setOpeningTrailerGateDisabled(true);
+  if (openingTrailerGateStatusEl) openingTrailerGateStatusEl.textContent = fullscreen ? "ENTERING FULLSCREEN" : "STARTING";
+
+  const recovery = mobileFullscreenRecoveryActive;
+  openingTrailerVideo.currentTime = 0;
+  openingTrailerVideo.muted = false;
+  openingTrailerVideo.volume = 1;
+
+  const playResult = openingTrailerVideo.play();
+  const fullscreenResult = fullscreen ? requestGameFullscreen() : Promise.resolve(false);
+  let playStarted = false;
+  try {
+    if (playResult?.then) await playResult;
+    playStarted = true;
+  } catch {
+    openingTrailerStarted = false;
+    setOpeningTrailerGateDisabled(false);
+    openingTrailerEl?.classList.remove("is-playing");
+    if (openingTrailerGateStatusEl) openingTrailerGateStatusEl.textContent = "TAP START AGAIN";
+    if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "AUDIO BLOCKED";
+    return;
+  }
+
+  if (playStarted) {
+    setOpeningTrailerPlaying("PLAYING");
+  }
+
+  const fullscreenGranted = await fullscreenResult;
+  if (!isOpeningTrailerActive()) return;
+
+  const fullscreenActive = fullscreenGranted || isFullscreenLike();
+  if (fullscreen) {
+    await tryLockLandscape();
+    if (touchControlsEnabled) {
+      mobileFullscreenPreferred = fullscreenActive;
+      saveMobileFullscreenPreference(mobileFullscreenPreferred);
+      mobileStartDismissed = true;
+      mobileFullscreenRecoveryActive = false;
+      updateMobileStartPrompt();
+    }
+  } else if (touchControlsEnabled) {
+    mobileFullscreenPreferred = false;
+    saveMobileFullscreenPreference(false);
+    mobileStartDismissed = true;
+    mobileFullscreenRecoveryActive = false;
+    updateMobileStartPrompt();
+  }
+
+  if (recovery) {
+    setPaused(false, "manual");
+  }
+}
+
+function setOpeningTrailerPlaying(statusText) {
+  openingTrailerEl?.classList.add("is-playing");
+  openingTrailerGateEl?.setAttribute("aria-hidden", "true");
+  if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = statusText;
+}
+
+function setOpeningTrailerGateDisabled(disabled) {
+  openingTrailerStartFullscreenButton?.toggleAttribute("disabled", disabled);
+  openingTrailerStartWindowedButton?.toggleAttribute("disabled", disabled);
+}
+
+function dismissOpeningTrailer(options = {}) {
+  if (!openingTrailerEl || openingTrailerDismissed) return;
+
+  const { unloadVideo = true } = options;
+  openingTrailerActive = false;
+  openingTrailerDismissed = true;
+  openingTrailerStarted = false;
+  document.body.classList.remove("opening-trailer-active");
+  openingTrailerEl.classList.add("hidden");
+  openingTrailerEl.setAttribute("aria-hidden", "true");
+  openingTrailerEl.classList.remove("is-playing");
+  openingTrailerGateEl?.setAttribute("aria-hidden", "true");
+  setOpeningTrailerGateDisabled(false);
+  clearOpeningPauseState();
+
+  if (openingTrailerVideo) {
+    openingTrailerVideo.pause();
+    if (unloadVideo) {
+      openingTrailerVideo.removeAttribute("src");
+      openingTrailerVideo.load();
+    }
+  }
+
+  startedAt = performance.now();
+  clock.getDelta();
+}
+
+function handleOpeningTrailerKey(event) {
+  if (!isOpeningTrailerActive()) return false;
+
+  if (!openingTrailerStarted && (event.code === "Enter" || event.code === "Space")) {
+    event.preventDefault();
+    startOpeningTrailer({ fullscreen: true });
+    return true;
+  }
+
+  event.preventDefault();
+  return true;
+}
+
+function clearOpeningPauseState() {
+  pauseStartedAt = 0;
+  if (!isPaused) return;
+
+  isPaused = false;
+  document.body.classList.remove("game-paused");
+  pauseMenu?.classList.add("hidden");
+  pauseButton?.setAttribute("aria-expanded", "false");
+}
+
 function bindInput() {
   window.addEventListener("keydown", (event) => {
+    if (handleOpeningTrailerKey(event)) return;
     if (event.code === "Backquote" && !event.repeat) {
       event.preventDefault();
       toggleDebugConsole();
@@ -12429,6 +12596,13 @@ function tick(now = performance.now()) {
     return;
   }
   lastFrameTime = now;
+
+  if (isOpeningTrailerActive()) {
+    clock.getDelta();
+    renderGame(0);
+    requestAnimationFrame(tick);
+    return;
+  }
 
   if (isPaused) {
     clock.getDelta();
@@ -14884,6 +15058,7 @@ function resumeMusicForGame(reason) {
 function startMusic() {
   if (!musicWanted) return;
   if (isPaused) return;
+  if (isOpeningTrailerActive()) return;
 
   if (!musicAudio) {
     setupMusic();
@@ -16787,10 +16962,13 @@ function clampHorizontalSpeed(maxSpeed) {
 }
 
 function getElapsedSeconds() {
+  if (isOpeningTrailerActive()) {
+    return 0;
+  }
   if (touchControlsEnabled && !touchInput.runStarted && !finished) {
     return 0;
   }
-  return (performance.now() - startedAt) / 1000;
+  return Math.max(0, (performance.now() - startedAt) / 1000);
 }
 
 function isDown(...codes) {
