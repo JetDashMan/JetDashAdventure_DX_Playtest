@@ -6,6 +6,7 @@ const openingTrailerGateEl = document.querySelector("#opening-trailer-gate");
 const openingTrailerVideo = document.querySelector("#opening-trailer-video");
 const openingTrailerStartFullscreenButton = document.querySelector("#opening-trailer-start-fullscreen");
 const openingTrailerStartWindowedButton = document.querySelector("#opening-trailer-start-windowed");
+const openingTrailerSkipButton = document.querySelector("#opening-trailer-skip");
 const openingTrailerStatusEl = document.querySelector("#opening-trailer-status");
 const openingTrailerGateStatusEl = document.querySelector("#opening-trailer-gate-status");
 const dnaEl = document.querySelector("#dna");
@@ -11866,6 +11867,7 @@ function setupOpeningTrailer() {
 
   openingTrailerStartFullscreenButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: true }));
   openingTrailerStartWindowedButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: false }));
+  openingTrailerSkipButton?.addEventListener("click", dismissOpeningTrailer);
   openingTrailerVideo?.addEventListener("ended", dismissOpeningTrailer);
   openingTrailerVideo?.addEventListener("error", () => {
     if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "VIDEO ERROR";

@@ -166,6 +166,27 @@ body {
   line-height: 0.86;
 }
 
+.opening-trailer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.opening-trailer-actions button {
+  min-width: 92px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 6px;
+  background: rgba(5, 14, 24, 0.78);
+  color: #f8fbff;
+  font-size: 0.78rem;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.36);
+}
+
 body.opening-trailer-active .hud,
 body.opening-trailer-active .main-menu,
 body.opening-trailer-active .quick-actions,
