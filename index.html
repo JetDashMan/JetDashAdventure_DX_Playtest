@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=exp120a-video-skip" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp121b-stage1-density" />
     <script type="importmap">
       {
         "imports": {
@@ -26,7 +26,7 @@
       <div id="opening-trailer-gate" class="opening-trailer-gate">
         <div class="opening-trailer-gate-panel">
           <p>JETDASH ADVENTURE</p>
-          <strong>OPENING</strong>
+          <strong>PROTOTYPE</strong>
           <output id="opening-trailer-gate-status">PRESS START</output>
           <div class="opening-trailer-gate-actions">
             <button id="opening-trailer-start-fullscreen" type="button">START FULLSCREEN</button>
@@ -59,7 +59,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-120A: 게임 시작 전에 임시 오프닝 트레일러를 먼저 보여줍니다.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-121B: Stage 1 density tuned, Next Stage skips intro gate, mobile slide hidden.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -587,9 +587,6 @@
         <button class="touch-btn touch-btn-small" type="button" data-touch-control="brake" aria-label="Brake or reverse">
           <span class="touch-icon touch-icon-brake" aria-hidden="true"></span>
         </button>
-        <button class="touch-btn touch-btn-small" type="button" data-touch-control="slide" aria-label="Slide">
-          <span class="touch-icon touch-icon-slide" aria-hidden="true"></span>
-        </button>
       </div>
       <div class="touch-cluster touch-cluster-right">
         <button class="touch-btn touch-btn-large" type="button" data-touch-control="jump" aria-label="Jump">
@@ -613,6 +610,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js?v=exp120a-video-skip"></script>
+    <script type="module" src="./src/main.js?v=exp121b-stage1-density"></script>
   </body>
 </html>

@@ -189,7 +189,7 @@ const graphicsPresets = {
     frameCap: "unlimited",
   },
 };
-const graphicsDefaults = { preset: "medium", ...graphicsPresets.medium };
+const graphicsDefaults = { preset: "ultra", ...graphicsPresets.ultra, viewDistance: "medium" };
 const asphaltTextureQualityConfig = {
   low: {
     baseColor: "./assets/textures/asphalt/busan_coastal_asphalt_basecolor_256.jpg",
@@ -1115,6 +1115,7 @@ const dashPadThreeLineDnaSuppressRadius = 65;
 const dashPadSingleLineDnaAlignRadius = 65;
 const dashPadDnaLineBreakRadius = 34;
 const dashPadDnaLaneAlignEpsilon = 0.05;
+const openingTrailerEndHoldMs = 650;
 const hitStunDuration = 1;
 const groundSnapDistance = 1.35;
 const jetModelBaseY = 1.14;
@@ -1236,6 +1237,7 @@ let mobileFullscreenRecoveryActive = false;
 let openingTrailerActive = false;
 let openingTrailerDismissed = false;
 let openingTrailerStarted = false;
+let openingTrailerEndTimer = 0;
 let hemiLight;
 let sunLight;
 let sunTarget;
@@ -2873,6 +2875,31 @@ function createStageTwoDefinition(label = "STAGE 2") {
     getGwangalliBridgeRoadY(z, y, startZ, bridgeRampEndZ, bridgeFenceEndZ, raisedBridgeY),
     z >= -4400 ? 20 : width,
   ]);
+  const dashPads = [
+    { lane: 1, z: startZ - 170 },
+    { lane: 0, z: startZ - 420 },
+    { lane: 1, z: startZ - 700 },
+    { lane: 1, z: -70 },
+    { lane: 2, z: -470 },
+    { lane: 2, z: -760 },
+    { lane: 0, z: -1080 },
+    { lane: 1, z: -1340 },
+    { lane: 1, z: -2220 },
+    { lane: 2, z: -2520 },
+    { lane: 2, z: -2820 },
+    { lane: 0, z: -3130 },
+    { lane: 2, z: -3940 },
+    { lane: 1, z: -5070 },
+    { lane: 2, z: -5940 },
+    { lane: 0, z: -6300 },
+    { lane: 0, z: -6600 },
+    { lane: 1, z: -7440 },
+    { lane: 1, z: -8300 },
+    { lane: 0, z: -9160 },
+    { lane: 2, z: -9960 },
+    { lane: 1, z: -10520 },
+  ];
+  const dashPadEntryDnaPlan = makeDashPadEntryDnaPlan(dashPads);
 
   return {
       label,
@@ -2887,6 +2914,7 @@ function createStageTwoDefinition(label = "STAGE 2") {
       gwangalliBridgeEndZ: -4400,
       gwangalliTunnelStartZ: -7900,
       gwangalliTunnelEndZ: goalZ,
+      minimumDnaGroupCount: 8,
       curvePoints: [
         [1550, 0, startZ],
         [1450, 0, startZ - 260],
@@ -2924,34 +2952,7 @@ function createStageTwoDefinition(label = "STAGE 2") {
       ],
       trackSegments: makeTrackSegments(bridgeTrackNodes),
       sidePlatforms: [],
-      dashPads: [
-        { lane: 1, z: startZ - 160 },
-        { lane: 2, z: startZ - 420 },
-        { lane: 0, z: startZ - 680 },
-        { lane: 1, z: startZ - 920 },
-        { lane: 1, z: -70 },
-        { lane: 0, z: -285 },
-        { lane: 2, z: -520 },
-        { lane: 1, z: -760 },
-        { lane: 0, z: -1080 },
-        { lane: 2, z: -1325 },
-        { lane: 1, z: -1585 },
-        { lane: 0, z: -2300 },
-        { lane: 2, z: -2560 },
-        { lane: 1, z: -2825 },
-        { lane: 0, z: -3130 },
-        { lane: 2, z: -3420 },
-        { lane: 1, z: -3820 },
-        { lane: 0, z: -4210 },
-        { lane: 2, z: -5030 },
-        { lane: 1, z: -5740 },
-        { lane: 0, z: -6530 },
-        { lane: 2, z: -7340 },
-        { lane: 1, z: -8260 },
-        { lane: 0, z: -9040 },
-        { lane: 2, z: -9820 },
-        { lane: 1, z: -10540 },
-      ],
+      dashPads,
       obstacles: [
         { lanes: [0], z: startZ - 280, height: 2.0 },
         { lanes: [1, 2], z: startZ - 560, height: 2.1 },
@@ -2967,53 +2968,39 @@ function createStageTwoDefinition(label = "STAGE 2") {
         { lanes: [2], z: -3270, height: 2.0 },
         { lanes: [1], z: -4100, height: 2.0 },
         { lanes: [0, 2], z: -5230, height: 2.1 },
+        { lanes: [0, 1], z: -6080, height: 2.05 },
+        { lanes: [1, 2], z: -6440, height: 2.05 },
         { lanes: [2], z: -6760, height: 2.0 },
+        { lanes: [0, 2], z: -7600, height: 2.05 },
         { lanes: [0], z: -8460, height: 2.1 },
         { lanes: [1, 2], z: -9320, height: 2.05 },
         { lanes: [0, 1], z: -10120, height: 2.15 },
         { lanes: [2], z: -10660, height: 2.0 },
       ],
       dnaPlan: [
-        { type: "trail", lane: 1, zStart: startZ - 32, count: 8, spacing: 9.0 },
-        { type: "switch", pattern: [1, 0, 1, 2], zStart: startZ - 260, count: 10, spacing: 9.5 },
-        { type: "trail", lane: 2, zStart: startZ - 545, count: 7, spacing: 10.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: startZ - 780, count: 9, spacing: 9.5 },
-        { type: "trail", lane: 1, zStart: 8, count: 7, spacing: 6.5 },
-        { type: "rows", zStart: -140, rowCount: 2, spacing: 13.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -330, count: 8, spacing: 7.0 },
-        { type: "trail", lane: 2, zStart: -470, count: 7, spacing: 7.0 },
-        { type: "rows", zStart: -700, rowCount: 2, spacing: 14.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -980, count: 8, spacing: 7.0 },
-        { type: "trail", lane: 0, zStart: -1260, count: 7, spacing: 7.0 },
-        { type: "rows", zStart: -1520, rowCount: 2, spacing: 14.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -1700, count: 8, spacing: 7.5 },
-        { type: "trail", lane: 1, zStart: -1900, count: 6, spacing: 8.0 },
-        { type: "rows", zStart: -2290, rowCount: 2, spacing: 14.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -2460, count: 8, spacing: 7.5 },
-        { type: "trail", lane: 2, zStart: -2740, count: 7, spacing: 7.0 },
-        { type: "rows", zStart: -3060, rowCount: 2, spacing: 14.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -3340, count: 8, spacing: 7.5 },
-        { type: "trail", lane: 1, zStart: -3740, count: 8, spacing: 9.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -4520, count: 10, spacing: 10.0 },
-        { type: "trail", lane: 0, zStart: -4860, count: 8, spacing: 10.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -5160, count: 12, spacing: 10.0 },
-        { type: "rows", zStart: -5480, rowCount: 2, spacing: 18.0 },
-        { type: "trail", lane: 1, zStart: -5900, count: 9, spacing: 10.0 },
-        { type: "trail", lane: 2, zStart: -6200, count: 8, spacing: 10.5 },
-        { type: "switch", pattern: [0, 1, 2, 1, 0], zStart: -6500, count: 12, spacing: 10.0 },
-        { type: "trail", lane: 0, zStart: -6900, count: 8, spacing: 10.5 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -7060, count: 10, spacing: 10.0 },
-        { type: "switch", pattern: [2, 1, 0, 1, 2], zStart: -7480, count: 12, spacing: 10.0 },
-        { type: "rows", zStart: -7820, rowCount: 1, spacing: 18.0 },
-        { type: "rows", zStart: -8120, rowCount: 2, spacing: 18.0 },
-        { type: "trail", lane: 2, zStart: -8400, count: 8, spacing: 11.0 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -8780, count: 10, spacing: 10.5 },
-        { type: "switch", pattern: [0, 1, 2, 1], zStart: -9180, count: 12, spacing: 10.0 },
-        { type: "trail", lane: 0, zStart: -9540, count: 8, spacing: 10.0 },
-        { type: "trail", lane: 1, zStart: -9760, count: 8, spacing: 10.0 },
-        { type: "trail", lane: 2, zStart: -10000, count: 8, spacing: 10.0 },
-        { type: "switch", pattern: [2, 1, 0, 1], zStart: -10320, count: 10, spacing: 10.5 },
-        { type: "trail", lane: 1, zStart: -10740, count: 9, spacing: 9.5 },
+        ...dashPadEntryDnaPlan,
+        { type: "trail", lane: 0, zStart: 250, count: 8, spacing: 12.0 },
+        { type: "trail", lane: 0, zStart: -1440, count: 8, spacing: 10.0 },
+        { type: "switch", pattern: [0, 1, 2, 1], zStart: -1660, count: 10, spacing: 9.0 },
+        { type: "trail", lane: 1, zStart: -1880, count: 8, spacing: 10.0 },
+        { type: "trail", lane: 1, zStart: -3420, count: 8, spacing: 11.0 },
+        { type: "switch", pattern: [1, 2, 1, 0], zStart: -3580, count: 10, spacing: 10.0 },
+        { type: "trail", lane: 0, zStart: -4190, count: 8, spacing: 11.0 },
+        { type: "switch", pattern: [2, 1, 0, 1], zStart: -4520, count: 12, spacing: 10.0 },
+        { type: "trail", lane: 1, zStart: -5360, count: 8, spacing: 10.0 },
+        { type: "rows", zStart: -5520, rowCount: 3, spacing: 18.0 },
+        { type: "trail", lane: 2, zStart: -5780, count: 8, spacing: 10.5 },
+        { type: "switch", pattern: [2, 1, 0, 1], zStart: -6140, count: 12, spacing: 10.0 },
+        { type: "trail", lane: 0, zStart: -6820, count: 8, spacing: 11.0 },
+        { type: "switch", pattern: [0, 1, 2, 1, 0], zStart: -7140, count: 12, spacing: 12.0 },
+        { type: "trail", lane: 1, zStart: -7570, count: 8, spacing: 10.5 },
+        { type: "rows", zStart: -7860, rowCount: 3, spacing: 20.0 },
+        { type: "trail", lane: 2, zStart: -8520, count: 8, spacing: 12.0 },
+        { type: "switch", pattern: [2, 1, 0, 1], zStart: -8780, count: 10, spacing: 11.0 },
+        { type: "trail", lane: 0, zStart: -9340, count: 8, spacing: 10.0 },
+        { type: "trail", lane: 2, zStart: -9540, count: 9, spacing: 11.0 },
+        { type: "trail", lane: 2, zStart: -10020, count: 8, spacing: 10.0 },
+        { type: "switch", pattern: [0, 1, 2, 1], zStart: -10280, count: 8, spacing: 10.0 },
       ],
     };
 }
@@ -3026,6 +3013,18 @@ function getGwangalliBridgeRoadY(z, baseY, startZ, rampEndZ, fenceEndZ, raisedY)
   }
   if (z >= fenceEndZ) return raisedY;
   return baseY;
+}
+
+function makeDashPadEntryDnaPlan(dashPads, { leadDistance = 108, count = 8, spacing = 8.5 } = {}) {
+  return dashPads
+    .filter((placement) => Number.isInteger(placement.lane))
+    .map((placement) => ({
+      type: "trail",
+      lane: placement.lane,
+      zStart: placement.z + leadDistance,
+      count,
+      spacing,
+    }));
 }
 
 function createStageThreeDefinition(label = "STAGE 3") {
@@ -11868,7 +11867,7 @@ function setupOpeningTrailer() {
   openingTrailerStartFullscreenButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: true }));
   openingTrailerStartWindowedButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: false }));
   openingTrailerSkipButton?.addEventListener("click", dismissOpeningTrailer);
-  openingTrailerVideo?.addEventListener("ended", dismissOpeningTrailer);
+  openingTrailerVideo?.addEventListener("ended", handleOpeningTrailerEnded);
   openingTrailerVideo?.addEventListener("error", () => {
     if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "VIDEO ERROR";
     if (openingTrailerGateStatusEl) openingTrailerGateStatusEl.textContent = "VIDEO ERROR";
@@ -11961,10 +11960,27 @@ function setOpeningTrailerGateDisabled(disabled) {
   openingTrailerStartWindowedButton?.toggleAttribute("disabled", disabled);
 }
 
+function handleOpeningTrailerEnded() {
+  if (!isOpeningTrailerActive()) return;
+  if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "ENDING";
+  clearOpeningTrailerEndTimer();
+  openingTrailerEndTimer = window.setTimeout(() => {
+    openingTrailerEndTimer = 0;
+    dismissOpeningTrailer();
+  }, openingTrailerEndHoldMs);
+}
+
+function clearOpeningTrailerEndTimer() {
+  if (!openingTrailerEndTimer) return;
+  window.clearTimeout(openingTrailerEndTimer);
+  openingTrailerEndTimer = 0;
+}
+
 function dismissOpeningTrailer(options = {}) {
   if (!openingTrailerEl || openingTrailerDismissed) return;
 
   const { unloadVideo = true } = options;
+  clearOpeningTrailerEndTimer();
   openingTrailerActive = false;
   openingTrailerDismissed = true;
   openingTrailerStarted = false;
@@ -13197,6 +13213,8 @@ function goToNextStage() {
   }
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set("stage", getStageRoute(currentStageIndex + 1));
+  nextUrl.searchParams.set("skipIntro", "1");
+  nextUrl.searchParams.delete("debugStartZ");
   window.location.href = nextUrl.toString();
 }
 
@@ -15205,20 +15223,14 @@ function getSafeGraphicsSettings() {
 }
 
 function getRouteDefaultGraphicsSettings() {
-  return isRequestedStageTestRoom()
-    ? normalizeGraphicsSettings({ preset: "ultra", ...graphicsPresets.ultra })
-    : normalizeGraphicsSettings();
-}
-
-function isRequestedStageTestRoom() {
-  const params = new URLSearchParams(window.location.search);
-  const stageRoute = String(params.get("stage") || "").trim().toLowerCase();
-  return ["test", "testroom", "test-room", "room"].includes(stageRoute);
+  return normalizeGraphicsSettings();
 }
 
 function normalizeGraphicsSettings(source = {}) {
-  const preset = graphicsPresets[source.preset] ? source.preset : graphicsDefaults.preset;
-  const base = source.preset === "custom" ? graphicsDefaults : graphicsPresets[preset];
+  const explicitPreset = Object.prototype.hasOwnProperty.call(source, "preset");
+  const validPreset = graphicsPresets[source.preset] ? source.preset : graphicsDefaults.preset;
+  const preset = source.preset === "custom" ? "custom" : validPreset;
+  const base = explicitPreset && graphicsPresets[source.preset] ? graphicsPresets[source.preset] : graphicsDefaults;
   const settings = { ...graphicsDefaults, ...base, ...source };
 
   return {
