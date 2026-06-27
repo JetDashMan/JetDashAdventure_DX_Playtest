@@ -192,6 +192,7 @@ body.opening-trailer-active .main-menu,
 body.opening-trailer-active .quick-actions,
 body.opening-trailer-active .build-summary,
 body.opening-trailer-active .game-version,
+body.opening-trailer-active .dash-chain-feedback,
 body.opening-trailer-active .touch-controls,
 body.opening-trailer-active .mobile-start {
   visibility: hidden;
@@ -562,6 +563,74 @@ body.test-room-active .hud {
   background: linear-gradient(90deg, #33f3ff, #ffd344);
   box-shadow: 0 0 20px rgba(51, 243, 255, 0.42);
   transition: width 90ms linear;
+}
+
+.dash-chain-feedback {
+  position: fixed;
+  top: 166px;
+  left: 22px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "label count"
+    "bonus bonus";
+  align-items: baseline;
+  justify-content: start;
+  gap: 0 8px;
+  max-width: min(260px, calc(100vw - 44px));
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #f8fbff;
+  text-align: left;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.72),
+    0 0 18px rgba(0, 0, 0, 0.52);
+  transform-origin: left top;
+  pointer-events: none;
+}
+
+.dash-chain-feedback.hidden {
+  display: none;
+}
+
+.dash-chain-feedback span {
+  grid-area: label;
+  font-size: clamp(0.68rem, 1.4vw, 0.84rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  color: rgba(248, 251, 255, 0.78);
+}
+
+.dash-chain-feedback strong {
+  grid-area: count;
+  font-size: clamp(1.45rem, 3.4vw, 2.2rem);
+  line-height: 0.9;
+  color: #ffd86a;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.78),
+    0 0 16px rgba(255, 216, 106, 0.5);
+}
+
+.dash-chain-feedback small {
+  grid-area: bonus;
+  font-size: clamp(0.66rem, 1.5vw, 0.82rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  color: #65f2ff;
+}
+
+.dash-chain-feedback.is-climax {
+  color: #e9fcff;
+}
+
+.dash-chain-feedback.is-climax strong {
+  color: #65f2ff;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.78),
+    0 0 20px rgba(101, 242, 255, 0.62);
 }
 
 .music-toggle {
@@ -2093,6 +2162,12 @@ body.touch-enabled:not(.portrait-touch) .tutorial-prompt {
   width: min(340px, calc(100vw - 260px));
   padding: 9px 12px;
   font-size: 0.9rem;
+}
+
+body.touch-enabled:not(.portrait-touch) .dash-chain-feedback {
+  top: 86px;
+  left: 14px;
+  max-width: min(220px, calc(100vw - 190px));
 }
 
 @media (pointer: coarse) and (max-height: 420px) {

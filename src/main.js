@@ -48,6 +48,10 @@ const stageMenuToggle = document.querySelector("#stage-menu-toggle");
 const stageMenu = document.querySelector("#stage-menu");
 const stageSelectButtons = document.querySelectorAll("[data-stage-select]");
 const tutorialPromptEl = document.querySelector("#tutorial-prompt");
+const dashChainFeedbackEl = document.querySelector("#dash-chain-feedback");
+const dashChainLabelEl = document.querySelector("#dash-chain-label");
+const dashChainCountEl = document.querySelector("#dash-chain-count");
+const dashChainBonusEl = document.querySelector("#dash-chain-bonus");
 const rotatePromptEl = document.querySelector("#rotate-prompt");
 const mobileStartEl = document.querySelector("#mobile-start");
 const mobileStartTitleEl = document.querySelector("#mobile-start-title");
@@ -1111,6 +1115,12 @@ const dnaScoreValue = 100;
 const obstacleScorePenalty = 1000;
 const dashPadSpeedGain = 100 / speedDisplayScale;
 const dashPadFadeDuration = 3;
+const dashPadChainTimeout = 2.85;
+const dashPadChainPulseDecay = 1.35;
+const dashPadChainScoreStep = 100;
+const dashPadChainScoreCap = 900;
+const dashPadChainClimaxStartProgress = 0.5;
+const dashPadChainClimaxEndProgress = 0.7;
 const dashPadThreeLineDnaSuppressRadius = 65;
 const dashPadSingleLineDnaAlignRadius = 65;
 const dashPadDnaLineBreakRadius = 34;
@@ -1217,6 +1227,9 @@ let objectGalleryCurrentItem = "";
 let objectGallerySpin = 0;
 let dashPadBoostStartSpeed = 0;
 let dashPadBoostRemaining = 0;
+let dashPadChainCount = 0;
+let dashPadChainTimer = 0;
+let dashPadChainPulse = 0;
 let debugSuperBoostActive = false;
 const defaultStageMusicUrl = "./assets/audio/The_Final_Straightaway.mp3";
 const stageMusicUrls = [
@@ -2879,16 +2892,28 @@ function createStageTwoDefinition(label = "STAGE 2") {
     { lane: 1, z: startZ - 170 },
     { lane: 0, z: startZ - 420 },
     { lane: 1, z: startZ - 700 },
+    { lane: 0, z: 160 },
     { lane: 1, z: -70 },
+    { lane: 0, z: -270 },
     { lane: 2, z: -470 },
     { lane: 2, z: -760 },
+    { lane: 1, z: -920 },
     { lane: 0, z: -1080 },
     { lane: 1, z: -1340 },
+    { lane: 0, z: -1580 },
+    { lane: 0, z: -1820 },
+    { lane: 1, z: -2060 },
     { lane: 1, z: -2220 },
+    { lane: 1, z: -2420 },
     { lane: 2, z: -2520 },
     { lane: 2, z: -2820 },
+    { lane: 2, z: -2970 },
     { lane: 0, z: -3130 },
+    { lane: 0, z: -3380 },
+    { lane: 1, z: -3630 },
+    { lane: 2, z: -3860 },
     { lane: 2, z: -3940 },
+    { lane: 0, z: -4220 },
     { lane: 1, z: -5070 },
     { lane: 2, z: -5320, dnaGuide: false },
     { lane: 2, z: -5580, dnaGuide: false },
@@ -2901,10 +2926,18 @@ function createStageTwoDefinition(label = "STAGE 2") {
     { lane: 1, z: -6900, dnaGuide: false },
     { lane: 1, z: -7140, dnaGuide: false },
     { lane: 1, z: -7440 },
+    { lane: 2, z: -8060 },
     { lane: 1, z: -8300 },
+    { lane: 2, z: -8560 },
+    { lane: 1, z: -8840 },
+    { lane: 0, z: -9000 },
     { lane: 0, z: -9160 },
+    { lane: 0, z: -9440 },
+    { lane: 2, z: -9720 },
     { lane: 2, z: -9960 },
+    { lane: 2, z: -10240 },
     { lane: 1, z: -10520 },
+    { lane: 0, z: -10740 },
   ];
   const dashPadEntryDnaPlan = makeDashPadEntryDnaPlan(dashPads);
 
@@ -12650,6 +12683,7 @@ function updateGame(dt) {
   updateLooseDnaItems(dt);
   updateObstacles(dt);
   updateDashPads(dt);
+  updateDashPadChain(dt);
   updateStageThreeHarbor(dt);
   updateHarborImpactEffects(dt);
   updateGwangalliTourBoats(dt);
@@ -12700,7 +12734,8 @@ function updatePlayer(dt) {
   const keyboardBoost = isDown("ShiftLeft", "ShiftRight");
   const touchBoost = touchControlsEnabled && touchInput.boost && touchInput.autoForward;
   const boosting = !stunned && !brakingInput && (keyboardBoost || touchBoost) && boostGauge > 0;
-  playerBoostEffectActive = boosting || debugSuperBoostActive;
+  const dashPadRushActive = dashPadBoostRemaining > 0 || dashPadChainPulse > 0.04;
+  playerBoostEffectActive = boosting || debugSuperBoostActive || dashPadRushActive;
   updateBoostCameraState(playerBoostEffectActive, dt);
   const sliding = isPlayerSliding();
   const keyboardStrafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
@@ -12809,8 +12844,8 @@ function updatePlayer(dt) {
   checkObstacleCollision();
 
   player.yaw = THREE.MathUtils.lerp(player.yaw, THREE.MathUtils.clamp(player.velocity.x * 0.035, -0.48, 0.48), 1 - Math.exp(-8 * dt));
-  velocityMotionBlurTarget = boosting || debugSuperBoostActive
-    ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.55, 1) * getMotionBlurScale()
+  velocityMotionBlurTarget = playerBoostEffectActive
+    ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.45 + dashPadChainPulse * 0.18, 1) * getMotionBlurScale()
     : 0;
 }
 
@@ -12964,6 +12999,10 @@ function checkDashPads() {
 function triggerDashPad(pad) {
   const currentSpeed = Math.min(getHorizontalSpeed(), maxHorizontalSpeed);
   const boostedSpeed = Math.min(currentSpeed + dashPadSpeedGain, maxHorizontalSpeed);
+  const chain = registerDashPadChain(pad);
+  if (chain.bonus > 0) {
+    addScore(chain.bonus);
+  }
   dashPadBoostStartSpeed = currentSpeed;
   dashPadBoostRemaining = dashPadFadeDuration;
   player.velocity.x = 0;
@@ -12972,7 +13011,90 @@ function triggerDashPad(pad) {
   player.yaw = 0;
   pad.cooldown = 0.9;
   quickStepFlash = 1;
+  dashPadChainPulse = Math.max(dashPadChainPulse, chain.pulse);
+  boostCameraKick = Math.max(boostCameraKick, chain.climax ? 1 : 0.85);
+  boostCameraSustain = Math.max(boostCameraSustain, chain.climax ? 0.62 : 0.42);
+  playerBoostEffectActive = true;
   pulseDashPad(pad.mesh);
+}
+
+function registerDashPadChain(pad) {
+  const continuesChain = dashPadChainTimer > 0 && dashPadChainCount > 0;
+  dashPadChainCount = continuesChain ? dashPadChainCount + 1 : 1;
+  dashPadChainTimer = dashPadChainTimeout;
+
+  const bonus = getDashPadChainScoreBonus(dashPadChainCount);
+  const climax = isDashPadClimaxSection(pad.position.z);
+  const pulse = climax
+    ? Math.min(1, 0.55 + dashPadChainCount * 0.06)
+    : Math.min(0.85, 0.38 + dashPadChainCount * 0.045);
+  showDashChainFeedback(dashPadChainCount, bonus, climax, pulse);
+
+  return { count: dashPadChainCount, bonus, climax, pulse };
+}
+
+function isDashPadClimaxSection(z) {
+  if (!currentStage.gwangalliTheme) return false;
+  const progress = getGoalProgressForZ(z);
+  return progress >= dashPadChainClimaxStartProgress && progress <= dashPadChainClimaxEndProgress;
+}
+
+function getDashPadChainScoreBonus(count) {
+  if (count < 2) return 0;
+  return Math.min(dashPadChainScoreCap, (count - 1) * dashPadChainScoreStep);
+}
+
+function updateDashPadChain(dt) {
+  if (dashPadChainTimer > 0) {
+    dashPadChainTimer = Math.max(0, dashPadChainTimer - dt);
+    if (dashPadChainTimer <= 0) {
+      dashPadChainCount = 0;
+      hideDashChainFeedback();
+    }
+  }
+
+  dashPadChainPulse = Math.max(0, dashPadChainPulse - dt * dashPadChainPulseDecay);
+
+  if (dashPadChainTimer > 0) {
+    updateDashChainFeedbackPulse();
+  }
+}
+
+function showDashChainFeedback(count, bonus, climax, pulse) {
+  if (!dashChainFeedbackEl) return;
+
+  dashChainFeedbackEl.classList.remove("hidden");
+  dashChainFeedbackEl.classList.toggle("is-climax", climax);
+  if (dashChainLabelEl) {
+    dashChainLabelEl.textContent = climax ? "GWANGALLI RUSH" : count > 1 ? "DASH CHAIN" : "DASH START";
+  }
+  if (dashChainCountEl) {
+    dashChainCountEl.textContent = `x${count}`;
+  }
+  if (dashChainBonusEl) {
+    dashChainBonusEl.textContent = bonus > 0 ? `+${bonus}` : "BOOST";
+  }
+  updateDashChainFeedbackPulse(pulse);
+}
+
+function updateDashChainFeedbackPulse(pulse = dashPadChainPulse) {
+  if (!dashChainFeedbackEl || dashChainFeedbackEl.classList.contains("hidden")) return;
+  const scale = 1 + THREE.MathUtils.clamp(pulse, 0, 1) * 0.055;
+  dashChainFeedbackEl.style.transform = `scale(${scale.toFixed(3)})`;
+}
+
+function hideDashChainFeedback() {
+  if (!dashChainFeedbackEl) return;
+  dashChainFeedbackEl.classList.add("hidden");
+  dashChainFeedbackEl.classList.remove("is-climax");
+  dashChainFeedbackEl.style.transform = "";
+}
+
+function resetDashPadChain() {
+  dashPadChainCount = 0;
+  dashPadChainTimer = 0;
+  dashPadChainPulse = 0;
+  hideDashChainFeedback();
 }
 
 function pulseDashPad(mesh) {
@@ -13148,6 +13270,7 @@ function handleObstacleHit(obstacle) {
   addScore(-obstacleScorePenalty);
   dashPadBoostStartSpeed = 0;
   dashPadBoostRemaining = 0;
+  resetDashPadChain();
   quickStepQueued = 0;
   quickStepTimer = 0;
   player.position.z = Math.min(player.position.z + 3.2, stageStartZ + 8);
@@ -13205,6 +13328,7 @@ function checkGoal() {
   if (player.position.z < goalZ + 6 && Math.abs(player.position.x) < 9.2) {
     setPaused(false, "finish");
     finished = true;
+    resetDashPadChain();
     finishEl.classList.remove("hidden");
     finishKickerEl.textContent = `${currentStage.label} CLEAR`;
     finishTimeEl.textContent = `${getElapsedSeconds().toFixed(2)}s`;
@@ -14328,8 +14452,8 @@ function getJetFootBottomLocalY() {
 
 const runCameraPreset = Object.freeze({
   back: 3.45,
-  lift: 1.875,
-  lookAhead: 2.4,
+  lift: 2.42,
+  lookAhead: 2.75,
   fov: 67,
 });
 
@@ -16815,6 +16939,7 @@ function warpToGoalProgress(progress) {
   jetFootContactOffsetY = 0;
   clearQuickStepAfterimages();
   dashPadBoostRemaining = 0;
+  resetDashPadChain();
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
   jetEnergyBloomStrength = 0;
@@ -16896,6 +17021,7 @@ function resetGame(options = {}) {
   resetVelocityMotionHistory();
   dashPadBoostStartSpeed = 0;
   dashPadBoostRemaining = 0;
+  resetDashPadChain();
   debugSuperBoostActive = false;
   startedAt = performance.now();
   if (touchControlsEnabled) resetTouchRunState();
