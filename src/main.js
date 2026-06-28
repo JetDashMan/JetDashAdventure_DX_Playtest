@@ -17,6 +17,7 @@ const progressEl = document.querySelector("#progress");
 const heightEl = document.querySelector("#height");
 const boostGaugeEl = document.querySelector("#boost-gauge");
 const boostFillEl = document.querySelector("#boost-fill");
+const rootEl = document.documentElement;
 const finishEl = document.querySelector("#finish");
 const finishKickerEl = document.querySelector("#finish-kicker");
 const finishTimeEl = document.querySelector("#finish-time");
@@ -78,6 +79,7 @@ const graphicsControls = {
   frameCap: document.querySelector("#graphics-frame-cap"),
 };
 const debugControls = {
+  openingTrailerEnabled: document.querySelector("#debug-opening-trailer"),
   superBoost: document.querySelector("#debug-super-boost"),
   infiniteJump: document.querySelector("#debug-infinite-jump"),
   mouseObject: document.querySelector("#debug-mouse-object"),
@@ -578,6 +580,7 @@ const objectGalleryItems = [
   "longContainer",
 ];
 const debugDefaults = {
+  openingTrailerEnabled: true,
   superBoost: false,
   infiniteJump: false,
   mouseObject: false,
@@ -1119,6 +1122,11 @@ const dashPadChainTimeout = 2.85;
 const dashPadChainPulseDecay = 1.35;
 const dashPadChainScoreStep = 100;
 const dashPadChainScoreCap = 900;
+const dashPadComboUiStartCount = 2;
+const dashPadComboOverdriveStartCount = 10;
+const dashPadComboOverdriveDisplayTopSpeed = 450;
+const dashPadComboOverdriveTopSpeed = dashPadComboOverdriveDisplayTopSpeed / speedDisplayScale;
+const dashPadComboOverdriveMotionBlurMultiplier = 2;
 const dashPadChainClimaxStartProgress = 0.5;
 const dashPadChainClimaxEndProgress = 0.7;
 const dashPadThreeLineDnaSuppressRadius = 65;
@@ -1230,6 +1238,7 @@ let dashPadBoostRemaining = 0;
 let dashPadChainCount = 0;
 let dashPadChainTimer = 0;
 let dashPadChainPulse = 0;
+let dashPadComboOverdriveBoosting = false;
 let debugSuperBoostActive = false;
 const defaultStageMusicUrl = "./assets/audio/The_Final_Straightaway.mp3";
 const stageMusicUrls = [
@@ -11901,7 +11910,11 @@ function handleDebugProgressWarpShortcut(event) {
 function isOpeningTrailerSkipRequested() {
   const introValue = String(urlParams.get("intro") || "").trim().toLowerCase();
   const skipValue = String(urlParams.get("skipIntro") || "").trim().toLowerCase();
-  return introValue === "0" || introValue === "false" || skipValue === "1" || skipValue === "true";
+  return !debugSettings.openingTrailerEnabled
+    || introValue === "0"
+    || introValue === "false"
+    || skipValue === "1"
+    || skipValue === "true";
 }
 
 function setupOpeningTrailer() {
@@ -11909,7 +11922,7 @@ function setupOpeningTrailer() {
 
   openingTrailerStartFullscreenButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: true }));
   openingTrailerStartWindowedButton?.addEventListener("click", () => startOpeningTrailer({ fullscreen: false }));
-  openingTrailerSkipButton?.addEventListener("click", dismissOpeningTrailer);
+  openingTrailerSkipButton?.addEventListener("click", handleOpeningTrailerSkip);
   openingTrailerVideo?.addEventListener("ended", handleOpeningTrailerEnded);
   openingTrailerVideo?.addEventListener("error", () => {
     if (openingTrailerStatusEl) openingTrailerStatusEl.textContent = "VIDEO ERROR";
@@ -12017,6 +12030,20 @@ function clearOpeningTrailerEndTimer() {
   if (!openingTrailerEndTimer) return;
   window.clearTimeout(openingTrailerEndTimer);
   openingTrailerEndTimer = 0;
+}
+
+function setOpeningTrailerEnabled(enabled) {
+  debugSettings = normalizeDebugSettings({
+    ...debugSettings,
+    openingTrailerEnabled: Boolean(enabled),
+  });
+  saveDebugSettings();
+  syncDebugControls();
+}
+
+function handleOpeningTrailerSkip() {
+  setOpeningTrailerEnabled(false);
+  dismissOpeningTrailer();
 }
 
 function dismissOpeningTrailer(options = {}) {
@@ -12699,6 +12726,7 @@ function updateGame(dt) {
   quickStepFlash = Math.max(0, quickStepFlash - dt * 5.5);
   velocityMotionBlurTarget = 0;
   playerBoostEffectActive = false;
+  dashPadComboOverdriveBoosting = false;
 
   if (!finished) {
     updateHarborGantryIntroCinematic(dt);
@@ -12734,14 +12762,18 @@ function updatePlayer(dt) {
   const keyboardBoost = isDown("ShiftLeft", "ShiftRight");
   const touchBoost = touchControlsEnabled && touchInput.boost && touchInput.autoForward;
   const boosting = !stunned && !brakingInput && (keyboardBoost || touchBoost) && boostGauge > 0;
-  const dashPadRushActive = dashPadBoostRemaining > 0 || dashPadChainPulse > 0.04;
+  dashPadComboOverdriveBoosting = boosting && isDashPadComboOverdriveActive();
+  const dashPadBoostMotionActive = isDashPadBoostMotionActive();
+  const dashPadRushActive = dashPadBoostMotionActive || dashPadChainPulse > 0.04;
   playerBoostEffectActive = boosting || debugSuperBoostActive || dashPadRushActive;
   updateBoostCameraState(playerBoostEffectActive, dt);
   const sliding = isPlayerSliding();
   const keyboardStrafeInput = (isDown("KeyD", "ArrowRight") ? 1 : 0) - (isDown("KeyA", "ArrowLeft") ? 1 : 0);
   const touchStrafeInput = touchControlsEnabled ? touchInput.lateral : 0;
   const strafeInput = THREE.MathUtils.clamp(keyboardStrafeInput + touchStrafeInput, -1, 1);
-  const speedLimit = debugSuperBoostActive ? debugSuperBoostSpeed : maxHorizontalSpeed;
+  const speedLimit = debugSuperBoostActive
+    ? debugSuperBoostSpeed
+    : Math.max(maxHorizontalSpeed, getDashPadComboOverdriveSpeedLimit());
 
   if (boosting) {
     boostGauge = Math.max(0, boostGauge - boostDrainPerSecond * dt);
@@ -12753,7 +12785,7 @@ function updatePlayer(dt) {
     slideTimer = 0;
   }
 
-  const dashPadTargetSpeed = getDashPadTargetSpeed();
+  const dashPadTargetSpeed = Math.max(getDashPadTargetSpeed(), getDashPadComboOverdriveTargetSpeed());
   const currentForwardSpeed = Math.max(0, -player.velocity.z);
   let targetVelocityZ = 0;
   let forwardAccel = 52;
@@ -12844,8 +12876,11 @@ function updatePlayer(dt) {
   checkObstacleCollision();
 
   player.yaw = THREE.MathUtils.lerp(player.yaw, THREE.MathUtils.clamp(player.velocity.x * 0.035, -0.48, 0.48), 1 - Math.exp(-8 * dt));
+  const motionBlurBoostMultiplier = dashPadComboOverdriveBoosting
+    ? dashPadComboOverdriveMotionBlurMultiplier
+    : 1;
   velocityMotionBlurTarget = playerBoostEffectActive
-    ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.45 + dashPadChainPulse * 0.18, 1) * getMotionBlurScale()
+    ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.45 + dashPadChainPulse * 0.18, 1) * getMotionBlurScale() * motionBlurBoostMultiplier
     : 0;
 }
 
@@ -13062,14 +13097,19 @@ function updateDashPadChain(dt) {
 
 function showDashChainFeedback(count, bonus, climax, pulse) {
   if (!dashChainFeedbackEl) return;
+  if (count < dashPadComboUiStartCount) {
+    hideDashChainFeedback();
+    return;
+  }
 
   dashChainFeedbackEl.classList.remove("hidden");
   dashChainFeedbackEl.classList.toggle("is-climax", climax);
+  dashChainFeedbackEl.classList.toggle("is-overdrive", count >= dashPadComboOverdriveStartCount);
   if (dashChainLabelEl) {
-    dashChainLabelEl.textContent = climax ? "GWANGALLI RUSH" : count > 1 ? "DASH CHAIN" : "DASH START";
+    dashChainLabelEl.textContent = "대시콤보";
   }
   if (dashChainCountEl) {
-    dashChainCountEl.textContent = `x${count}`;
+    dashChainCountEl.textContent = `X${count}`;
   }
   if (dashChainBonusEl) {
     dashChainBonusEl.textContent = bonus > 0 ? `+${bonus}` : "BOOST";
@@ -13087,6 +13127,8 @@ function hideDashChainFeedback() {
   if (!dashChainFeedbackEl) return;
   dashChainFeedbackEl.classList.add("hidden");
   dashChainFeedbackEl.classList.remove("is-climax");
+  dashChainFeedbackEl.classList.remove("is-overdrive");
+  dashChainFeedbackEl.classList.remove("is-boosting");
   dashChainFeedbackEl.style.transform = "";
 }
 
@@ -13119,6 +13161,36 @@ function getDashPadTargetSpeed() {
   const fade = THREE.MathUtils.clamp(dashPadBoostRemaining / dashPadFadeDuration, 0, 1);
   const boostedTarget = Math.min(dashPadBoostStartSpeed + dashPadSpeedGain, maxHorizontalSpeed);
   return THREE.MathUtils.lerp(dashPadBoostStartSpeed, boostedTarget, fade);
+}
+
+function isDashPadComboOverdriveActive() {
+  return dashPadChainTimer > 0 && dashPadChainCount >= dashPadComboOverdriveStartCount;
+}
+
+function isDashPadBoostMotionActive() {
+  return dashPadBoostRemaining > 0 || isDashPadComboOverdriveActive();
+}
+
+function getDashPadComboOverdriveTargetSpeed() {
+  if (!dashPadComboOverdriveBoosting) return 0;
+  return dashPadComboOverdriveTopSpeed;
+}
+
+function getDashPadComboOverdriveSpeedLimit() {
+  if (!dashPadComboOverdriveBoosting) return 0;
+  return dashPadComboOverdriveTopSpeed;
+}
+
+function syncDashComboOverdrivePresentation() {
+  const overdriveReady = isDashPadComboOverdriveActive();
+  rootEl?.classList.toggle("dash-combo-overdrive-ready", overdriveReady);
+  rootEl?.classList.toggle("dash-combo-overdrive-boosting", dashPadComboOverdriveBoosting);
+
+  if (!dashChainFeedbackEl) return;
+  dashChainFeedbackEl.classList.toggle("is-boosting", dashPadComboOverdriveBoosting);
+  if (!dashChainFeedbackEl.classList.contains("hidden") && overdriveReady && dashChainBonusEl) {
+    dashChainBonusEl.textContent = dashPadComboOverdriveBoosting ? "BOOST DRIVE" : "OVERDRIVE";
+  }
 }
 
 function updateObstacles(dt) {
@@ -13951,7 +14023,8 @@ function animatePlayerModel(dt) {
   const speed = motionPreview?.speed ?? getHorizontalSpeed();
   const moving = speed > 2;
   const motionGrounded = motionPreview?.grounded ?? player.grounded;
-  const motionBoostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
+  const xenoDashPadBoostActive = !motionPreview && isDashPadBoostMotionActive();
+  const motionBoostActive = motionPreview?.boostActive ?? (playerBoostEffectActive || xenoDashPadBoostActive);
   const motionSlideActive = motionPreview?.slideActive ?? isPlayerSliding();
   const quickStepActive = motionPreview?.quickStepActive ?? quickStepTimer > 0;
   const quickStepProgress = quickStepActive
@@ -13994,10 +14067,20 @@ function animatePlayerModel(dt) {
   const runStrength = Math.min(runAmount, 1.72);
   const sprintAmount = moving && motionGrounded ? THREE.MathUtils.clamp(speed / runTopSpeed, 0, 1) : 0;
   const boostPoseAmount = moving && motionGrounded && motionBoostActive
-    ? THREE.MathUtils.clamp((speed - runTopSpeed * 0.75) / (boostTopSpeed - runTopSpeed * 0.75), 0, 1)
+    ? Math.max(
+      THREE.MathUtils.clamp((speed - runTopSpeed * 0.75) / (boostTopSpeed - runTopSpeed * 0.75), 0, 1),
+      xenoDashPadBoostActive ? 1 : 0,
+    )
     : 0;
   const boostStartFlare = boostPoseAmount > 0
-    ? THREE.MathUtils.clamp(motionPreview?.boostFlare ?? THREE.MathUtils.smoothstep(boostCameraKick, 0, 1), 0, 1)
+    ? THREE.MathUtils.clamp(
+      motionPreview?.boostFlare ?? Math.max(
+        THREE.MathUtils.smoothstep(boostCameraKick, 0, 1),
+        xenoDashPadBoostActive ? 0.72 : 0,
+      ),
+      0,
+      1,
+    )
     : 0;
   const shoePulse = 1 + Math.min(runAmount, 1.2) * motionTune.shoePulse;
   const airborne = !motionGrounded;
@@ -14013,8 +14096,8 @@ function animatePlayerModel(dt) {
     0,
     THREE.MathUtils.lerp(1.16, 1.0, boostLegDriveAmount),
   );
-  const limbBlend = 1 - Math.exp(-15 * dt);
-  const legLimbBlend = 1 - Math.exp(-26 * dt);
+  const limbBlend = 1 - Math.exp(-(xenoDashPadBoostActive ? 42 : 15) * dt);
+  const legLimbBlend = 1 - Math.exp(-(xenoDashPadBoostActive ? 32 : 26) * dt);
   const runBodyBob = moving && motionGrounded ? Math.abs(Math.sin(runPhase * 2)) * motionTune.bodyBob : 0;
   const slideBlendRate = motionSlideActive ? 18 : 14;
   slidePoseAmount = THREE.MathUtils.lerp(
@@ -14136,6 +14219,18 @@ function animatePlayerModel(dt) {
       arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, side * 0.18, limbBlend);
       if (arm.forearm) arm.forearm.rotation.x = THREE.MathUtils.lerp(arm.forearm.rotation.x, 0.42, limbBlend);
       if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, 0, limbBlend);
+      return;
+    }
+
+    if (xenoDashPadBoostActive) {
+      const targetArmX = -motionTune.boostArmBack - boostStartFlare * 0.18;
+      const targetArmZ = side * (motionTune.boostArmSide + boostStartFlare * 0.16);
+      const targetForearmX = 0.18 + boostStartFlare * 0.18;
+      const targetHandX = -0.04 + boostStartFlare * 0.08;
+      arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, targetArmX, limbBlend);
+      arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, targetArmZ, limbBlend);
+      if (arm.forearm) arm.forearm.rotation.x = THREE.MathUtils.lerp(arm.forearm.rotation.x, targetForearmX, limbBlend);
+      if (arm.hand) arm.hand.rotation.x = THREE.MathUtils.lerp(arm.hand.rotation.x, targetHandX, limbBlend);
       return;
     }
 
@@ -14378,14 +14473,18 @@ function animatePlayerModel(dt) {
     1 - Math.exp(-8 * dt),
   );
 
+  const overdriveEnergyBoost = dashPadComboOverdriveBoosting ? 0.22 : 0;
   const energyAmount = motionBoostActive
-    ? THREE.MathUtils.clamp(0.35 + speed / boostTopSpeed, 0.35, 1)
+    ? THREE.MathUtils.clamp(0.35 + speed / boostTopSpeed + overdriveEnergyBoost, 0.35, 1.18)
     : 0;
-  materials.jetEnergy.opacity = energyAmount > 0 ? 0.3 + energyAmount * 0.55 : 0;
+  materials.jetEnergy.color.set(dashPadComboOverdriveBoosting ? 0x7ff5ff : 0x24d9ff);
+  materials.jetEnergy.opacity = energyAmount > 0
+    ? Math.min(1, 0.3 + energyAmount * (dashPadComboOverdriveBoosting ? 0.62 : 0.55))
+    : 0;
   for (const line of player.parts.energyLines ?? []) {
     line.visible = energyAmount > 0;
     const pulse = energyAmount > 0
-      ? 1 + Math.sin(runPhase * 3 + line.userData.phase) * 0.08 * energyAmount
+      ? 1 + Math.sin(runPhase * 3 + line.userData.phase) * (dashPadComboOverdriveBoosting ? 0.14 : 0.08) * energyAmount
       : 1;
     line.scale.setScalar(pulse);
   }
@@ -15746,6 +15845,9 @@ function getObjectGalleryItem(source = {}) {
 
 function normalizeDebugSettings(source = {}) {
   return {
+    openingTrailerEnabled: typeof source.openingTrailerEnabled === "boolean"
+      ? source.openingTrailerEnabled
+      : debugDefaults.openingTrailerEnabled,
     superBoost: typeof source.superBoost === "boolean" ? source.superBoost : debugDefaults.superBoost,
     infiniteJump: typeof source.infiniteJump === "boolean" ? source.infiniteJump : debugDefaults.infiniteJump,
     mouseObject: typeof source.mouseObject === "boolean" ? source.mouseObject : debugDefaults.mouseObject,
@@ -16895,7 +16997,12 @@ function isGameplayKey(code) {
 }
 
 function updateHud() {
-  const speedCap = debugSuperBoostActive ? 2000 : 400;
+  syncDashComboOverdrivePresentation();
+  const speedCap = debugSuperBoostActive
+    ? 2000
+    : dashPadComboOverdriveBoosting
+    ? dashPadComboOverdriveDisplayTopSpeed
+    : 400;
   dnaEl.textContent = `${collectedDna}/${dnaItems.length}`;
   speedEl.textContent = `${Math.round(Math.min(getHorizontalSpeed() * speedDisplayScale, speedCap))}`;
   timeEl.textContent = getElapsedSeconds().toFixed(2);
@@ -16942,6 +17049,7 @@ function warpToGoalProgress(progress) {
   resetDashPadChain();
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
+  dashPadComboOverdriveBoosting = false;
   jetEnergyBloomStrength = 0;
   harborCraneWarningBloomStrength = 0;
   clearHarborImpactEffects();
@@ -17003,6 +17111,7 @@ function resetGame(options = {}) {
   boostGauge = boostGaugeMax;
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
+  dashPadComboOverdriveBoosting = false;
   jetEnergyBloomStrength = 0;
   harborCraneWarningBloomStrength = 0;
   clearHarborImpactEffects();

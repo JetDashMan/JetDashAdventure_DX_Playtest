@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=exp121g-tunnel-dash-chain" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp122f-dash-combo-overdrive-fx" />
     <script type="importmap">
       {
         "imports": {
@@ -59,7 +59,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-121G: Tunnel dash chain pads added.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-122F: 대시콤보 오버드라이브 연출 강화.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -427,6 +427,10 @@
         <output id="debug-render-samples">Checking</output>
       </div>
       <label class="debug-check">
+        <span>Opening Trailer</span>
+        <input id="debug-opening-trailer" type="checkbox" />
+      </label>
+      <label class="debug-check">
         <span>U Super Boost</span>
         <input id="debug-super-boost" type="checkbox" />
       </label>
@@ -563,10 +567,12 @@
     <div id="tutorial-prompt" class="tutorial-prompt hidden" aria-live="polite"></div>
 
     <div id="dash-chain-feedback" class="dash-chain-feedback hidden" aria-live="polite">
-      <span id="dash-chain-label">DASH CHAIN</span>
-      <strong id="dash-chain-count">x1</strong>
+      <span id="dash-chain-label">대시콤보</span>
+      <strong id="dash-chain-count">X2</strong>
       <small id="dash-chain-bonus">+0</small>
     </div>
+
+    <div id="overdrive-speed-streaks" class="overdrive-speed-streaks" aria-hidden="true"></div>
 
     <div id="rotate-prompt" class="rotate-prompt" aria-hidden="true">
       <div class="rotate-prompt-panel">
@@ -616,6 +622,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js?v=exp121g-tunnel-dash-chain"></script>
+    <script type="module" src="./src/main.js?v=exp122f-dash-combo-overdrive-fx"></script>
   </body>
 </html>
