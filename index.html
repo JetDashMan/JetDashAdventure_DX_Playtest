@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=exp122f-dash-combo-overdrive-fx" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp123d-compact-resizable-tuning" />
     <script type="importmap">
       {
         "imports": {
@@ -59,7 +59,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-122F: 대시콤보 오버드라이브 연출 강화.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-123D: 튜닝 패널 컴팩트 리사이즈.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -426,6 +426,10 @@
         <span>Render Samples</span>
         <output id="debug-render-samples">Checking</output>
       </div>
+      <div class="debug-block debug-tuning-launch">
+        <span>Tuning</span>
+        <button id="debug-tuning-open" type="button">OPEN TUNING PANEL</button>
+      </div>
       <label class="debug-check">
         <span>Opening Trailer</span>
         <input id="debug-opening-trailer" type="checkbox" />
@@ -531,6 +535,20 @@
       </label>
     </section>
 
+    <section id="debug-tuning-panel" class="settings-panel tuning-panel hidden" aria-label="Debug tuning panel">
+      <div id="debug-tuning-resize" class="tuning-panel-resize" role="separator" aria-label="Resize debug tuning panel" aria-orientation="vertical" tabindex="0"></div>
+      <div class="panel-title tuning-panel-title">
+        <strong>TUNING</strong>
+        <div class="debug-tuning-actions">
+          <button id="debug-tuning-copy" type="button">Copy</button>
+          <button id="debug-tuning-reset-all" type="button">Reset All</button>
+          <button type="button" data-close-panel="debug-tuning" aria-label="Close debug tuning panel">x</button>
+        </div>
+      </div>
+      <div id="debug-tuning-groups" class="debug-tuning-groups"></div>
+      <output id="debug-tuning-status" class="debug-tuning-status">Session only</output>
+    </section>
+
     <section id="pause-menu" class="pause-menu hidden" aria-label="Pause menu" aria-modal="true" role="dialog">
       <div class="pause-panel">
         <div class="panel-title">
@@ -622,6 +640,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js?v=exp122f-dash-combo-overdrive-fx"></script>
+    <script type="module" src="./src/main.js?v=exp123d-compact-resizable-tuning"></script>
   </body>
 </html>

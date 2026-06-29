@@ -38,6 +38,13 @@ const debugConsoleOutputEl = document.querySelector("#debug-console-output");
 const debugConsoleForm = document.querySelector("#debug-console-form");
 const debugConsoleInputEl = document.querySelector("#debug-console-input");
 const debugConsoleStatusEl = document.querySelector("#debug-console-status");
+const debugTuningPanel = document.querySelector("#debug-tuning-panel");
+const debugTuningOpenButton = document.querySelector("#debug-tuning-open");
+const debugTuningGroupsEl = document.querySelector("#debug-tuning-groups");
+const debugTuningResetAllButton = document.querySelector("#debug-tuning-reset-all");
+const debugTuningCopyButton = document.querySelector("#debug-tuning-copy");
+const debugTuningStatusEl = document.querySelector("#debug-tuning-status");
+const debugTuningResizeHandle = document.querySelector("#debug-tuning-resize");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
 const menuButton = document.querySelector("#menu-toggle");
@@ -626,6 +633,25 @@ const jetBoostLightColor = 0x42dfff;
 const jetBoostLightMaxIntensity = 50;
 const jetBoostLightDistance = 7.5;
 const jetBoostLightDecay = 2.0;
+const debugTuneGroupOrder = Object.freeze([
+  "Motion Blur",
+  "Dash Combo",
+  "Overdrive",
+  "Run Camera",
+  "Boost Camera",
+  "Camera",
+  "Quickstep",
+  "JET VFX",
+]);
+const debugTuneDefaultGroup = "General";
+const debugTuningPanelMinWidth = 300;
+const debugTuningPanelDefaultWidth = 360;
+const debugTuningPanelMaxWidth = 760;
+const debugTuningResizeState = {
+  active: false,
+  pointerId: null,
+  rightInset: 18,
+};
 const debugTuneDefaults = Object.freeze({
   "camera.followLerp": 14,
   "camera.inspectLerp": 12,
@@ -641,32 +667,83 @@ const debugTuneDefaults = Object.freeze({
   "motionBlur.medium": motionBlurStrengthConfig.medium,
   "motionBlur.high": motionBlurStrengthConfig.high,
   "motionBlur.ultra": motionBlurStrengthConfig.ultra,
+  "dashCombo.timeout": 2.85,
+  "dashCombo.uiStartCount": 2,
+  "dashCombo.scoreStep": 100,
+  "dashCombo.scoreCap": 900,
+  "dashCombo.pulseDecay": 1.35,
+  "dashCombo.padSpeedGain": 100,
+  "dashCombo.padBoostDuration": 3,
+  "overdrive.startCount": 10,
+  "overdrive.displayTopSpeed": 450,
+  "overdrive.motionBlurMultiplier": 2,
+  "overdrive.energyBoost": 0.22,
+  "overdrive.energyOpacity": 0.62,
+  "overdrive.energyPulse": 0.14,
+  "runCamera.back": 3.45,
+  "runCamera.lift": 2.42,
+  "runCamera.lookAhead": 2.75,
+  "runCamera.fov": 67,
+  "boostCamera.kickBack": 3.6,
+  "boostCamera.kickLift": 0.7,
+  "boostCamera.kickLookAhead": 1.6,
+  "boostCamera.kickFov": 8.0,
+  "boostCamera.holdBack": 1.0,
+  "boostCamera.holdLift": 0.3,
+  "boostCamera.holdLookAhead": 0.6,
+  "boostCamera.holdFov": 2.4,
   "quickstep.afterimageBlurRadius": quickStepAfterimageBlurRadius,
   "quickstep.afterimageIntensity": quickStepAfterimageBlurIntensity,
   "jet.bloomBlurRadius": jetEnergyBloomBlurRadius,
   "jet.boostLightMaxIntensity": jetBoostLightMaxIntensity,
 });
 const debugTuneRegistry = Object.freeze({
-  "camera.followLerp": { min: 0.5, max: 40, precision: 3 },
-  "camera.inspectLerp": { min: 0.5, max: 40, precision: 3 },
-  "camera.lateralIdleFollowRatio": { min: 0, max: 1, precision: 3 },
-  "camera.lateralRunFollowRatio": { min: 0, max: 1, precision: 3 },
-  "camera.lateralBoostFollowRatio": { min: 0, max: 1, precision: 3 },
-  "camera.lateralQuickStepFollowRatio": { min: 0, max: 1, precision: 3 },
-  "camera.lateralIdleFollowRate": { min: 0.1, max: 20, precision: 3 },
-  "camera.lateralRunFollowRate": { min: 0.1, max: 20, precision: 3 },
-  "camera.lateralQuickStepFollowRate": { min: 0.1, max: 20, precision: 3 },
-  "motionBlur.maxPixels": { min: 0, max: 240, precision: 2 },
-  "motionBlur.low": { min: 0, max: 8, precision: 3 },
-  "motionBlur.medium": { min: 0, max: 8, precision: 3 },
-  "motionBlur.high": { min: 0, max: 8, precision: 3 },
-  "motionBlur.ultra": { min: 0, max: 8, precision: 3 },
-  "quickstep.afterimageBlurRadius": { min: 0, max: 60, precision: 2 },
-  "quickstep.afterimageIntensity": { min: 0, max: 3, precision: 3 },
-  "jet.bloomBlurRadius": { min: 0, max: 8, precision: 3 },
-  "jet.boostLightMaxIntensity": { min: 0, max: 100, precision: 2 },
+  "camera.followLerp": { group: "Camera", label: "Follow Lerp", min: 0.5, max: 40, step: 0.1, precision: 3 },
+  "camera.inspectLerp": { group: "Camera", label: "Inspect Lerp", min: 0.5, max: 40, step: 0.1, precision: 3 },
+  "camera.lateralIdleFollowRatio": { group: "Camera", label: "Idle Lateral Ratio", min: 0, max: 1, step: 0.01, precision: 3 },
+  "camera.lateralRunFollowRatio": { group: "Camera", label: "Run Lateral Ratio", min: 0, max: 1, step: 0.01, precision: 3 },
+  "camera.lateralBoostFollowRatio": { group: "Camera", label: "Boost Lateral Ratio", min: 0, max: 1, step: 0.01, precision: 3 },
+  "camera.lateralQuickStepFollowRatio": { group: "Camera", label: "Quickstep Lateral Ratio", min: 0, max: 1, step: 0.01, precision: 3 },
+  "camera.lateralIdleFollowRate": { group: "Camera", label: "Idle Follow Rate", min: 0.1, max: 20, step: 0.1, precision: 3 },
+  "camera.lateralRunFollowRate": { group: "Camera", label: "Run Follow Rate", min: 0.1, max: 20, step: 0.1, precision: 3 },
+  "camera.lateralQuickStepFollowRate": { group: "Camera", label: "Quickstep Follow Rate", min: 0.1, max: 20, step: 0.1, precision: 3 },
+  "motionBlur.maxPixels": { group: "Motion Blur", label: "Max Pixels", min: 0, max: 240, step: 1, precision: 2 },
+  "motionBlur.low": { group: "Motion Blur", label: "Low Strength", min: 0, max: 8, step: 0.05, precision: 3 },
+  "motionBlur.medium": { group: "Motion Blur", label: "Medium Strength", min: 0, max: 8, step: 0.05, precision: 3 },
+  "motionBlur.high": { group: "Motion Blur", label: "High Strength", min: 0, max: 8, step: 0.05, precision: 3 },
+  "motionBlur.ultra": { group: "Motion Blur", label: "Ultra Strength", min: 0, max: 8, step: 0.05, precision: 3 },
+  "dashCombo.timeout": { group: "Dash Combo", label: "Combo Timeout", min: 0.4, max: 8, step: 0.05, precision: 3 },
+  "dashCombo.uiStartCount": { group: "Dash Combo", label: "UI Start Count", min: 1, max: 12, step: 1, precision: 0 },
+  "dashCombo.scoreStep": { group: "Dash Combo", label: "Score Step", min: 0, max: 500, step: 10, precision: 0 },
+  "dashCombo.scoreCap": { group: "Dash Combo", label: "Score Cap", min: 0, max: 3000, step: 50, precision: 0 },
+  "dashCombo.pulseDecay": { group: "Dash Combo", label: "Pulse Decay", min: 0.1, max: 5, step: 0.05, precision: 3 },
+  "dashCombo.padSpeedGain": { group: "Dash Combo", label: "Pad Speed Gain", min: 0, max: 220, step: 5, precision: 0 },
+  "dashCombo.padBoostDuration": { group: "Dash Combo", label: "Pad Boost Duration", min: 0.2, max: 8, step: 0.05, precision: 3 },
+  "overdrive.startCount": { group: "Overdrive", label: "Start Count", min: 2, max: 20, step: 1, precision: 0 },
+  "overdrive.displayTopSpeed": { group: "Overdrive", label: "SPEED Cap", min: 400, max: 650, step: 5, precision: 0 },
+  "overdrive.motionBlurMultiplier": { group: "Overdrive", label: "Motion Blur Multiplier", min: 1, max: 4, step: 0.05, precision: 3 },
+  "overdrive.energyBoost": { group: "Overdrive", label: "Energy Boost", min: 0, max: 0.8, step: 0.01, precision: 3 },
+  "overdrive.energyOpacity": { group: "Overdrive", label: "Energy Opacity", min: 0, max: 1, step: 0.01, precision: 3 },
+  "overdrive.energyPulse": { group: "Overdrive", label: "Energy Pulse", min: 0, max: 0.4, step: 0.01, precision: 3 },
+  "runCamera.back": { group: "Run Camera", label: "Back Distance", min: 1.5, max: 7, step: 0.05, precision: 3 },
+  "runCamera.lift": { group: "Run Camera", label: "Lift", min: 0.8, max: 5.5, step: 0.05, precision: 3 },
+  "runCamera.lookAhead": { group: "Run Camera", label: "Look Ahead", min: 0.2, max: 8, step: 0.05, precision: 3 },
+  "runCamera.fov": { group: "Run Camera", label: "FOV", min: 45, max: 86, step: 0.5, precision: 2 },
+  "boostCamera.kickBack": { group: "Boost Camera", label: "Kick Back", min: 0, max: 8, step: 0.05, precision: 3 },
+  "boostCamera.kickLift": { group: "Boost Camera", label: "Kick Lift", min: -1, max: 3, step: 0.05, precision: 3 },
+  "boostCamera.kickLookAhead": { group: "Boost Camera", label: "Kick Look Ahead", min: 0, max: 5, step: 0.05, precision: 3 },
+  "boostCamera.kickFov": { group: "Boost Camera", label: "Kick FOV Add", min: 0, max: 18, step: 0.25, precision: 2 },
+  "boostCamera.holdBack": { group: "Boost Camera", label: "Hold Back", min: 0, max: 5, step: 0.05, precision: 3 },
+  "boostCamera.holdLift": { group: "Boost Camera", label: "Hold Lift", min: -1, max: 2.5, step: 0.05, precision: 3 },
+  "boostCamera.holdLookAhead": { group: "Boost Camera", label: "Hold Look Ahead", min: 0, max: 3, step: 0.05, precision: 3 },
+  "boostCamera.holdFov": { group: "Boost Camera", label: "Hold FOV Add", min: 0, max: 10, step: 0.25, precision: 2 },
+  "quickstep.afterimageBlurRadius": { group: "Quickstep", label: "Afterimage Blur Radius", min: 0, max: 60, step: 0.5, precision: 2 },
+  "quickstep.afterimageIntensity": { group: "Quickstep", label: "Afterimage Intensity", min: 0, max: 3, step: 0.05, precision: 3 },
+  "jet.bloomBlurRadius": { group: "JET VFX", label: "Bloom Blur Radius", min: 0, max: 8, step: 0.05, precision: 3 },
+  "jet.boostLightMaxIntensity": { group: "JET VFX", label: "Boost Light Intensity", min: 0, max: 100, step: 1, precision: 2 },
 });
 const debugTuneValues = { ...debugTuneDefaults };
+const debugTuneControls = new Map();
 
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
@@ -1116,17 +1193,6 @@ const boostDrainPerSecond = 10;
 const dnaBoostGaugeGain = 5;
 const dnaScoreValue = 100;
 const obstacleScorePenalty = 1000;
-const dashPadSpeedGain = 100 / speedDisplayScale;
-const dashPadFadeDuration = 3;
-const dashPadChainTimeout = 2.85;
-const dashPadChainPulseDecay = 1.35;
-const dashPadChainScoreStep = 100;
-const dashPadChainScoreCap = 900;
-const dashPadComboUiStartCount = 2;
-const dashPadComboOverdriveStartCount = 10;
-const dashPadComboOverdriveDisplayTopSpeed = 450;
-const dashPadComboOverdriveTopSpeed = dashPadComboOverdriveDisplayTopSpeed / speedDisplayScale;
-const dashPadComboOverdriveMotionBlurMultiplier = 2;
 const dashPadChainClimaxStartProgress = 0.5;
 const dashPadChainClimaxEndProgress = 0.7;
 const dashPadThreeLineDnaSuppressRadius = 65;
@@ -11635,7 +11701,9 @@ function getDebugTuneValue(key) {
 
 function formatDebugTuneValue(key, value = getDebugTuneValue(key)) {
   const precision = debugTuneRegistry[key]?.precision ?? 3;
-  return Number(value).toFixed(precision).replace(/\.?0+$/, "");
+  const fixedValue = Number(value).toFixed(precision);
+  if (precision <= 0) return fixedValue;
+  return fixedValue.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
 function resolveDebugTuneKey(input) {
@@ -11663,6 +11731,8 @@ function setDebugTuneValue(key, value) {
 
   debugTuneValues[key] = value;
   applyDebugTuneValue(key);
+  syncDebugTuneControl(key);
+  updateDebugTuningStatus(`${key} = ${formatDebugTuneValue(key)}`);
   return { ok: true, message: `${key} = ${formatDebugTuneValue(key)}` };
 }
 
@@ -11670,12 +11740,16 @@ function resetDebugTuneValue(key) {
   if (!debugTuneRegistry[key]) return { ok: false, message: `unknown key: ${key}` };
   debugTuneValues[key] = debugTuneDefaults[key];
   applyDebugTuneValue(key);
+  syncDebugTuneControl(key);
+  updateDebugTuningStatus(`${key} reset`);
   return { ok: true, message: `${key} reset to ${formatDebugTuneValue(key)}` };
 }
 
 function resetAllDebugTuneValues() {
   Object.assign(debugTuneValues, debugTuneDefaults);
   applyAllDebugTuneValues();
+  syncAllDebugTuneControls();
+  updateDebugTuningStatus("all values reset");
 }
 
 function applyDebugTuneValue(key) {
@@ -11697,6 +11771,269 @@ function applyAllDebugTuneValues() {
   for (const key of Object.keys(debugTuneRegistry)) {
     applyDebugTuneValue(key);
   }
+}
+
+function getDebugTuneStep(key) {
+  const config = debugTuneRegistry[key] ?? {};
+  if (Number.isFinite(config.step) && config.step > 0) return config.step;
+  const precision = THREE.MathUtils.clamp(config.precision ?? 3, 0, 6);
+  return 10 ** -precision;
+}
+
+function getIntegerDebugTuneValue(key) {
+  return Math.max(0, Math.round(getDebugTuneValue(key)));
+}
+
+function getDisplaySpeedDebugTuneValue(key) {
+  return getDebugTuneValue(key) / speedDisplayScale;
+}
+
+function updateDebugTuningStatus(message, state = "") {
+  if (!debugTuningStatusEl) return;
+  debugTuningStatusEl.textContent = message || "Session only";
+  debugTuningStatusEl.dataset.state = state;
+}
+
+function createDebugTuneSnapshot() {
+  return Object.keys(debugTuneRegistry)
+    .map((key) => `${key} = ${formatDebugTuneValue(key)}`)
+    .join("\n");
+}
+
+async function copyDebugTuneSnapshot() {
+  const snapshot = createDebugTuneSnapshot();
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(snapshot);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = snapshot;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    updateDebugTuningStatus("snapshot copied");
+  } catch (error) {
+    updateDebugTuningStatus("copy failed", "error");
+  }
+}
+
+function buildDebugTuningPanel() {
+  if (!debugTuningGroupsEl) return;
+
+  debugTuneControls.clear();
+  debugTuningGroupsEl.textContent = "";
+
+  const groups = new Map();
+  for (const [key, config] of Object.entries(debugTuneRegistry)) {
+    const groupName = config.group || debugTuneDefaultGroup;
+    if (!groups.has(groupName)) groups.set(groupName, []);
+    groups.get(groupName).push([key, config]);
+  }
+
+  const groupNames = [...groups.keys()].sort((a, b) => {
+    const indexA = debugTuneGroupOrder.includes(a) ? debugTuneGroupOrder.indexOf(a) : Number.MAX_SAFE_INTEGER;
+    const indexB = debugTuneGroupOrder.includes(b) ? debugTuneGroupOrder.indexOf(b) : Number.MAX_SAFE_INTEGER;
+    if (indexA !== indexB) return indexA - indexB;
+    return a.localeCompare(b);
+  });
+
+  for (const groupName of groupNames) {
+    const details = document.createElement("details");
+    details.className = "debug-tuning-group";
+    details.open = groupName === "Motion Blur";
+
+    const summary = document.createElement("summary");
+    const label = document.createElement("span");
+    label.textContent = groupName;
+    const count = document.createElement("small");
+    count.textContent = String(groups.get(groupName).length);
+    summary.append(label, count);
+
+    const rows = document.createElement("div");
+    rows.className = "debug-tuning-rows";
+    for (const [key, config] of groups.get(groupName)) {
+      rows.append(createDebugTuneRow(key, config));
+    }
+
+    details.append(summary, rows);
+    debugTuningGroupsEl.append(details);
+  }
+
+  syncAllDebugTuneControls();
+  updateDebugTuningStatus("Session only");
+}
+
+function createDebugTuneRow(key, config) {
+  const row = document.createElement("div");
+  row.className = "debug-tuning-row";
+  row.dataset.tuneKey = key;
+
+  const label = document.createElement("div");
+  label.className = "debug-tuning-label";
+  const title = document.createElement("span");
+  title.textContent = config.label || key;
+  const keyText = document.createElement("small");
+  keyText.textContent = key;
+  label.append(title, keyText);
+
+  const controls = document.createElement("div");
+  controls.className = "debug-tuning-controls";
+
+  const range = document.createElement("input");
+  range.type = "range";
+  range.min = String(config.min);
+  range.max = String(config.max);
+  range.step = String(getDebugTuneStep(key));
+  range.setAttribute("aria-label", `${config.label || key} slider`);
+
+  const number = document.createElement("input");
+  number.type = "number";
+  number.min = String(config.min);
+  number.max = String(config.max);
+  number.step = String(getDebugTuneStep(key));
+  number.inputMode = "decimal";
+  number.setAttribute("aria-label", `${config.label || key} value`);
+
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.textContent = "Reset";
+  reset.setAttribute("aria-label", `Reset ${config.label || key}`);
+
+  const commitValue = (rawValue) => {
+    const result = setDebugTuneValue(key, Number(rawValue));
+    if (!result.ok) {
+      updateDebugTuningStatus(result.message, "error");
+      syncDebugTuneControl(key);
+    }
+  };
+
+  range.addEventListener("input", () => commitValue(range.value));
+  number.addEventListener("change", () => commitValue(number.value));
+  number.addEventListener("keydown", (event) => {
+    if (event.code === "Enter") {
+      event.preventDefault();
+      commitValue(number.value);
+      number.blur();
+    }
+  });
+  reset.addEventListener("click", () => resetDebugTuneValue(key));
+
+  controls.append(range, number, reset);
+  row.append(label, controls);
+  debugTuneControls.set(key, { row, range, number });
+  return row;
+}
+
+function syncDebugTuneControl(key) {
+  const controls = debugTuneControls.get(key);
+  if (!controls) return;
+  const value = getDebugTuneValue(key);
+  const formatted = formatDebugTuneValue(key, value);
+  controls.range.value = String(value);
+  controls.number.value = formatted;
+  controls.row.classList.toggle("is-edited", value !== debugTuneDefaults[key]);
+}
+
+function syncAllDebugTuneControls() {
+  for (const key of Object.keys(debugTuneRegistry)) {
+    syncDebugTuneControl(key);
+  }
+}
+
+function getDebugTuningPanelMaxWidth() {
+  return Math.max(debugTuningPanelMinWidth, Math.min(debugTuningPanelMaxWidth, window.innerWidth - 36));
+}
+
+function clampDebugTuningPanelWidth(width) {
+  const maxWidth = getDebugTuningPanelMaxWidth();
+  return THREE.MathUtils.clamp(width, Math.min(debugTuningPanelMinWidth, maxWidth), maxWidth);
+}
+
+function setDebugTuningPanelWidth(width) {
+  if (!debugTuningPanel) return;
+  const nextWidth = clampDebugTuningPanelWidth(width);
+  debugTuningPanel.style.setProperty("--tuning-panel-width", `${nextWidth}px`);
+}
+
+function syncDebugTuningPanelWidth() {
+  if (!debugTuningPanel) return;
+  const currentWidth = debugTuningPanel.getBoundingClientRect().width || debugTuningPanelDefaultWidth;
+  setDebugTuningPanelWidth(currentWidth);
+}
+
+function beginDebugTuningResize(event) {
+  if (!debugTuningPanel || !debugTuningResizeHandle) return;
+  if (event.button !== undefined && event.button !== 0) return;
+  if (window.innerWidth <= 720) return;
+
+  const rect = debugTuningPanel.getBoundingClientRect();
+  debugTuningResizeState.active = true;
+  debugTuningResizeState.pointerId = event.pointerId;
+  debugTuningResizeState.rightInset = Math.max(0, window.innerWidth - rect.right);
+  debugTuningPanel.classList.add("is-resizing");
+  document.body.classList.add("is-resizing-debug-tuning");
+  try {
+    debugTuningResizeHandle.setPointerCapture?.(event.pointerId);
+  } catch {
+    // Pointer capture is only a convenience here; window-level listeners still handle the drag.
+  }
+  event.preventDefault();
+}
+
+function updateDebugTuningResize(event) {
+  if (!debugTuningResizeState.active || !debugTuningPanel) return;
+  const width = window.innerWidth - event.clientX - debugTuningResizeState.rightInset;
+  setDebugTuningPanelWidth(width);
+}
+
+function endDebugTuningResize(event) {
+  if (!debugTuningResizeState.active) return;
+  debugTuningResizeState.active = false;
+  if (debugTuningResizeHandle && debugTuningResizeState.pointerId !== null) {
+    try {
+      debugTuningResizeHandle.releasePointerCapture?.(debugTuningResizeState.pointerId);
+    } catch {
+      // Ignore capture release races after pointer cancellation.
+    }
+  }
+  debugTuningResizeState.pointerId = null;
+  debugTuningPanel?.classList.remove("is-resizing");
+  document.body.classList.remove("is-resizing-debug-tuning");
+  event?.preventDefault?.();
+}
+
+function nudgeDebugTuningPanelWidth(delta) {
+  if (!debugTuningPanel) return;
+  const currentWidth = debugTuningPanel.getBoundingClientRect().width || debugTuningPanelDefaultWidth;
+  setDebugTuningPanelWidth(currentWidth + delta);
+}
+
+function bindDebugTuningPanel() {
+  buildDebugTuningPanel();
+  debugTuningResetAllButton?.addEventListener("click", () => resetAllDebugTuneValues());
+  debugTuningCopyButton?.addEventListener("click", () => {
+    copyDebugTuneSnapshot();
+  });
+  setDebugTuningPanelWidth(debugTuningPanelDefaultWidth);
+  debugTuningResizeHandle?.addEventListener("pointerdown", beginDebugTuningResize);
+  debugTuningResizeHandle?.addEventListener("keydown", (event) => {
+    if (event.code === "ArrowLeft") {
+      nudgeDebugTuningPanelWidth(24);
+      event.preventDefault();
+    }
+    if (event.code === "ArrowRight") {
+      nudgeDebugTuningPanelWidth(-24);
+      event.preventDefault();
+    }
+  });
+  window.addEventListener("pointermove", updateDebugTuningResize);
+  window.addEventListener("pointerup", endDebugTuningResize);
+  window.addEventListener("pointercancel", endDebugTuningResize);
 }
 
 function isTextEntryTarget(target) {
@@ -11796,6 +12133,7 @@ function bindDebugConsole() {
     keys: () => Object.keys(debugTuneRegistry),
     get: (key) => getDebugTuneValue(key),
     set: (key, value) => setDebugTuneValue(key, Number(value)),
+    snapshot: () => createDebugTuneSnapshot(),
     reset: (key) => {
       if (!key || key === "all") {
         resetAllDebugTuneValues();
@@ -12164,6 +12502,7 @@ function bindInput() {
   });
 
   bindDebugConsole();
+  bindDebugTuningPanel();
   bindTouchControls();
   canvas.addEventListener("pointermove", handleMouseObjectPointerMove);
   canvas.addEventListener("pointerleave", handleMouseObjectPointerLeave);
@@ -12194,11 +12533,13 @@ function bindInput() {
   musicButton.addEventListener("click", toggleMusic);
   graphicsButton?.addEventListener("click", () => setGraphicsPanelOpen(graphicsPanel?.classList.contains("hidden")));
   debugButton?.addEventListener("click", () => setDebugPanelOpen(debugPanel?.classList.contains("hidden")));
+  debugTuningOpenButton?.addEventListener("click", () => setDebugTuningPanelOpen(true));
   pauseButton?.addEventListener("click", () => setPaused(true, "manual"));
   resumeButton?.addEventListener("click", () => setPaused(false, "manual"));
   helpButton?.addEventListener("click", () => setHelpPanelOpen(helpPanel?.classList.contains("hidden")));
   document.querySelector("[data-close-panel='graphics']")?.addEventListener("click", () => setGraphicsPanelOpen(false));
   document.querySelector("[data-close-panel='debug']")?.addEventListener("click", () => setDebugPanelOpen(false));
+  document.querySelector("[data-close-panel='debug-tuning']")?.addEventListener("click", () => setDebugTuningPanelOpen(false));
   document.querySelector("[data-close-panel='help']")?.addEventListener("click", () => setHelpPanelOpen(false));
   fullscreenButton?.addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -12208,7 +12549,10 @@ function bindInput() {
   bindGraphicsControls();
   bindDebugControls();
   bindTestRoomPanelLayering();
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", () => {
+    resize();
+    syncDebugTuningPanelWidth();
+  });
   updateMusicButton();
   updateStageSelector();
   updateFullscreenButton();
@@ -12877,7 +13221,7 @@ function updatePlayer(dt) {
 
   player.yaw = THREE.MathUtils.lerp(player.yaw, THREE.MathUtils.clamp(player.velocity.x * 0.035, -0.48, 0.48), 1 - Math.exp(-8 * dt));
   const motionBlurBoostMultiplier = dashPadComboOverdriveBoosting
-    ? dashPadComboOverdriveMotionBlurMultiplier
+    ? getDashComboOverdriveMotionBlurMultiplier()
     : 1;
   velocityMotionBlurTarget = playerBoostEffectActive
     ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.45 + dashPadChainPulse * 0.18, 1) * getMotionBlurScale() * motionBlurBoostMultiplier
@@ -13031,15 +13375,59 @@ function checkDashPads() {
   }
 }
 
+function getDashComboTimeout() {
+  return getDebugTuneValue("dashCombo.timeout");
+}
+
+function getDashComboUiStartCount() {
+  return Math.max(1, getIntegerDebugTuneValue("dashCombo.uiStartCount"));
+}
+
+function getDashComboOverdriveStartCount() {
+  return Math.max(2, getIntegerDebugTuneValue("overdrive.startCount"));
+}
+
+function getDashComboScoreStep() {
+  return getIntegerDebugTuneValue("dashCombo.scoreStep");
+}
+
+function getDashComboScoreCap() {
+  return getIntegerDebugTuneValue("dashCombo.scoreCap");
+}
+
+function getDashComboPulseDecay() {
+  return getDebugTuneValue("dashCombo.pulseDecay");
+}
+
+function getDashPadSpeedGain() {
+  return getDisplaySpeedDebugTuneValue("dashCombo.padSpeedGain");
+}
+
+function getDashPadBoostDuration() {
+  return getDebugTuneValue("dashCombo.padBoostDuration");
+}
+
+function getDashComboOverdriveTopSpeed() {
+  return getDisplaySpeedDebugTuneValue("overdrive.displayTopSpeed");
+}
+
+function getDashComboOverdriveDisplayTopSpeed() {
+  return getIntegerDebugTuneValue("overdrive.displayTopSpeed");
+}
+
+function getDashComboOverdriveMotionBlurMultiplier() {
+  return getDebugTuneValue("overdrive.motionBlurMultiplier");
+}
+
 function triggerDashPad(pad) {
   const currentSpeed = Math.min(getHorizontalSpeed(), maxHorizontalSpeed);
-  const boostedSpeed = Math.min(currentSpeed + dashPadSpeedGain, maxHorizontalSpeed);
+  const boostedSpeed = Math.min(currentSpeed + getDashPadSpeedGain(), maxHorizontalSpeed);
   const chain = registerDashPadChain(pad);
   if (chain.bonus > 0) {
     addScore(chain.bonus);
   }
   dashPadBoostStartSpeed = currentSpeed;
-  dashPadBoostRemaining = dashPadFadeDuration;
+  dashPadBoostRemaining = getDashPadBoostDuration();
   player.velocity.x = 0;
   player.velocity.z = -boostedSpeed;
   player.velocity.y = Math.max(player.velocity.y, 3.4);
@@ -13056,7 +13444,7 @@ function triggerDashPad(pad) {
 function registerDashPadChain(pad) {
   const continuesChain = dashPadChainTimer > 0 && dashPadChainCount > 0;
   dashPadChainCount = continuesChain ? dashPadChainCount + 1 : 1;
-  dashPadChainTimer = dashPadChainTimeout;
+  dashPadChainTimer = getDashComboTimeout();
 
   const bonus = getDashPadChainScoreBonus(dashPadChainCount);
   const climax = isDashPadClimaxSection(pad.position.z);
@@ -13076,7 +13464,7 @@ function isDashPadClimaxSection(z) {
 
 function getDashPadChainScoreBonus(count) {
   if (count < 2) return 0;
-  return Math.min(dashPadChainScoreCap, (count - 1) * dashPadChainScoreStep);
+  return Math.min(getDashComboScoreCap(), (count - 1) * getDashComboScoreStep());
 }
 
 function updateDashPadChain(dt) {
@@ -13088,7 +13476,7 @@ function updateDashPadChain(dt) {
     }
   }
 
-  dashPadChainPulse = Math.max(0, dashPadChainPulse - dt * dashPadChainPulseDecay);
+  dashPadChainPulse = Math.max(0, dashPadChainPulse - dt * getDashComboPulseDecay());
 
   if (dashPadChainTimer > 0) {
     updateDashChainFeedbackPulse();
@@ -13097,14 +13485,14 @@ function updateDashPadChain(dt) {
 
 function showDashChainFeedback(count, bonus, climax, pulse) {
   if (!dashChainFeedbackEl) return;
-  if (count < dashPadComboUiStartCount) {
+  if (count < getDashComboUiStartCount()) {
     hideDashChainFeedback();
     return;
   }
 
   dashChainFeedbackEl.classList.remove("hidden");
   dashChainFeedbackEl.classList.toggle("is-climax", climax);
-  dashChainFeedbackEl.classList.toggle("is-overdrive", count >= dashPadComboOverdriveStartCount);
+  dashChainFeedbackEl.classList.toggle("is-overdrive", count >= getDashComboOverdriveStartCount());
   if (dashChainLabelEl) {
     dashChainLabelEl.textContent = "대시콤보";
   }
@@ -13158,13 +13546,13 @@ function updateDashPads(dt) {
 function getDashPadTargetSpeed() {
   if (dashPadBoostRemaining <= 0) return 0;
 
-  const fade = THREE.MathUtils.clamp(dashPadBoostRemaining / dashPadFadeDuration, 0, 1);
-  const boostedTarget = Math.min(dashPadBoostStartSpeed + dashPadSpeedGain, maxHorizontalSpeed);
+  const fade = THREE.MathUtils.clamp(dashPadBoostRemaining / getDashPadBoostDuration(), 0, 1);
+  const boostedTarget = Math.min(dashPadBoostStartSpeed + getDashPadSpeedGain(), maxHorizontalSpeed);
   return THREE.MathUtils.lerp(dashPadBoostStartSpeed, boostedTarget, fade);
 }
 
 function isDashPadComboOverdriveActive() {
-  return dashPadChainTimer > 0 && dashPadChainCount >= dashPadComboOverdriveStartCount;
+  return dashPadChainTimer > 0 && dashPadChainCount >= getDashComboOverdriveStartCount();
 }
 
 function isDashPadBoostMotionActive() {
@@ -13173,12 +13561,12 @@ function isDashPadBoostMotionActive() {
 
 function getDashPadComboOverdriveTargetSpeed() {
   if (!dashPadComboOverdriveBoosting) return 0;
-  return dashPadComboOverdriveTopSpeed;
+  return getDashComboOverdriveTopSpeed();
 }
 
 function getDashPadComboOverdriveSpeedLimit() {
   if (!dashPadComboOverdriveBoosting) return 0;
-  return dashPadComboOverdriveTopSpeed;
+  return getDashComboOverdriveTopSpeed();
 }
 
 function syncDashComboOverdrivePresentation() {
@@ -13461,6 +13849,9 @@ function setMainMenuOpen(open) {
   if (!menuPanel || !menuButton) return;
   menuPanel.classList.toggle("hidden", !open);
   menuButton.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    setDebugTuningPanelOpen(false);
+  }
   if (!open) {
     setStageMenuOpen(false);
   }
@@ -13470,6 +13861,9 @@ function setStageMenuOpen(open) {
   if (!stageMenu || !stageMenuToggle) return;
   stageMenu.classList.toggle("hidden", !open);
   stageMenuToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    setDebugTuningPanelOpen(false);
+  }
 }
 
 function updateTutorialPrompt() {
@@ -14473,18 +14867,20 @@ function animatePlayerModel(dt) {
     1 - Math.exp(-8 * dt),
   );
 
-  const overdriveEnergyBoost = dashPadComboOverdriveBoosting ? 0.22 : 0;
+  const overdriveEnergyBoost = dashPadComboOverdriveBoosting ? getDebugTuneValue("overdrive.energyBoost") : 0;
   const energyAmount = motionBoostActive
     ? THREE.MathUtils.clamp(0.35 + speed / boostTopSpeed + overdriveEnergyBoost, 0.35, 1.18)
     : 0;
+  const boostedEnergyOpacity = getDebugTuneValue("overdrive.energyOpacity");
+  const boostedEnergyPulse = getDebugTuneValue("overdrive.energyPulse");
   materials.jetEnergy.color.set(dashPadComboOverdriveBoosting ? 0x7ff5ff : 0x24d9ff);
   materials.jetEnergy.opacity = energyAmount > 0
-    ? Math.min(1, 0.3 + energyAmount * (dashPadComboOverdriveBoosting ? 0.62 : 0.55))
+    ? Math.min(1, 0.3 + energyAmount * (dashPadComboOverdriveBoosting ? boostedEnergyOpacity : 0.55))
     : 0;
   for (const line of player.parts.energyLines ?? []) {
     line.visible = energyAmount > 0;
     const pulse = energyAmount > 0
-      ? 1 + Math.sin(runPhase * 3 + line.userData.phase) * (dashPadComboOverdriveBoosting ? 0.14 : 0.08) * energyAmount
+      ? 1 + Math.sin(runPhase * 3 + line.userData.phase) * (dashPadComboOverdriveBoosting ? boostedEnergyPulse : 0.08) * energyAmount
       : 1;
     line.scale.setScalar(pulse);
   }
@@ -14549,33 +14945,6 @@ function getJetFootBottomLocalY() {
   return minY;
 }
 
-const runCameraPreset = Object.freeze({
-  back: 3.45,
-  lift: 2.42,
-  lookAhead: 2.75,
-  fov: 67,
-});
-
-const boostCameraKickPreset = Object.freeze({
-  back: 3.6,
-  lift: 0.7,
-  lookAhead: 1.6,
-  fov: 8.0,
-});
-
-const boostCameraHoldPreset = Object.freeze({
-  back: 1.0,
-  lift: 0.3,
-  lookAhead: 0.6,
-  fov: 2.4,
-});
-const cameraLateralIdleFollowRatio = 0.72;
-const cameraLateralRunFollowRatio = 0.52;
-const cameraLateralBoostFollowRatio = 0.34;
-const cameraLateralQuickStepFollowRatio = 0.42;
-const cameraLateralIdleFollowRate = 3.6;
-const cameraLateralRunFollowRate = 4.2;
-const cameraLateralQuickStepFollowRate = 2.4;
 const characterInspectTargetPresets = Object.freeze({
   full: { focusLift: 0.18, distance: 5.1, heightOffset: 0.92, fov: 52 },
   face: { focusLift: 2.02, distance: 1.35, heightOffset: 0.08, fov: 29 },
@@ -15002,12 +15371,12 @@ function getRunCameraTargetState(frame) {
   const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
   const boostCameraSustainEase = boostCameraSustain;
   const centerWorld = toWorldPosition(new THREE.Vector3(cameraLateralFocusX, player.position.y, player.position.z));
-  const cameraBack = runCameraPreset.back
-    + boostCameraKickPreset.back * boostCameraKickEase
-    + boostCameraHoldPreset.back * boostCameraSustainEase;
-  const cameraLift = runCameraPreset.lift
-    + boostCameraKickPreset.lift * boostCameraKickEase
-    + boostCameraHoldPreset.lift * boostCameraSustainEase;
+  const cameraBack = getDebugTuneValue("runCamera.back")
+    + getDebugTuneValue("boostCamera.kickBack") * boostCameraKickEase
+    + getDebugTuneValue("boostCamera.holdBack") * boostCameraSustainEase;
+  const cameraLift = getDebugTuneValue("runCamera.lift")
+    + getDebugTuneValue("boostCamera.kickLift") * boostCameraKickEase
+    + getDebugTuneValue("boostCamera.holdLift") * boostCameraSustainEase;
   const cameraOffset = frame.tangent.clone()
     .multiplyScalar(-cameraBack)
     .addScaledVector(frame.up, cameraLift);
@@ -15019,14 +15388,14 @@ function getRunCameraTargetState(frame) {
   const lookAt = centerWorld.clone()
     .addScaledVector(
       frame.tangent,
-      runCameraPreset.lookAhead
-        + boostCameraKickPreset.lookAhead * boostCameraKickEase
-        + boostCameraHoldPreset.lookAhead * boostCameraSustainEase,
+      getDebugTuneValue("runCamera.lookAhead")
+        + getDebugTuneValue("boostCamera.kickLookAhead") * boostCameraKickEase
+        + getDebugTuneValue("boostCamera.holdLookAhead") * boostCameraSustainEase,
     )
     .addScaledVector(frame.up, 1.05);
-  const targetFov = runCameraPreset.fov
-    + boostCameraKickPreset.fov * boostCameraKickEase
-    + boostCameraHoldPreset.fov * boostCameraSustainEase
+  const targetFov = getDebugTuneValue("runCamera.fov")
+    + getDebugTuneValue("boostCamera.kickFov") * boostCameraKickEase
+    + getDebugTuneValue("boostCamera.holdFov") * boostCameraSustainEase
     + jumpImpact * 2.5
     + quickStepFlash * 1.5;
 
@@ -16877,6 +17246,7 @@ function setGraphicsPanelOpen(open) {
     setMainMenuOpen(false);
     setStageMenuOpen(false);
     setDebugPanelOpen(false);
+    setDebugTuningPanelOpen(false);
     setHelpPanelOpen(false);
   }
 }
@@ -16890,6 +17260,21 @@ function setDebugPanelOpen(open) {
     setMainMenuOpen(false);
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
+    setDebugTuningPanelOpen(false);
+    setHelpPanelOpen(false);
+  }
+}
+
+function setDebugTuningPanelOpen(open) {
+  if (!debugTuningPanel) return;
+  debugTuningPanel.classList.toggle("hidden", !open);
+  if (open) {
+    syncAllDebugTuneControls();
+    updateDebugTuningStatus("Session only");
+    setMainMenuOpen(false);
+    setStageMenuOpen(false);
+    setGraphicsPanelOpen(false);
+    setDebugPanelOpen(false);
     setHelpPanelOpen(false);
   }
 }
@@ -16906,6 +17291,7 @@ function setHelpPanelOpen(open) {
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
+    setDebugTuningPanelOpen(false);
   }
 }
 
@@ -17001,7 +17387,7 @@ function updateHud() {
   const speedCap = debugSuperBoostActive
     ? 2000
     : dashPadComboOverdriveBoosting
-    ? dashPadComboOverdriveDisplayTopSpeed
+    ? getDashComboOverdriveDisplayTopSpeed()
     : 400;
   dnaEl.textContent = `${collectedDna}/${dnaItems.length}`;
   speedEl.textContent = `${Math.round(Math.min(getHorizontalSpeed() * speedDisplayScale, speedCap))}`;
