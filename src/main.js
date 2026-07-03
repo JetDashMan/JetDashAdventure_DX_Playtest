@@ -634,13 +634,16 @@ const jetBoostLightMaxIntensity = 50;
 const jetBoostLightDistance = 7.5;
 const jetBoostLightDecay = 2.0;
 const debugTuneGroupOrder = Object.freeze([
-  "Motion Blur",
+  "Movement",
+  "Boost",
+  "Jump",
+  "Quickstep",
   "Dash Combo",
   "Overdrive",
   "Run Camera",
   "Boost Camera",
   "Camera",
-  "Quickstep",
+  "Motion Blur",
   "JET VFX",
 ]);
 const debugTuneDefaultGroup = "General";
@@ -692,6 +695,38 @@ const debugTuneDefaults = Object.freeze({
   "boostCamera.holdLift": 0.3,
   "boostCamera.holdLookAhead": 0.6,
   "boostCamera.holdFov": 2.4,
+  "movement.runTopSpeed": 147.2,
+  "movement.boostTopSpeed": 300,
+  "movement.maxSpeedCap": 400,
+  "movement.reverseTopSpeed": 147,
+  "movement.runAccel": 56,
+  "movement.runDecel": 52,
+  "movement.boostAccel": 118,
+  "movement.brakeAccel": 128,
+  "movement.reverseAccel": 38,
+  "movement.dashPadAccel": 36,
+  "movement.strafeRunSpeed": 15,
+  "movement.strafeBoostSpeed": 17,
+  "movement.strafeSlideSpeed": 6.5,
+  "movement.strafeAccel": 64,
+  "movement.strafeReturnAccel": 42,
+  "movement.airControl": 0.58,
+  "boost.gaugeMax": 100,
+  "boost.drainPerSecond": 10,
+  "boost.dnaGain": 5,
+  "jump.initialVelocity": 42.5,
+  "jump.speedBonusScale": 0.04,
+  "jump.speedBonusCap": 4.5,
+  "jump.holdDuration": 0.075,
+  "jump.holdAccel": 9,
+  "jump.gravityUp": 128,
+  "jump.gravityDown": 82,
+  "quickstep.duration": 0.2,
+  "quickstep.distance": 4.2,
+  "quickstep.cooldown": 0.015,
+  "quickstep.launchSpeed": 36,
+  "quickstep.flashDecay": 5.5,
+  "quickstep.fovAdd": 1.5,
   "quickstep.afterimageBlurRadius": quickStepAfterimageBlurRadius,
   "quickstep.afterimageIntensity": quickStepAfterimageBlurIntensity,
   "jet.bloomBlurRadius": jetEnergyBloomBlurRadius,
@@ -737,6 +772,38 @@ const debugTuneRegistry = Object.freeze({
   "boostCamera.holdLift": { group: "Boost Camera", label: "Hold Lift", min: -1, max: 2.5, step: 0.05, precision: 3 },
   "boostCamera.holdLookAhead": { group: "Boost Camera", label: "Hold Look Ahead", min: 0, max: 3, step: 0.05, precision: 3 },
   "boostCamera.holdFov": { group: "Boost Camera", label: "Hold FOV Add", min: 0, max: 10, step: 0.25, precision: 2 },
+  "movement.runTopSpeed": { group: "Movement", label: "Run Top SPEED", min: 80, max: 260, step: 0.1, precision: 1 },
+  "movement.boostTopSpeed": { group: "Movement", label: "Boost Top SPEED", min: 180, max: 520, step: 5, precision: 0 },
+  "movement.maxSpeedCap": { group: "Movement", label: "Base SPEED Cap", min: 260, max: 650, step: 5, precision: 0 },
+  "movement.reverseTopSpeed": { group: "Movement", label: "Reverse Top SPEED", min: 0, max: 260, step: 1, precision: 1 },
+  "movement.runAccel": { group: "Movement", label: "Run Accel", min: 5, max: 160, step: 1, precision: 2 },
+  "movement.runDecel": { group: "Movement", label: "Run Decel", min: 5, max: 160, step: 1, precision: 2 },
+  "movement.boostAccel": { group: "Movement", label: "Boost Accel", min: 20, max: 260, step: 1, precision: 2 },
+  "movement.brakeAccel": { group: "Movement", label: "Brake Accel", min: 20, max: 260, step: 1, precision: 2 },
+  "movement.reverseAccel": { group: "Movement", label: "Reverse Accel", min: 5, max: 140, step: 1, precision: 2 },
+  "movement.dashPadAccel": { group: "Movement", label: "Dash Pad Accel", min: 5, max: 160, step: 1, precision: 2 },
+  "movement.strafeRunSpeed": { group: "Movement", label: "Strafe Run Speed", min: 2, max: 32, step: 0.5, precision: 2 },
+  "movement.strafeBoostSpeed": { group: "Movement", label: "Strafe Boost Speed", min: 2, max: 40, step: 0.5, precision: 2 },
+  "movement.strafeSlideSpeed": { group: "Movement", label: "Strafe Slide Speed", min: 0, max: 22, step: 0.5, precision: 2 },
+  "movement.strafeAccel": { group: "Movement", label: "Strafe Accel", min: 5, max: 150, step: 1, precision: 2 },
+  "movement.strafeReturnAccel": { group: "Movement", label: "Strafe Return Accel", min: 5, max: 120, step: 1, precision: 2 },
+  "movement.airControl": { group: "Movement", label: "Air Control", min: 0.05, max: 1.2, step: 0.01, precision: 3 },
+  "boost.gaugeMax": { group: "Boost", label: "Gauge Max", min: 20, max: 250, step: 5, precision: 0 },
+  "boost.drainPerSecond": { group: "Boost", label: "Drain / Sec", min: 0, max: 45, step: 0.5, precision: 2 },
+  "boost.dnaGain": { group: "Boost", label: "DNA Gauge Gain", min: 0, max: 40, step: 0.5, precision: 2 },
+  "jump.initialVelocity": { group: "Jump", label: "Initial Velocity", min: 18, max: 72, step: 0.5, precision: 2 },
+  "jump.speedBonusScale": { group: "Jump", label: "Speed Bonus Scale", min: 0, max: 0.12, step: 0.005, precision: 3 },
+  "jump.speedBonusCap": { group: "Jump", label: "Speed Bonus Cap", min: 0, max: 12, step: 0.25, precision: 2 },
+  "jump.holdDuration": { group: "Jump", label: "Hold Duration", min: 0, max: 0.22, step: 0.005, precision: 3 },
+  "jump.holdAccel": { group: "Jump", label: "Hold Accel", min: 0, max: 32, step: 0.5, precision: 2 },
+  "jump.gravityUp": { group: "Jump", label: "Gravity Up", min: 40, max: 220, step: 1, precision: 2 },
+  "jump.gravityDown": { group: "Jump", label: "Gravity Down", min: 30, max: 180, step: 1, precision: 2 },
+  "quickstep.duration": { group: "Quickstep", label: "Duration", min: 0.08, max: 0.45, step: 0.005, precision: 3 },
+  "quickstep.distance": { group: "Quickstep", label: "Lane Distance", min: 3.4, max: 5.2, step: 0.05, precision: 3 },
+  "quickstep.cooldown": { group: "Quickstep", label: "Cooldown", min: 0, max: 0.35, step: 0.005, precision: 3 },
+  "quickstep.launchSpeed": { group: "Quickstep", label: "Launch Speed", min: 8, max: 72, step: 1, precision: 2 },
+  "quickstep.flashDecay": { group: "Quickstep", label: "Flash Decay", min: 0.5, max: 18, step: 0.25, precision: 2 },
+  "quickstep.fovAdd": { group: "Quickstep", label: "FOV Add", min: 0, max: 6, step: 0.25, precision: 2 },
   "quickstep.afterimageBlurRadius": { group: "Quickstep", label: "Afterimage Blur Radius", min: 0, max: 60, step: 0.5, precision: 2 },
   "quickstep.afterimageIntensity": { group: "Quickstep", label: "Afterimage Intensity", min: 0, max: 3, step: 0.05, precision: 3 },
   "jet.bloomBlurRadius": { group: "JET VFX", label: "Bloom Blur Radius", min: 0, max: 8, step: 0.05, precision: 3 },
@@ -1172,9 +1239,7 @@ const stageCurve = createStageCurve(currentStage.curvePoints);
 const rollClearStartZ = currentStage.rollClearStartZ;
 const rollClearEndZ = currentStage.rollClearEndZ;
 const rollLiftHeight = currentStage.rollLiftHeight;
-const quickStepDuration = 0.2;
-const quickStepDistance = 4.2;
-const quickStepCooldownDuration = 0.015;
+const authoredQuickStepLaneDistance = 4.2;
 const quickStepLaneSnapEpsilon = 0.05;
 const slideDuration = 0.72;
 const slideCooldownDuration = 0.16;
@@ -1184,13 +1249,6 @@ const debugSuperBoostSpeed = 2000 / speedDisplayScale;
 const seaLevelY = -8.2;
 const waterPlaneBaseSize = 14000;
 const waterPlaneZMargin = 1800;
-const runTopSpeed = 46;
-const reverseTopSpeed = 147 / speedDisplayScale;
-const boostTopSpeed = 300 / speedDisplayScale;
-const maxHorizontalSpeed = 400 / speedDisplayScale;
-const boostGaugeMax = 100;
-const boostDrainPerSecond = 10;
-const dnaBoostGaugeGain = 5;
 const dnaScoreValue = 100;
 const obstacleScorePenalty = 1000;
 const dashPadChainClimaxStartProgress = 0.5;
@@ -1269,7 +1327,7 @@ let quickStepCooldown = 0;
 let quickStepStartX = 0;
 let quickStepTargetX = 0;
 let quickStepFlash = 0;
-let boostGauge = boostGaugeMax;
+let boostGauge = getBoostGaugeMax();
 let velocityMotionBlurTarget = 0;
 let velocityMotionBlurStrength = 0;
 let jetEnergyBloomStrength = 0;
@@ -2428,7 +2486,13 @@ const harborExcavators = [];
 const harborInfectedDrones = [];
 const harborContainerChunks = [];
 const harborContainerChunkSize = 420;
-const harborCraneDropLane5Centers = [-quickStepDistance * 2, -quickStepDistance, 0, quickStepDistance, quickStepDistance * 2];
+const harborCraneDropLane5Centers = [
+  -authoredQuickStepLaneDistance * 2,
+  -authoredQuickStepLaneDistance,
+  0,
+  authoredQuickStepLaneDistance,
+  authoredQuickStepLaneDistance * 2,
+];
 const harborCraneDropLanePair5Centers = [
   (harborCraneDropLane5Centers[0] + harborCraneDropLane5Centers[1]) * 0.5,
   (harborCraneDropLane5Centers[1] + harborCraneDropLane5Centers[2]) * 0.5,
@@ -10107,7 +10171,7 @@ function triggerHarborImpactCameraShake(event) {
   );
   if (distanceFactor <= 0) return;
 
-  const speedFactor = THREE.MathUtils.lerp(0.62, 1, THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1));
+  const speedFactor = THREE.MathUtils.lerp(0.62, 1, THREE.MathUtils.clamp(getHorizontalSpeed() / getBoostTopSpeed(), 0, 1));
   harborImpactCameraShake.duration = harborImpactEffectConfig.cameraShakeDuration;
   harborImpactCameraShake.timer = Math.max(harborImpactCameraShake.timer, harborImpactCameraShake.duration);
   harborImpactCameraShake.strength = Math.max(
@@ -10859,7 +10923,7 @@ function getHarborContainerObstacleGuideLaneX(obstacle) {
   ));
   if (openLanes.length === 0) return Number.NaN;
 
-  if (openLanes.includes(0) && Math.abs(obstacle.position.x) > quickStepDistance * 0.6) {
+  if (openLanes.includes(0) && Math.abs(obstacle.position.x) > authoredQuickStepLaneDistance * 0.6) {
     return 0;
   }
   if (openLanes.length === 1) return openLanes[0];
@@ -11630,8 +11694,8 @@ function spawnQuickStepAfterimages(direction) {
 
     syncQuickStepAfterimagePose(afterimage);
     afterimage.localPosition.set(x, player.position.y, player.position.z + z);
-    afterimage.life = quickStepDuration;
-    afterimage.maxLife = quickStepDuration;
+    afterimage.life = getQuickStepDuration();
+    afterimage.maxLife = getQuickStepDuration();
     afterimage.baseOpacity = opacity;
     afterimage.scaleX = scaleX;
     afterimage.scaleY = scaleY;
@@ -11649,7 +11713,7 @@ function spawnQuickStepAfterimages(direction) {
 function updateQuickStepAfterimages() {
   const quickStepActive = quickStepTimer > 0;
   const allowAfterimages = quickStepActive && playerBoostEffectActive;
-  const quickStepRawProgress = quickStepActive ? 1 - quickStepTimer / quickStepDuration : 1;
+  const quickStepRawProgress = quickStepActive ? 1 - quickStepTimer / getQuickStepDuration() : 1;
   const quickStepProgress = 1 - Math.pow(
     1 - THREE.MathUtils.clamp(quickStepRawProgress, 0, 1),
     3,
@@ -11753,6 +11817,9 @@ function resetAllDebugTuneValues() {
 }
 
 function applyDebugTuneValue(key) {
+  if (key === "boost.gaugeMax") {
+    boostGauge = Math.min(boostGauge, getBoostGaugeMax());
+  }
   if (key === "motionBlur.maxPixels" && velocityMotionBlurMaterial) {
     velocityMotionBlurMaterial.uniforms.uMaxBlurPixels.value = getDebugTuneValue(key);
   }
@@ -11786,6 +11853,86 @@ function getIntegerDebugTuneValue(key) {
 
 function getDisplaySpeedDebugTuneValue(key) {
   return getDebugTuneValue(key) / speedDisplayScale;
+}
+
+function getRunTopSpeed() {
+  return getDisplaySpeedDebugTuneValue("movement.runTopSpeed");
+}
+
+function getBoostTopSpeed() {
+  return getDisplaySpeedDebugTuneValue("movement.boostTopSpeed");
+}
+
+function getMaxHorizontalSpeed() {
+  return getDisplaySpeedDebugTuneValue("movement.maxSpeedCap");
+}
+
+function getReverseTopSpeed() {
+  return getDisplaySpeedDebugTuneValue("movement.reverseTopSpeed");
+}
+
+function getBoostGaugeMax() {
+  return Math.max(1, getDebugTuneValue("boost.gaugeMax"));
+}
+
+function getBoostDrainPerSecond() {
+  return getDebugTuneValue("boost.drainPerSecond");
+}
+
+function getDnaBoostGaugeGain() {
+  return getDebugTuneValue("boost.dnaGain");
+}
+
+function getQuickStepDuration() {
+  return getDebugTuneValue("quickstep.duration");
+}
+
+function getQuickStepDistance() {
+  return getDebugTuneValue("quickstep.distance");
+}
+
+function getQuickStepCooldownDuration() {
+  return getDebugTuneValue("quickstep.cooldown");
+}
+
+function getQuickStepLaunchSpeed() {
+  return getDebugTuneValue("quickstep.launchSpeed");
+}
+
+function getQuickStepFlashDecay() {
+  return getDebugTuneValue("quickstep.flashDecay");
+}
+
+function getQuickStepFovAdd() {
+  return getDebugTuneValue("quickstep.fovAdd");
+}
+
+function getJumpInitialVelocity() {
+  return getDebugTuneValue("jump.initialVelocity");
+}
+
+function getJumpSpeedBonusScale() {
+  return getDebugTuneValue("jump.speedBonusScale");
+}
+
+function getJumpSpeedBonusCap() {
+  return getDebugTuneValue("jump.speedBonusCap");
+}
+
+function getJumpHoldDuration() {
+  return getDebugTuneValue("jump.holdDuration");
+}
+
+function getJumpHoldAccel() {
+  return getDebugTuneValue("jump.holdAccel");
+}
+
+function getJumpGravityUp() {
+  return getDebugTuneValue("jump.gravityUp");
+}
+
+function getJumpGravityDown() {
+  return getDebugTuneValue("jump.gravityDown");
 }
 
 function updateDebugTuningStatus(message, state = "") {
@@ -11845,7 +11992,7 @@ function buildDebugTuningPanel() {
   for (const groupName of groupNames) {
     const details = document.createElement("details");
     details.className = "debug-tuning-group";
-    details.open = groupName === "Motion Blur";
+    details.open = groupName === "Movement";
 
     const summary = document.createElement("summary");
     const label = document.createElement("span");
@@ -13067,7 +13214,7 @@ function updateGame(dt) {
   slideTimer = Math.max(0, slideTimer - dt);
   slideCooldown = Math.max(0, slideCooldown - dt);
   quickStepCooldown = Math.max(0, quickStepCooldown - dt);
-  quickStepFlash = Math.max(0, quickStepFlash - dt * 5.5);
+  quickStepFlash = Math.max(0, quickStepFlash - dt * getQuickStepFlashDecay());
   velocityMotionBlurTarget = 0;
   playerBoostEffectActive = false;
   dashPadComboOverdriveBoosting = false;
@@ -13117,10 +13264,10 @@ function updatePlayer(dt) {
   const strafeInput = THREE.MathUtils.clamp(keyboardStrafeInput + touchStrafeInput, -1, 1);
   const speedLimit = debugSuperBoostActive
     ? debugSuperBoostSpeed
-    : Math.max(maxHorizontalSpeed, getDashPadComboOverdriveSpeedLimit());
+    : Math.max(getMaxHorizontalSpeed(), getDashPadComboOverdriveSpeedLimit());
 
   if (boosting) {
-    boostGauge = Math.max(0, boostGauge - boostDrainPerSecond * dt);
+    boostGauge = Math.max(0, boostGauge - getBoostDrainPerSecond() * dt);
   }
   if (stunned) {
     jumpHoldRemaining = 0;
@@ -13138,28 +13285,44 @@ function updatePlayer(dt) {
     targetVelocityZ = -debugSuperBoostSpeed;
     forwardAccel = 720;
   } else if (boosting) {
-    targetVelocityZ = -Math.min(Math.max(boostTopSpeed, dashPadTargetSpeed), speedLimit);
-    forwardAccel = 118;
+    targetVelocityZ = -Math.min(Math.max(getBoostTopSpeed(), dashPadTargetSpeed), speedLimit);
+    forwardAccel = getDebugTuneValue("movement.boostAccel");
   } else if (holdingForward && !holdingBack) {
-    const targetForwardSpeed = Math.min(Math.max(runTopSpeed, dashPadTargetSpeed), speedLimit);
+    const targetForwardSpeed = Math.min(Math.max(getRunTopSpeed(), dashPadTargetSpeed), speedLimit);
     targetVelocityZ = -targetForwardSpeed;
-    forwardAccel = targetVelocityZ < player.velocity.z ? 56 : 52;
+    forwardAccel = targetVelocityZ < player.velocity.z
+      ? getDebugTuneValue("movement.runAccel")
+      : getDebugTuneValue("movement.runDecel");
   } else if (brakingInput) {
     const brakingForward = currentForwardSpeed > 2;
-    targetVelocityZ = brakingForward ? 0 : reverseTopSpeed;
-    forwardAccel = brakingForward ? 128 : 38;
+    targetVelocityZ = brakingForward ? 0 : getReverseTopSpeed();
+    forwardAccel = brakingForward
+      ? getDebugTuneValue("movement.brakeAccel")
+      : getDebugTuneValue("movement.reverseAccel");
   } else if (dashPadTargetSpeed > 0) {
     targetVelocityZ = -Math.min(dashPadTargetSpeed, speedLimit);
-    forwardAccel = targetVelocityZ < player.velocity.z ? 36 : 52;
+    forwardAccel = targetVelocityZ < player.velocity.z
+      ? getDebugTuneValue("movement.dashPadAccel")
+      : getDebugTuneValue("movement.runDecel");
   }
 
   player.velocity.z = debugSuperBoostActive || boosting
     ? targetVelocityZ
     : moveToward(player.velocity.z, targetVelocityZ, forwardAccel * dt);
 
-  const airControl = player.grounded ? 1 : 0.58;
-  const targetSideSpeed = strafeInput * (sliding ? 6.5 : boosting ? 17 : 15);
-  const sideAccel = (strafeInput === 0 ? 42 : 64) * airControl;
+  const airControl = player.grounded ? 1 : getDebugTuneValue("movement.airControl");
+  const targetSideSpeed = strafeInput * (
+    sliding
+      ? getDebugTuneValue("movement.strafeSlideSpeed")
+      : boosting
+      ? getDebugTuneValue("movement.strafeBoostSpeed")
+      : getDebugTuneValue("movement.strafeRunSpeed")
+  );
+  const sideAccel = (
+    strafeInput === 0
+      ? getDebugTuneValue("movement.strafeReturnAccel")
+      : getDebugTuneValue("movement.strafeAccel")
+  ) * airControl;
 
   if (!stunned && slideQueued) {
     startSlide();
@@ -13173,7 +13336,7 @@ function updatePlayer(dt) {
 
   if (quickStepTimer > 0) {
     quickStepTimer = Math.max(0, quickStepTimer - dt);
-    const t = 1 - quickStepTimer / quickStepDuration;
+    const t = 1 - quickStepTimer / getQuickStepDuration();
     const eased = 1 - Math.pow(1 - THREE.MathUtils.clamp(t, 0, 1), 3);
     player.position.x = THREE.MathUtils.lerp(quickStepStartX, quickStepTargetX, eased);
     player.velocity.x = 0;
@@ -13190,21 +13353,22 @@ function updatePlayer(dt) {
   const canJump = player.grounded || debugSettings.infiniteJump;
 
   if (!stunned && jumpQueued && canJump && !isPlayerSliding()) {
-    player.velocity.y = 42.5 + Math.min(speed * 0.04, 4.5);
+    player.velocity.y = getJumpInitialVelocity()
+      + Math.min(speed * getJumpSpeedBonusScale(), getJumpSpeedBonusCap());
     player.grounded = false;
-    jumpHoldRemaining = 0.075;
+    jumpHoldRemaining = getJumpHoldDuration();
     jumpImpact = 1;
   }
   jumpQueued = false;
 
   if (jumpHoldRemaining > 0 && isJumpHeld() && player.velocity.y > 0) {
-    player.velocity.y += 9 * dt;
+    player.velocity.y += getJumpHoldAccel() * dt;
     jumpHoldRemaining -= dt;
   } else if (!isJumpHeld()) {
     jumpHoldRemaining = 0;
   }
 
-  player.velocity.y -= (player.velocity.y > 0 ? 128 : 82) * dt;
+  player.velocity.y -= (player.velocity.y > 0 ? getJumpGravityUp() : getJumpGravityDown()) * dt;
   player.position.addScaledVector(player.velocity, dt);
   if (player.position.z > stageStartZ + 8) {
     player.position.z = stageStartZ + 8;
@@ -13224,7 +13388,7 @@ function updatePlayer(dt) {
     ? getDashComboOverdriveMotionBlurMultiplier()
     : 1;
   velocityMotionBlurTarget = playerBoostEffectActive
-    ? THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0.45 + dashPadChainPulse * 0.18, 1) * getMotionBlurScale() * motionBlurBoostMultiplier
+    ? THREE.MathUtils.clamp(getHorizontalSpeed() / getBoostTopSpeed(), 0.45 + dashPadChainPulse * 0.18, 1) * getMotionBlurScale() * motionBlurBoostMultiplier
     : 0;
 }
 
@@ -13240,7 +13404,7 @@ function startSlide() {
   jumpQueued = false;
   player.velocity.x *= 0.35;
   if (forwardSpeed > 0) {
-    player.velocity.z = -Math.max(forwardSpeed, Math.min(runTopSpeed * 0.82, boostTopSpeed));
+    player.velocity.z = -Math.max(forwardSpeed, Math.min(getRunTopSpeed() * 0.82, getBoostTopSpeed()));
   }
   return true;
 }
@@ -13312,11 +13476,11 @@ function startQuickStep(direction) {
   quickStepDirection = laneDirection;
   quickStepStartX = player.position.x;
   quickStepTargetX = getQuickStepTargetX(laneDirection, halfWidth);
-  quickStepTimer = quickStepDuration;
-  quickStepCooldown = quickStepCooldownDuration;
+  quickStepTimer = getQuickStepDuration();
+  quickStepCooldown = getQuickStepCooldownDuration();
   quickStepFlash = 1;
   spawnQuickStepAfterimages(laneDirection);
-  player.velocity.x = laneDirection * 36;
+  player.velocity.x = laneDirection * getQuickStepLaunchSpeed();
 }
 
 function getQuickStepTargetX(direction, halfWidth) {
@@ -13335,8 +13499,9 @@ function getQuickStepTargetX(direction, halfWidth) {
 }
 
 function getQuickStepLaneCenters(halfWidth) {
-  const outerLaneX = Math.min(quickStepDistance * 2, halfWidth);
-  const laneCenters = [-outerLaneX, -quickStepDistance, 0, quickStepDistance, outerLaneX];
+  const quickStepLaneDistance = getQuickStepDistance();
+  const outerLaneX = Math.min(quickStepLaneDistance * 2, halfWidth);
+  const laneCenters = [-outerLaneX, -quickStepLaneDistance, 0, quickStepLaneDistance, outerLaneX];
   const result = [];
 
   for (const laneCenter of laneCenters) {
@@ -13420,8 +13585,8 @@ function getDashComboOverdriveMotionBlurMultiplier() {
 }
 
 function triggerDashPad(pad) {
-  const currentSpeed = Math.min(getHorizontalSpeed(), maxHorizontalSpeed);
-  const boostedSpeed = Math.min(currentSpeed + getDashPadSpeedGain(), maxHorizontalSpeed);
+  const currentSpeed = Math.min(getHorizontalSpeed(), getMaxHorizontalSpeed());
+  const boostedSpeed = Math.min(currentSpeed + getDashPadSpeedGain(), getMaxHorizontalSpeed());
   const chain = registerDashPadChain(pad);
   if (chain.bonus > 0) {
     addScore(chain.bonus);
@@ -13547,7 +13712,7 @@ function getDashPadTargetSpeed() {
   if (dashPadBoostRemaining <= 0) return 0;
 
   const fade = THREE.MathUtils.clamp(dashPadBoostRemaining / getDashPadBoostDuration(), 0, 1);
-  const boostedTarget = Math.min(dashPadBoostStartSpeed + getDashPadSpeedGain(), maxHorizontalSpeed);
+  const boostedTarget = Math.min(dashPadBoostStartSpeed + getDashPadSpeedGain(), getMaxHorizontalSpeed());
   return THREE.MathUtils.lerp(dashPadBoostStartSpeed, boostedTarget, fade);
 }
 
@@ -13666,7 +13831,7 @@ function updateLooseDnaItems(dt) {
     if (loose.age > loose.collectDelay && loose.localPosition.distanceTo(player.position) < 1.45) {
       collectedDna += 1;
       addScore(dnaScoreValue);
-      restoreBoostGauge(dnaBoostGaugeGain);
+      restoreBoostGauge(getDnaBoostGaugeGain());
       scene.remove(loose.mesh);
       looseDnaItems.splice(i, 1);
       continue;
@@ -13687,7 +13852,7 @@ function checkDnaCollection() {
       hideDnaInstance(dna);
       collectedDna += 1;
       addScore(dnaScoreValue);
-      restoreBoostGauge(dnaBoostGaugeGain);
+      restoreBoostGauge(getDnaBoostGaugeGain());
     }
   }
 }
@@ -13697,7 +13862,7 @@ function addScore(amount) {
 }
 
 function restoreBoostGauge(amount) {
-  boostGauge = Math.min(boostGaugeMax, boostGauge + amount);
+  boostGauge = Math.min(getBoostGaugeMax(), boostGauge + amount);
 }
 
 function checkObstacleCollision() {
@@ -13889,7 +14054,7 @@ function renderGame(dt) {
     const quickStepActive = motionPreview?.quickStepActive ?? quickStepTimer > 0;
     const quickStepProgress = quickStepActive
       ? THREE.MathUtils.clamp(
-        motionPreview?.quickStepProgress ?? 1 - quickStepTimer / quickStepDuration,
+        motionPreview?.quickStepProgress ?? 1 - quickStepTimer / getQuickStepDuration(),
         0,
         1,
       )
@@ -13930,7 +14095,7 @@ function updateVelocityMotionBlur(dt) {
 
 function updateJetEnergyBloom(dt) {
   const motionPreview = getCharacterInspectMotionPreviewState();
-  const speedRatio = THREE.MathUtils.clamp((motionPreview?.speed ?? getHorizontalSpeed()) / boostTopSpeed, 0, 1);
+  const speedRatio = THREE.MathUtils.clamp((motionPreview?.speed ?? getHorizontalSpeed()) / getBoostTopSpeed(), 0, 1);
   const boostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
   const target = boostActive ? 1.0 + speedRatio * 1.28 : 0;
   const fadeRate = target > jetEnergyBloomStrength ? 12 : 9;
@@ -13953,7 +14118,7 @@ function updateJetBoostLight() {
   if (!jetBoostLight) return;
 
   const motionPreview = getCharacterInspectMotionPreviewState();
-  const speedRatio = THREE.MathUtils.clamp((motionPreview?.speed ?? getHorizontalSpeed()) / boostTopSpeed, 0, 1);
+  const speedRatio = THREE.MathUtils.clamp((motionPreview?.speed ?? getHorizontalSpeed()) / getBoostTopSpeed(), 0, 1);
   const boostActive = motionPreview?.boostActive ?? playerBoostEffectActive;
   const boostLightRatio = boostActive ? 0.12 + speedRatio * 0.88 : 0;
   const maxIntensity = getDebugTuneValue("jet.boostLightMaxIntensity");
@@ -14181,14 +14346,14 @@ function getCharacterInspectMotionPreviewState() {
     return { speed: 0, grounded: true, boostActive: false, timeScale };
   }
   if (mode === "walk") {
-    return { speed: runTopSpeed * 0.45, grounded: true, boostActive: false, runPhaseOverride, timeScale };
+    return { speed: getRunTopSpeed() * 0.45, grounded: true, boostActive: false, runPhaseOverride, timeScale };
   }
   if (mode === "run") {
-    return { speed: runTopSpeed * 1.02, grounded: true, boostActive: false, runPhaseOverride, timeScale };
+    return { speed: getRunTopSpeed() * 1.02, grounded: true, boostActive: false, runPhaseOverride, timeScale };
   }
   if (mode === "boost") {
     return {
-      speed: boostTopSpeed * 0.96,
+      speed: getBoostTopSpeed() * 0.96,
       grounded: true,
       boostActive: true,
       boostFlare: 0.55 + boostFlareWave * 0.18,
@@ -14198,7 +14363,7 @@ function getCharacterInspectMotionPreviewState() {
   }
   if (mode === "slide") {
     return {
-      speed: runTopSpeed * 0.92,
+      speed: getRunTopSpeed() * 0.92,
       grounded: true,
       boostActive: false,
       slideActive: true,
@@ -14209,7 +14374,7 @@ function getCharacterInspectMotionPreviewState() {
   if (mode === "quickstepLeft" || mode === "quickstepRight") {
     const direction = mode === "quickstepLeft" ? -1 : 1;
     return {
-      speed: runTopSpeed * 0.28,
+      speed: getRunTopSpeed() * 0.28,
       grounded: true,
       boostActive: false,
       quickStepActive: true,
@@ -14221,7 +14386,7 @@ function getCharacterInspectMotionPreviewState() {
   }
   if (mode === "jump") {
     return {
-      speed: runTopSpeed * 0.56,
+      speed: getRunTopSpeed() * 0.56,
       grounded: false,
       boostActive: false,
       jumpPosePreset: debugSettings.characterInspectJumpPose,
@@ -14231,7 +14396,7 @@ function getCharacterInspectMotionPreviewState() {
   }
   if (mode === "landing") {
     return {
-      speed: runTopSpeed * 0.32,
+      speed: getRunTopSpeed() * 0.32,
       grounded: true,
       boostActive: false,
       jumpImpact: frozen ? 0.25 + cyclePulse * 0.75 : 0.75 + Math.sin(time * 4.0) * 0.2,
@@ -14423,7 +14588,7 @@ function animatePlayerModel(dt) {
   const quickStepActive = motionPreview?.quickStepActive ?? quickStepTimer > 0;
   const quickStepProgress = quickStepActive
     ? THREE.MathUtils.clamp(
-      motionPreview?.quickStepProgress ?? 1 - quickStepTimer / quickStepDuration,
+      motionPreview?.quickStepProgress ?? 1 - quickStepTimer / getQuickStepDuration(),
       0,
       1,
     )
@@ -14449,7 +14614,9 @@ function animatePlayerModel(dt) {
   const longStrideCadenceScale = THREE.MathUtils.lerp(1.06, 0.88, longStrideSpeedAmount)
     + boostCadenceAmount * 0.34;
   const runAmount = THREE.MathUtils.clamp(speed / 54, 0, 1.8);
-  const cappedCadenceSpeed = Math.min(speed, runTopSpeed * 1.25);
+  const tunedRunTopSpeed = getRunTopSpeed();
+  const tunedBoostTopSpeed = getBoostTopSpeed();
+  const cappedCadenceSpeed = Math.min(speed, tunedRunTopSpeed * 1.25);
   const motionTimeScale = motionPreview?.timeScale ?? 1;
   if (Number.isFinite(motionPreview?.runPhaseOverride)) {
     runPhase = motionPreview.runPhaseOverride;
@@ -14459,10 +14626,11 @@ function animatePlayerModel(dt) {
 
   const motionTune = getCharacterMotionTuneConfig();
   const runStrength = Math.min(runAmount, 1.72);
-  const sprintAmount = moving && motionGrounded ? THREE.MathUtils.clamp(speed / runTopSpeed, 0, 1) : 0;
+  const sprintAmount = moving && motionGrounded ? THREE.MathUtils.clamp(speed / tunedRunTopSpeed, 0, 1) : 0;
+  const boostPoseRange = Math.max(1, tunedBoostTopSpeed - tunedRunTopSpeed * 0.75);
   const boostPoseAmount = moving && motionGrounded && motionBoostActive
     ? Math.max(
-      THREE.MathUtils.clamp((speed - runTopSpeed * 0.75) / (boostTopSpeed - runTopSpeed * 0.75), 0, 1),
+      THREE.MathUtils.clamp((speed - tunedRunTopSpeed * 0.75) / boostPoseRange, 0, 1),
       xenoDashPadBoostActive ? 1 : 0,
     )
     : 0;
@@ -14869,7 +15037,7 @@ function animatePlayerModel(dt) {
 
   const overdriveEnergyBoost = dashPadComboOverdriveBoosting ? getDebugTuneValue("overdrive.energyBoost") : 0;
   const energyAmount = motionBoostActive
-    ? THREE.MathUtils.clamp(0.35 + speed / boostTopSpeed + overdriveEnergyBoost, 0.35, 1.18)
+    ? THREE.MathUtils.clamp(0.35 + speed / getBoostTopSpeed() + overdriveEnergyBoost, 0.35, 1.18)
     : 0;
   const boostedEnergyOpacity = getDebugTuneValue("overdrive.energyOpacity");
   const boostedEnergyPulse = getDebugTuneValue("overdrive.energyPulse");
@@ -15397,7 +15565,7 @@ function getRunCameraTargetState(frame) {
     + getDebugTuneValue("boostCamera.kickFov") * boostCameraKickEase
     + getDebugTuneValue("boostCamera.holdFov") * boostCameraSustainEase
     + jumpImpact * 2.5
-    + quickStepFlash * 1.5;
+    + quickStepFlash * getQuickStepFovAdd();
 
   return {
     desired,
@@ -15513,7 +15681,7 @@ function updateCamera(dt) {
 
   const boostCameraKickEase = THREE.MathUtils.smoothstep(boostCameraKick, 0, 1);
   const boostCameraSustainEase = boostCameraSustain;
-  const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / boostTopSpeed, 0, 1);
+  const speedRatio = THREE.MathUtils.clamp(getHorizontalSpeed() / getBoostTopSpeed(), 0, 1);
   const speedBasedFollowRatio = THREE.MathUtils.lerp(
     getDebugTuneValue("camera.lateralIdleFollowRatio"),
     getDebugTuneValue("camera.lateralRunFollowRatio"),
@@ -17395,9 +17563,10 @@ function updateHud() {
   scoreEl.textContent = `${score}`;
   progressEl.textContent = `${getGoalProgressPercent()}%`;
   heightEl.textContent = `${Math.round(getPlayerHeightAboveSea())}m`;
-  boostGaugeEl.textContent = `${Math.round(boostGauge)}%`;
-  boostFillEl.style.width = `${boostGauge}%`;
-  boostFillEl.parentElement.setAttribute("aria-valuenow", `${Math.round(boostGauge)}`);
+  const boostGaugePercent = THREE.MathUtils.clamp(boostGauge / getBoostGaugeMax(), 0, 1) * 100;
+  boostGaugeEl.textContent = `${Math.round(boostGaugePercent)}%`;
+  boostFillEl.style.width = `${boostGaugePercent}%`;
+  boostFillEl.parentElement.setAttribute("aria-valuenow", `${Math.round(boostGaugePercent)}`);
 }
 
 function getPlayerHeightAboveSea() {
@@ -17405,7 +17574,7 @@ function getPlayerHeightAboveSea() {
 }
 
 function refillBoostGauge() {
-  boostGauge = boostGaugeMax;
+  boostGauge = getBoostGaugeMax();
   updateHud();
 }
 
@@ -17494,7 +17663,7 @@ function resetGame(options = {}) {
   quickStepTargetX = 0;
   quickStepFlash = 0;
   clearQuickStepAfterimages();
-  boostGauge = boostGaugeMax;
+  boostGauge = getBoostGaugeMax();
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
   dashPadComboOverdriveBoosting = false;
