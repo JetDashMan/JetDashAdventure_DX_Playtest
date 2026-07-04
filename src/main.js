@@ -43,8 +43,17 @@ const debugTuningOpenButton = document.querySelector("#debug-tuning-open");
 const debugTuningGroupsEl = document.querySelector("#debug-tuning-groups");
 const debugTuningResetAllButton = document.querySelector("#debug-tuning-reset-all");
 const debugTuningCopyButton = document.querySelector("#debug-tuning-copy");
+const debugTuningCopyCodeButton = document.querySelector("#debug-tuning-copy-code");
 const debugTuningStatusEl = document.querySelector("#debug-tuning-status");
 const debugTuningResizeHandle = document.querySelector("#debug-tuning-resize");
+const debugTuningSearchInput = document.querySelector("#debug-tuning-search");
+const debugTuningFavoritesOnlyButton = document.querySelector("#debug-tuning-favorites-only");
+const debugTuningPresetNameInput = document.querySelector("#debug-tuning-preset-name");
+const debugTuningPresetSelect = document.querySelector("#debug-tuning-preset-select");
+const debugTuningPresetSaveButton = document.querySelector("#debug-tuning-preset-save");
+const debugTuningPresetLoadButton = document.querySelector("#debug-tuning-preset-load");
+const debugTuningPresetDeleteButton = document.querySelector("#debug-tuning-preset-delete");
+const debugTuningOutputEl = document.querySelector("#debug-tuning-output");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
 const menuButton = document.querySelector("#menu-toggle");
@@ -811,6 +820,14 @@ const debugTuneRegistry = Object.freeze({
 });
 const debugTuneValues = { ...debugTuneDefaults };
 const debugTuneControls = new Map();
+const debugTuneGroupControls = new Map();
+const debugTunePresetStorageKey = "jetDash.debugTunePresets.v1";
+const debugTuneFavoriteStorageKey = "jetDash.debugTuneFavorites.v1";
+const debugTuneFilterState = {
+  query: "",
+  favoritesOnly: false,
+};
+const debugTuneFavoriteKeys = new Set(loadDebugTuneFavoriteKeys());
 
 const sceneRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
   depthBuffer: true,
@@ -11941,38 +11958,350 @@ function updateDebugTuningStatus(message, state = "") {
   debugTuningStatusEl.dataset.state = state;
 }
 
+function readJsonStorage(key, fallback) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadDebugTuneFavoriteKeys() {
+  const stored = readJsonStorage(debugTuneFavoriteStorageKey, []);
+  if (!Array.isArray(stored)) return [];
+  return stored.filter((key) => Boolean(debugTuneRegistry[key]));
+}
+
+function saveDebugTuneFavoriteKeys() {
+  return writeJsonStorage(debugTuneFavoriteStorageKey, [...debugTuneFavoriteKeys].sort());
+}
+
+function readDebugTunePresets() {
+  const stored = readJsonStorage(debugTunePresetStorageKey, {});
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+
+  const presets = {};
+  for (const [name, preset] of Object.entries(stored)) {
+    if (!preset || typeof preset !== "object") continue;
+    const values = sanitizeDebugTuneValuesObject(preset.values);
+    if (Object.keys(values).length === 0) continue;
+    presets[name] = {
+      values,
+      updatedAt: typeof preset.updatedAt === "string" ? preset.updatedAt : "",
+    };
+  }
+  return presets;
+}
+
+function writeDebugTunePresets(presets) {
+  return writeJsonStorage(debugTunePresetStorageKey, presets);
+}
+
+function sanitizeDebugTunePresetName(name) {
+  return String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 36);
+}
+
+function getDebugTuneValuesObject({ editedOnly = false } = {}) {
+  const values = {};
+  for (const key of Object.keys(debugTuneRegistry)) {
+    const value = getDebugTuneValue(key);
+    if (editedOnly && value === debugTuneDefaults[key]) continue;
+    values[key] = value;
+  }
+  return values;
+}
+
+function sanitizeDebugTuneValuesObject(values) {
+  const sanitized = {};
+  if (!values || typeof values !== "object" || Array.isArray(values)) return sanitized;
+
+  for (const [key, rawValue] of Object.entries(values)) {
+    const config = debugTuneRegistry[key];
+    const value = Number(rawValue);
+    if (!config || !Number.isFinite(value)) continue;
+    sanitized[key] = THREE.MathUtils.clamp(value, config.min, config.max);
+  }
+  return sanitized;
+}
+
+function applyDebugTuneValuesObject(values, { resetFirst = false } = {}) {
+  const sanitized = sanitizeDebugTuneValuesObject(values);
+  if (resetFirst) {
+    Object.assign(debugTuneValues, debugTuneDefaults);
+  }
+
+  for (const [key, value] of Object.entries(sanitized)) {
+    debugTuneValues[key] = value;
+  }
+  applyAllDebugTuneValues();
+  syncAllDebugTuneControls();
+  return Object.keys(sanitized).length;
+}
+
 function createDebugTuneSnapshot() {
   return Object.keys(debugTuneRegistry)
     .map((key) => `${key} = ${formatDebugTuneValue(key)}`)
     .join("\n");
 }
 
-async function copyDebugTuneSnapshot() {
-  const snapshot = createDebugTuneSnapshot();
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(snapshot);
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = snapshot;
-      textarea.setAttribute("readonly", "");
+function createDebugTuneCodeSnapshot() {
+  const editedValues = getDebugTuneValuesObject({ editedOnly: true });
+  const values = Object.keys(editedValues).length > 0
+    ? editedValues
+    : getDebugTuneValuesObject();
+  const orderedValues = {};
+  for (const key of Object.keys(values).sort()) {
+    orderedValues[key] = Number(formatDebugTuneValue(key, values[key]));
+  }
+  return JSON.stringify(orderedValues, null, 2);
+}
+
+async function copyDebugTuneText(text, successMessage) {
+  if (debugTuningOutputEl) {
+    debugTuningOutputEl.value = text;
+    debugTuningOutputEl.classList.remove("hidden");
+  }
+
+  let copied = false;
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      copied = false;
+    }
+  }
+
+  if (!copied) {
+    const textarea = debugTuningOutputEl || document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    if (!debugTuningOutputEl) {
       textarea.style.position = "fixed";
       textarea.style.left = "-9999px";
       document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
     }
-    updateDebugTuningStatus("snapshot copied");
-  } catch (error) {
-    updateDebugTuningStatus("copy failed", "error");
+    textarea.focus();
+    textarea.select();
+    try {
+      copied = Boolean(document.execCommand?.("copy"));
+    } catch {
+      copied = false;
+    }
+    if (!debugTuningOutputEl) textarea.remove();
   }
+
+  if (copied) {
+    updateDebugTuningStatus(successMessage);
+  } else {
+    updateDebugTuningStatus("copy ready for manual copy", "manual");
+  }
+}
+
+async function copyDebugTuneSnapshot() {
+  await copyDebugTuneText(createDebugTuneSnapshot(), "snapshot copied");
+}
+
+async function copyDebugTuneCodeSnapshot() {
+  await copyDebugTuneText(createDebugTuneCodeSnapshot(), "code JSON copied");
+}
+
+function refreshDebugTunePresetSelect(selectedName = "") {
+  if (!debugTuningPresetSelect) return;
+  const presets = readDebugTunePresets();
+  const names = Object.keys(presets).sort((a, b) => a.localeCompare(b));
+  debugTuningPresetSelect.textContent = "";
+
+  if (names.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No presets";
+    debugTuningPresetSelect.append(option);
+  } else {
+    for (const name of names) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      debugTuningPresetSelect.append(option);
+    }
+    debugTuningPresetSelect.value = names.includes(selectedName) ? selectedName : names[0];
+  }
+
+  const hasPreset = names.length > 0;
+  if (debugTuningPresetLoadButton) debugTuningPresetLoadButton.disabled = !hasPreset;
+  if (debugTuningPresetDeleteButton) debugTuningPresetDeleteButton.disabled = !hasPreset;
+}
+
+function saveCurrentDebugTunePreset() {
+  if (!debugTuningPresetNameInput) return;
+  const fallbackName = `Preset ${new Date().toLocaleTimeString("en-US", { hour12: false })}`;
+  const name = sanitizeDebugTunePresetName(debugTuningPresetNameInput.value || fallbackName);
+  if (!name) {
+    updateDebugTuningStatus("preset name required", "error");
+    return;
+  }
+
+  const presets = readDebugTunePresets();
+  presets[name] = {
+    values: getDebugTuneValuesObject(),
+    updatedAt: new Date().toISOString(),
+  };
+  if (!writeDebugTunePresets(presets)) {
+    updateDebugTuningStatus("preset save failed", "error");
+    return;
+  }
+  debugTuningPresetNameInput.value = name;
+  refreshDebugTunePresetSelect(name);
+  updateDebugTuningStatus(`preset saved: ${name}`);
+}
+
+function loadSelectedDebugTunePreset() {
+  const name = debugTuningPresetSelect?.value || "";
+  const presets = readDebugTunePresets();
+  const preset = presets[name];
+  if (!name || !preset) {
+    updateDebugTuningStatus("preset not found", "error");
+    refreshDebugTunePresetSelect();
+    return;
+  }
+
+  const count = applyDebugTuneValuesObject(preset.values, { resetFirst: true });
+  if (debugTuningPresetNameInput) debugTuningPresetNameInput.value = name;
+  updateDebugTuningStatus(`preset loaded: ${name} (${count})`);
+}
+
+function deleteSelectedDebugTunePreset() {
+  const name = debugTuningPresetSelect?.value || "";
+  const presets = readDebugTunePresets();
+  if (!name || !presets[name]) {
+    updateDebugTuningStatus("preset not found", "error");
+    refreshDebugTunePresetSelect();
+    return;
+  }
+  delete presets[name];
+  if (!writeDebugTunePresets(presets)) {
+    updateDebugTuningStatus("preset delete failed", "error");
+    return;
+  }
+  refreshDebugTunePresetSelect();
+  updateDebugTuningStatus(`preset deleted: ${name}`);
+}
+
+function getDebugTuneSearchText(key, config) {
+  return `${key} ${config.label || ""} ${config.group || debugTuneDefaultGroup}`.toLowerCase();
+}
+
+function isDebugTuneRowVisible(key, config) {
+  if (debugTuneFilterState.favoritesOnly && !debugTuneFavoriteKeys.has(key)) return false;
+  const query = debugTuneFilterState.query.trim().toLowerCase();
+  if (!query) return true;
+  return getDebugTuneSearchText(key, config).includes(query);
+}
+
+function syncDebugTuneFavoriteControl(key) {
+  const controls = debugTuneControls.get(key);
+  if (!controls?.favorite) return;
+  const active = debugTuneFavoriteKeys.has(key);
+  controls.favorite.classList.toggle("is-active", active);
+  controls.favorite.setAttribute("aria-pressed", active ? "true" : "false");
+}
+
+function toggleDebugTuneFavorite(key) {
+  if (!debugTuneRegistry[key]) return;
+  let active = false;
+  if (debugTuneFavoriteKeys.has(key)) {
+    debugTuneFavoriteKeys.delete(key);
+  } else {
+    debugTuneFavoriteKeys.add(key);
+    active = true;
+  }
+  saveDebugTuneFavoriteKeys();
+  syncDebugTuneFavoriteControl(key);
+  applyDebugTuneFilters({ updateStatus: false });
+  updateDebugTuningStatus(`${active ? "favorite added" : "favorite removed"}: ${key}`);
+}
+
+function applyDebugTuneFilters({ updateStatus = true } = {}) {
+  let total = 0;
+  let visible = 0;
+
+  for (const [groupName, groupControl] of debugTuneGroupControls.entries()) {
+    let groupVisible = 0;
+    for (const key of groupControl.keys) {
+      const config = debugTuneRegistry[key];
+      const controls = debugTuneControls.get(key);
+      if (!config || !controls?.row) continue;
+
+      total += 1;
+      const rowVisible = isDebugTuneRowVisible(key, config);
+      controls.row.hidden = !rowVisible;
+      if (rowVisible) {
+        visible += 1;
+        groupVisible += 1;
+      }
+    }
+
+    groupControl.details.hidden = groupVisible === 0;
+    groupControl.count.textContent = groupVisible === groupControl.keys.length
+      ? String(groupControl.keys.length)
+      : `${groupVisible}/${groupControl.keys.length}`;
+    if ((debugTuneFilterState.query || debugTuneFilterState.favoritesOnly) && groupVisible > 0) {
+      groupControl.details.open = true;
+    } else if (!debugTuneFilterState.query && !debugTuneFilterState.favoritesOnly) {
+      groupControl.details.open = groupName === "Movement";
+    }
+  }
+
+  const favoritesActive = debugTuneFilterState.favoritesOnly;
+  if (debugTuningFavoritesOnlyButton) {
+    debugTuningFavoritesOnlyButton.classList.toggle("is-active", favoritesActive);
+    debugTuningFavoritesOnlyButton.setAttribute("aria-pressed", favoritesActive ? "true" : "false");
+  }
+
+  if (updateStatus && (debugTuneFilterState.query || favoritesActive)) {
+    updateDebugTuningStatus(`${visible}/${total} visible`);
+  } else if (updateStatus) {
+    updateDebugTuningStatus("Session only");
+  }
+}
+
+function installDebugTuneApi() {
+  window.jetDashDebugTune = {
+    keys: () => Object.keys(debugTuneRegistry),
+    get: (key) => getDebugTuneValue(key),
+    set: (key, value) => setDebugTuneValue(key, Number(value)),
+    snapshot: () => createDebugTuneSnapshot(),
+    code: () => createDebugTuneCodeSnapshot(),
+    presets: () => readDebugTunePresets(),
+    reset: (key) => {
+      if (!key || key === "all") {
+        resetAllDebugTuneValues();
+        return { ok: true, message: "all reset" };
+      }
+      return resetDebugTuneValue(key);
+    },
+  };
 }
 
 function buildDebugTuningPanel() {
   if (!debugTuningGroupsEl) return;
 
   debugTuneControls.clear();
+  debugTuneGroupControls.clear();
   debugTuningGroupsEl.textContent = "";
 
   const groups = new Map();
@@ -12003,16 +12332,23 @@ function buildDebugTuningPanel() {
 
     const rows = document.createElement("div");
     rows.className = "debug-tuning-rows";
+    const groupKeys = [];
     for (const [key, config] of groups.get(groupName)) {
+      groupKeys.push(key);
       rows.append(createDebugTuneRow(key, config));
     }
 
     details.append(summary, rows);
     debugTuningGroupsEl.append(details);
+    debugTuneGroupControls.set(groupName, {
+      details,
+      count,
+      keys: groupKeys,
+    });
   }
 
   syncAllDebugTuneControls();
-  updateDebugTuningStatus("Session only");
+  applyDebugTuneFilters();
 }
 
 function createDebugTuneRow(key, config) {
@@ -12022,11 +12358,23 @@ function createDebugTuneRow(key, config) {
 
   const label = document.createElement("div");
   label.className = "debug-tuning-label";
+  const labelText = document.createElement("div");
+  labelText.className = "debug-tuning-label-text";
   const title = document.createElement("span");
   title.textContent = config.label || key;
   const keyText = document.createElement("small");
   keyText.textContent = key;
-  label.append(title, keyText);
+  labelText.append(title, keyText);
+
+  const favorite = document.createElement("button");
+  favorite.type = "button";
+  favorite.className = "debug-tuning-favorite";
+  favorite.textContent = "Fav";
+  favorite.setAttribute("aria-label", `Favorite ${config.label || key}`);
+  favorite.setAttribute("aria-pressed", debugTuneFavoriteKeys.has(key) ? "true" : "false");
+  favorite.addEventListener("click", () => toggleDebugTuneFavorite(key));
+
+  label.append(labelText, favorite);
 
   const controls = document.createElement("div");
   controls.className = "debug-tuning-controls";
@@ -12072,7 +12420,8 @@ function createDebugTuneRow(key, config) {
 
   controls.append(range, number, reset);
   row.append(label, controls);
-  debugTuneControls.set(key, { row, range, number });
+  debugTuneControls.set(key, { row, range, number, favorite });
+  syncDebugTuneFavoriteControl(key);
   return row;
 }
 
@@ -12161,11 +12510,30 @@ function nudgeDebugTuningPanelWidth(delta) {
 }
 
 function bindDebugTuningPanel() {
+  installDebugTuneApi();
   buildDebugTuningPanel();
   debugTuningResetAllButton?.addEventListener("click", () => resetAllDebugTuneValues());
   debugTuningCopyButton?.addEventListener("click", () => {
     copyDebugTuneSnapshot();
   });
+  debugTuningCopyCodeButton?.addEventListener("click", () => {
+    copyDebugTuneCodeSnapshot();
+  });
+  debugTuningSearchInput?.addEventListener("input", () => {
+    debugTuneFilterState.query = debugTuningSearchInput.value;
+    applyDebugTuneFilters();
+  });
+  debugTuningFavoritesOnlyButton?.addEventListener("click", () => {
+    debugTuneFilterState.favoritesOnly = !debugTuneFilterState.favoritesOnly;
+    applyDebugTuneFilters();
+  });
+  debugTuningPresetSaveButton?.addEventListener("click", saveCurrentDebugTunePreset);
+  debugTuningPresetLoadButton?.addEventListener("click", loadSelectedDebugTunePreset);
+  debugTuningPresetDeleteButton?.addEventListener("click", deleteSelectedDebugTunePreset);
+  debugTuningPresetSelect?.addEventListener("change", () => {
+    if (debugTuningPresetNameInput) debugTuningPresetNameInput.value = debugTuningPresetSelect.value;
+  });
+  refreshDebugTunePresetSelect();
   setDebugTuningPanelWidth(debugTuningPanelDefaultWidth);
   debugTuningResizeHandle?.addEventListener("pointerdown", beginDebugTuningResize);
   debugTuningResizeHandle?.addEventListener("keydown", (event) => {
@@ -12276,19 +12644,7 @@ function bindDebugConsole() {
     }
   });
 
-  window.jetDashDebugTune = {
-    keys: () => Object.keys(debugTuneRegistry),
-    get: (key) => getDebugTuneValue(key),
-    set: (key, value) => setDebugTuneValue(key, Number(value)),
-    snapshot: () => createDebugTuneSnapshot(),
-    reset: (key) => {
-      if (!key || key === "all") {
-        resetAllDebugTuneValues();
-        return { ok: true, message: "all reset" };
-      }
-      return resetDebugTuneValue(key);
-    },
-  };
+  installDebugTuneApi();
 }
 
 function submitDebugConsoleInput() {

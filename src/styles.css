@@ -1017,6 +1017,7 @@ body.is-resizing-debug-tuning {
   position: sticky;
   top: -10px;
   z-index: 2;
+  align-items: flex-start;
   margin: -10px -10px 8px;
   padding: 9px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
@@ -1110,6 +1111,8 @@ body.is-resizing-debug-tuning {
 
 .debug-tuning-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 4px;
 }
 
@@ -1119,6 +1122,56 @@ body.is-resizing-debug-tuning {
   padding: 0 6px;
   border-radius: 5px;
   font-size: 0.6rem;
+}
+
+.debug-tuning-tools {
+  display: grid;
+  gap: 6px;
+  padding: 0 0 6px;
+}
+
+.debug-tuning-filter,
+.debug-tuning-presets {
+  display: grid;
+  gap: 5px;
+}
+
+.debug-tuning-filter {
+  grid-template-columns: minmax(0, 1fr) 72px;
+}
+
+.debug-tuning-presets {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) repeat(3, minmax(46px, auto));
+}
+
+.debug-tuning-filter input,
+.debug-tuning-presets input,
+.debug-tuning-presets select {
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(120, 214, 255, 0.24);
+  border-radius: 5px;
+  background: rgba(4, 13, 22, 0.48);
+  color: #effaff;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.debug-tuning-filter button,
+.debug-tuning-presets button,
+.debug-tuning-favorite {
+  min-height: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 0.58rem;
+}
+
+.debug-tuning-filter button.is-active,
+.debug-tuning-favorite.is-active {
+  border-color: rgba(255, 211, 68, 0.7);
+  background: rgba(255, 211, 68, 0.92);
+  color: #1a1200;
 }
 
 .debug-tuning-controls button {
@@ -1185,9 +1238,15 @@ body.is-resizing-debug-tuning {
 
 .debug-tuning-label {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
+}
+
+.debug-tuning-label-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
 }
 
 .debug-tuning-label span {
@@ -1201,6 +1260,12 @@ body.is-resizing-debug-tuning {
   font-size: 0.56rem;
   font-weight: 700;
   overflow-wrap: anywhere;
+}
+
+.debug-tuning-favorite {
+  width: 34px;
+  min-width: 34px;
+  color: rgba(241, 249, 255, 0.7);
 }
 
 .debug-tuning-controls {
@@ -1246,8 +1311,33 @@ body.is-resizing-debug-tuning {
   color: #ffb3b3;
 }
 
+.debug-tuning-status[data-state="manual"] {
+  border-color: rgba(255, 211, 68, 0.36);
+  color: #ffdf7a;
+}
+
 .tuning-panel:not(:hover):not(:focus-within):not(.is-resizing) .debug-tuning-status {
   background: rgba(4, 13, 22, 0.12);
+}
+
+.debug-tuning-output {
+  width: 100%;
+  min-height: 72px;
+  max-height: 140px;
+  padding: 7px;
+  border: 1px solid rgba(120, 214, 255, 0.2);
+  border-radius: 5px;
+  background: rgba(4, 13, 22, 0.54);
+  color: rgba(241, 249, 255, 0.82);
+  font-family: "Consolas", "SFMono-Regular", monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.debug-tuning-output.hidden {
+  display: none;
 }
 
 .tuning-panel .debug-tuning-groups {
@@ -1284,6 +1374,10 @@ body.is-resizing-debug-tuning {
   .tuning-panel .debug-tuning-controls button {
     width: 40px;
     min-width: 40px;
+  }
+
+  .debug-tuning-presets {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) repeat(3, minmax(50px, auto));
   }
 }
 
@@ -2694,6 +2788,14 @@ body.touch-enabled:not(.portrait-touch) .dash-chain-feedback {
 
   .debug-tuning-actions {
     display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .debug-tuning-filter {
+    grid-template-columns: minmax(0, 1fr) 66px;
+  }
+
+  .debug-tuning-presets {
     grid-template-columns: 1fr 1fr;
   }
 

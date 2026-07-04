@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=exp123e-play-feel-tuning" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp123f-tuning-preset-tools" />
     <script type="importmap">
       {
         "imports": {
@@ -59,7 +59,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-123E: 플레이 감각 튜닝값 확장.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-123F: 튜닝 프리셋 관리.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -541,10 +541,25 @@
         <strong>TUNING</strong>
         <div class="debug-tuning-actions">
           <button id="debug-tuning-copy" type="button">Copy</button>
+          <button id="debug-tuning-copy-code" type="button">Copy Code</button>
           <button id="debug-tuning-reset-all" type="button">Reset All</button>
           <button type="button" data-close-panel="debug-tuning" aria-label="Close debug tuning panel">x</button>
         </div>
       </div>
+      <div class="debug-tuning-tools">
+        <div class="debug-tuning-filter">
+          <input id="debug-tuning-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search" aria-label="Search tuning values" />
+          <button id="debug-tuning-favorites-only" type="button" aria-pressed="false">Fav Only</button>
+        </div>
+        <div class="debug-tuning-presets">
+          <input id="debug-tuning-preset-name" type="text" autocomplete="off" spellcheck="false" maxlength="36" placeholder="Preset" aria-label="Tuning preset name" />
+          <select id="debug-tuning-preset-select" aria-label="Saved tuning presets"></select>
+          <button id="debug-tuning-preset-save" type="button">Save</button>
+          <button id="debug-tuning-preset-load" type="button">Load</button>
+          <button id="debug-tuning-preset-delete" type="button">Delete</button>
+        </div>
+      </div>
+      <textarea id="debug-tuning-output" class="debug-tuning-output hidden" readonly aria-label="Copied tuning values"></textarea>
       <div id="debug-tuning-groups" class="debug-tuning-groups"></div>
       <output id="debug-tuning-status" class="debug-tuning-status">Session only</output>
     </section>
@@ -640,6 +655,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js?v=exp123e-play-feel-tuning"></script>
+    <script type="module" src="./src/main.js?v=exp123f-tuning-preset-tools"></script>
   </body>
 </html>
