@@ -647,8 +647,12 @@ const debugTuneGroupOrder = Object.freeze([
   "Boost",
   "Jump",
   "Quickstep",
+  "Gameplay",
+  "DNA",
+  "Collision",
   "Dash Combo",
   "Overdrive",
+  "Harbor Impact",
   "Run Camera",
   "Boost Camera",
   "Camera",
@@ -738,6 +742,32 @@ const debugTuneDefaults = Object.freeze({
   "quickstep.fovAdd": 1.5,
   "quickstep.afterimageBlurRadius": quickStepAfterimageBlurRadius,
   "quickstep.afterimageIntensity": quickStepAfterimageBlurIntensity,
+  "gameplay.dnaScore": 100,
+  "gameplay.obstaclePenalty": 1000,
+  "gameplay.hitCooldown": 1.2,
+  "gameplay.hitStun": 1,
+  "gameplay.groundSnapDistance": 1.35,
+  "dna.collectRadius": 1.42,
+  "dna.looseCollectRadius": 1.45,
+  "dna.looseCollectDelay": 0.65,
+  "dna.looseLifetime": 8,
+  "dna.looseGravity": 30,
+  "dna.looseBounce": 0.42,
+  "collision.playerRadiusScale": 0.72,
+  "collision.topGrace": 0.12,
+  "collision.hitPushbackZ": 3.2,
+  "collision.hitBounceY": 9.5,
+  "collision.hitSideKick": 7.5,
+  "harborImpact.cameraShakeDuration": 0.42,
+  "harborImpact.cameraShakeStrength": 0.44,
+  "harborImpact.cameraShakeNearDistance": 140,
+  "harborImpact.cameraShakeMaxDistance": 620,
+  "harborImpact.dustCount": 10,
+  "harborImpact.debrisCount": 7,
+  "harborImpact.sparkCount": 9,
+  "harborImpact.gravityDust": 4.2,
+  "harborImpact.gravitySpark": 18,
+  "harborImpact.gravityDebris": 24,
   "jet.bloomBlurRadius": jetEnergyBloomBlurRadius,
   "jet.boostLightMaxIntensity": jetBoostLightMaxIntensity,
 });
@@ -815,6 +845,32 @@ const debugTuneRegistry = Object.freeze({
   "quickstep.fovAdd": { group: "Quickstep", label: "FOV Add", min: 0, max: 6, step: 0.25, precision: 2 },
   "quickstep.afterimageBlurRadius": { group: "Quickstep", label: "Afterimage Blur Radius", min: 0, max: 60, step: 0.5, precision: 2 },
   "quickstep.afterimageIntensity": { group: "Quickstep", label: "Afterimage Intensity", min: 0, max: 3, step: 0.05, precision: 3 },
+  "gameplay.dnaScore": { group: "Gameplay", label: "DNA Score", min: 0, max: 1000, step: 25, precision: 0 },
+  "gameplay.obstaclePenalty": { group: "Gameplay", label: "Obstacle Penalty", min: 0, max: 5000, step: 100, precision: 0 },
+  "gameplay.hitCooldown": { group: "Gameplay", label: "Hit Cooldown", min: 0, max: 4, step: 0.05, precision: 3 },
+  "gameplay.hitStun": { group: "Gameplay", label: "Hit Stun", min: 0, max: 4, step: 0.05, precision: 3 },
+  "gameplay.groundSnapDistance": { group: "Gameplay", label: "Ground Snap", min: 0.1, max: 4, step: 0.05, precision: 3 },
+  "dna.collectRadius": { group: "DNA", label: "Collect Radius", min: 0.4, max: 4, step: 0.05, precision: 3 },
+  "dna.looseCollectRadius": { group: "DNA", label: "Loose Collect Radius", min: 0.4, max: 4, step: 0.05, precision: 3 },
+  "dna.looseCollectDelay": { group: "DNA", label: "Loose Collect Delay", min: 0, max: 3, step: 0.05, precision: 3 },
+  "dna.looseLifetime": { group: "DNA", label: "Loose Lifetime", min: 1, max: 20, step: 0.25, precision: 2 },
+  "dna.looseGravity": { group: "DNA", label: "Loose Gravity", min: 0, max: 80, step: 1, precision: 2 },
+  "dna.looseBounce": { group: "DNA", label: "Loose Bounce", min: 0, max: 1.2, step: 0.02, precision: 3 },
+  "collision.playerRadiusScale": { group: "Collision", label: "Player Radius Scale", min: 0.1, max: 1.5, step: 0.02, precision: 3 },
+  "collision.topGrace": { group: "Collision", label: "Top Grace", min: 0, max: 1.2, step: 0.02, precision: 3 },
+  "collision.hitPushbackZ": { group: "Collision", label: "Hit Pushback Z", min: 0, max: 12, step: 0.25, precision: 2 },
+  "collision.hitBounceY": { group: "Collision", label: "Hit Bounce Y", min: 0, max: 24, step: 0.25, precision: 2 },
+  "collision.hitSideKick": { group: "Collision", label: "Hit Side Kick", min: 0, max: 24, step: 0.25, precision: 2 },
+  "harborImpact.cameraShakeDuration": { group: "Harbor Impact", label: "Shake Duration", min: 0, max: 2, step: 0.02, precision: 3 },
+  "harborImpact.cameraShakeStrength": { group: "Harbor Impact", label: "Shake Strength", min: 0, max: 2, step: 0.02, precision: 3 },
+  "harborImpact.cameraShakeNearDistance": { group: "Harbor Impact", label: "Shake Near Dist", min: 0, max: 800, step: 10, precision: 0 },
+  "harborImpact.cameraShakeMaxDistance": { group: "Harbor Impact", label: "Shake Max Dist", min: 80, max: 2000, step: 10, precision: 0 },
+  "harborImpact.dustCount": { group: "Harbor Impact", label: "Dust Count", min: 0, max: 60, step: 1, precision: 0 },
+  "harborImpact.debrisCount": { group: "Harbor Impact", label: "Debris Count", min: 0, max: 40, step: 1, precision: 0 },
+  "harborImpact.sparkCount": { group: "Harbor Impact", label: "Spark Count", min: 0, max: 80, step: 1, precision: 0 },
+  "harborImpact.gravityDust": { group: "Harbor Impact", label: "Dust Gravity", min: 0, max: 40, step: 0.5, precision: 2 },
+  "harborImpact.gravitySpark": { group: "Harbor Impact", label: "Spark Gravity", min: 0, max: 80, step: 0.5, precision: 2 },
+  "harborImpact.gravityDebris": { group: "Harbor Impact", label: "Debris Gravity", min: 0, max: 80, step: 0.5, precision: 2 },
   "jet.bloomBlurRadius": { group: "JET VFX", label: "Bloom Blur Radius", min: 0, max: 8, step: 0.05, precision: 3 },
   "jet.boostLightMaxIntensity": { group: "JET VFX", label: "Boost Light Intensity", min: 0, max: 100, step: 1, precision: 2 },
 });
@@ -1266,8 +1322,6 @@ const debugSuperBoostSpeed = 2000 / speedDisplayScale;
 const seaLevelY = -8.2;
 const waterPlaneBaseSize = 14000;
 const waterPlaneZMargin = 1800;
-const dnaScoreValue = 100;
-const obstacleScorePenalty = 1000;
 const dashPadChainClimaxStartProgress = 0.5;
 const dashPadChainClimaxEndProgress = 0.7;
 const dashPadThreeLineDnaSuppressRadius = 65;
@@ -1275,8 +1329,6 @@ const dashPadSingleLineDnaAlignRadius = 65;
 const dashPadDnaLineBreakRadius = 34;
 const dashPadDnaLaneAlignEpsilon = 0.05;
 const openingTrailerEndHoldMs = 650;
-const hitStunDuration = 1;
-const groundSnapDistance = 1.35;
 const jetModelBaseY = 1.14;
 const jetFootGroundClearance = 0.015;
 const dashPadPlacements = currentStage.dashPads;
@@ -10183,17 +10235,17 @@ function triggerHarborImpactCameraShake(event) {
   const distance = Math.abs(player.position.z - event.z);
   const distanceFactor = 1 - THREE.MathUtils.smoothstep(
     distance,
-    harborImpactEffectConfig.cameraShakeNearDistance,
-    harborImpactEffectConfig.cameraShakeMaxDistance,
+    getHarborImpactCameraShakeNearDistance(),
+    getHarborImpactCameraShakeMaxDistance(),
   );
   if (distanceFactor <= 0) return;
 
   const speedFactor = THREE.MathUtils.lerp(0.62, 1, THREE.MathUtils.clamp(getHorizontalSpeed() / getBoostTopSpeed(), 0, 1));
-  harborImpactCameraShake.duration = harborImpactEffectConfig.cameraShakeDuration;
+  harborImpactCameraShake.duration = getHarborImpactCameraShakeDuration();
   harborImpactCameraShake.timer = Math.max(harborImpactCameraShake.timer, harborImpactCameraShake.duration);
   harborImpactCameraShake.strength = Math.max(
     harborImpactCameraShake.strength,
-    harborImpactEffectConfig.cameraShakeStrength * distanceFactor * speedFactor * (event.impactShakeScale ?? 1),
+    getHarborImpactCameraShakeStrength() * distanceFactor * speedFactor * (event.impactShakeScale ?? 1),
   );
   harborImpactCameraShake.phase = event.phase ?? harborImpactCameraShake.phase;
 }
@@ -10207,9 +10259,9 @@ function triggerHarborDropImpact(event) {
   const halfWidth = cargoWidth * 0.5;
   const impactScale = Math.max(1, event.impactScale ?? 1);
   const impactBoost = THREE.MathUtils.clamp(impactScale - 1, 0, 1);
-  const dustCount = Math.round(harborImpactEffectConfig.dustCount * THREE.MathUtils.lerp(1, 1.55, impactBoost));
-  const debrisCount = Math.round(harborImpactEffectConfig.debrisCount * THREE.MathUtils.lerp(1, 1.35, impactBoost));
-  const sparkCount = Math.round(harborImpactEffectConfig.sparkCount * THREE.MathUtils.lerp(1, 1.55, impactBoost));
+  const dustCount = Math.round(getHarborImpactDustCount() * THREE.MathUtils.lerp(1, 1.55, impactBoost));
+  const debrisCount = Math.round(getHarborImpactDebrisCount() * THREE.MathUtils.lerp(1, 1.35, impactBoost));
+  const sparkCount = Math.round(getHarborImpactSparkCount() * THREE.MathUtils.lerp(1, 1.55, impactBoost));
   const dustLiftScale = THREE.MathUtils.lerp(1, 1.85, impactBoost);
   const sparkLiftScale = THREE.MathUtils.lerp(1, 1.32, impactBoost);
   const dustLifeScale = THREE.MathUtils.lerp(1, 1.42, impactBoost);
@@ -10320,7 +10372,7 @@ function updateHarborImpactEffects(dt) {
 
     const age = 1 - effect.life / effect.maxLife;
     const fade = THREE.MathUtils.clamp(effect.life / effect.maxLife, 0, 1);
-    const gravity = effect.type === "dust" ? 4.2 : effect.type === "spark" ? 18 : 24;
+    const gravity = getHarborImpactParticleGravity(effect.type);
     effect.velocity.y -= gravity * dt;
     effect.localPosition.addScaledVector(effect.velocity, dt);
     effect.rotationZ += (effect.spin.z + effect.spin.x * 0.35) * dt;
@@ -11950,6 +12002,104 @@ function getJumpGravityUp() {
 
 function getJumpGravityDown() {
   return getDebugTuneValue("jump.gravityDown");
+}
+
+function getDnaScoreValue() {
+  return getIntegerDebugTuneValue("gameplay.dnaScore");
+}
+
+function getObstacleScorePenalty() {
+  return getIntegerDebugTuneValue("gameplay.obstaclePenalty");
+}
+
+function getHitCooldownDuration() {
+  return getDebugTuneValue("gameplay.hitCooldown");
+}
+
+function getHitStunDuration() {
+  return getDebugTuneValue("gameplay.hitStun");
+}
+
+function getGroundSnapDistance() {
+  return getDebugTuneValue("gameplay.groundSnapDistance");
+}
+
+function getDnaCollectRadius() {
+  return getDebugTuneValue("dna.collectRadius");
+}
+
+function getLooseDnaCollectRadius() {
+  return getDebugTuneValue("dna.looseCollectRadius");
+}
+
+function getLooseDnaCollectDelay() {
+  return getDebugTuneValue("dna.looseCollectDelay");
+}
+
+function getLooseDnaLifetime() {
+  return getDebugTuneValue("dna.looseLifetime");
+}
+
+function getLooseDnaGravity() {
+  return getDebugTuneValue("dna.looseGravity");
+}
+
+function getLooseDnaBounce() {
+  return getDebugTuneValue("dna.looseBounce");
+}
+
+function getCollisionPlayerRadiusScale() {
+  return getDebugTuneValue("collision.playerRadiusScale");
+}
+
+function getCollisionTopGrace() {
+  return getDebugTuneValue("collision.topGrace");
+}
+
+function getCollisionHitPushbackZ() {
+  return getDebugTuneValue("collision.hitPushbackZ");
+}
+
+function getCollisionHitBounceY() {
+  return getDebugTuneValue("collision.hitBounceY");
+}
+
+function getCollisionHitSideKick() {
+  return getDebugTuneValue("collision.hitSideKick");
+}
+
+function getHarborImpactCameraShakeDuration() {
+  return getDebugTuneValue("harborImpact.cameraShakeDuration");
+}
+
+function getHarborImpactCameraShakeStrength() {
+  return getDebugTuneValue("harborImpact.cameraShakeStrength");
+}
+
+function getHarborImpactCameraShakeNearDistance() {
+  return getDebugTuneValue("harborImpact.cameraShakeNearDistance");
+}
+
+function getHarborImpactCameraShakeMaxDistance() {
+  return getDebugTuneValue("harborImpact.cameraShakeMaxDistance");
+}
+
+function getHarborImpactDustCount() {
+  return getIntegerDebugTuneValue("harborImpact.dustCount");
+}
+
+function getHarborImpactDebrisCount() {
+  return getIntegerDebugTuneValue("harborImpact.debrisCount");
+}
+
+function getHarborImpactSparkCount() {
+  return getIntegerDebugTuneValue("harborImpact.sparkCount");
+}
+
+function getHarborImpactParticleGravity(type) {
+  if (type === "dust") return getDebugTuneValue("harborImpact.gravityDust");
+  if (type === "spark") return getDebugTuneValue("harborImpact.gravitySpark");
+  return getDebugTuneValue("harborImpact.gravityDebris");
 }
 
 function updateDebugTuningStatus(message, state = "") {
@@ -13782,7 +13932,7 @@ function snapToGround() {
 
     const groundY = sample.y + player.radius;
     const distanceToGround = player.position.y - groundY;
-    const canSnapDown = player.velocity.y <= 0 && distanceToGround <= groundSnapDistance;
+    const canSnapDown = player.velocity.y <= 0 && distanceToGround <= getGroundSnapDistance();
 
     if (player.position.y <= groundY || canSnapDown) {
       player.position.y = groundY;
@@ -14168,7 +14318,7 @@ function updateLooseDnaItems(dt) {
   for (let i = looseDnaItems.length - 1; i >= 0; i -= 1) {
     const loose = looseDnaItems[i];
     loose.age += dt;
-    loose.velocity.y -= 30 * dt;
+    loose.velocity.y -= getLooseDnaGravity() * dt;
     loose.localPosition.addScaledVector(loose.velocity, dt);
     loose.spinAngle += dt * loose.spin * 1.4;
 
@@ -14176,7 +14326,7 @@ function updateLooseDnaItems(dt) {
     if (sample && loose.localPosition.y <= sample.y + 0.46) {
       loose.localPosition.y = sample.y + 0.46;
       if (loose.velocity.y < 0) {
-        loose.velocity.y *= -0.42;
+        loose.velocity.y *= -getLooseDnaBounce();
       }
       loose.velocity.x *= Math.exp(-2.8 * dt);
       loose.velocity.z *= Math.exp(-2.8 * dt);
@@ -14184,16 +14334,16 @@ function updateLooseDnaItems(dt) {
 
     setStageObjectTransform(loose.mesh, loose.localPosition, loose.spinAngle);
 
-    if (loose.age > loose.collectDelay && loose.localPosition.distanceTo(player.position) < 1.45) {
+    if (loose.age > loose.collectDelay && loose.localPosition.distanceTo(player.position) < getLooseDnaCollectRadius()) {
       collectedDna += 1;
-      addScore(dnaScoreValue);
+      addScore(getDnaScoreValue());
       restoreBoostGauge(getDnaBoostGaugeGain());
       scene.remove(loose.mesh);
       looseDnaItems.splice(i, 1);
       continue;
     }
 
-    if (loose.age > 8 || loose.localPosition.y < -14) {
+    if (loose.age > getLooseDnaLifetime() || loose.localPosition.y < -14) {
       scene.remove(loose.mesh);
       looseDnaItems.splice(i, 1);
     }
@@ -14203,11 +14353,11 @@ function updateLooseDnaItems(dt) {
 function checkDnaCollection() {
   for (const dna of dnaItems) {
     if (dna.collected) continue;
-    if (dna.localPosition.distanceTo(player.position) < 1.42) {
+    if (dna.localPosition.distanceTo(player.position) < getDnaCollectRadius()) {
       dna.collected = true;
       hideDnaInstance(dna);
       collectedDna += 1;
-      addScore(dnaScoreValue);
+      addScore(getDnaScoreValue());
       restoreBoostGauge(getDnaBoostGaugeGain());
     }
   }
@@ -14227,8 +14377,9 @@ function checkObstacleCollision() {
   for (const obstacle of obstacles) {
     const dx = Math.abs(player.position.x - obstacle.position.x);
     const dz = Math.abs(player.position.z - obstacle.position.z);
-    const horizontalHit = dx < obstacle.size.x * 0.5 + player.radius * 0.72
-      && dz < obstacle.size.z * 0.5 + player.radius * 0.72;
+    const collisionRadius = player.radius * getCollisionPlayerRadiusScale();
+    const horizontalHit = dx < obstacle.size.x * 0.5 + collisionRadius
+      && dz < obstacle.size.z * 0.5 + collisionRadius;
 
     if (!horizontalHit) continue;
 
@@ -14238,7 +14389,7 @@ function checkObstacleCollision() {
 
     const obstacleTop = obstacle.position.y + obstacle.size.y * 0.5;
     const playerBottom = player.position.y - player.radius;
-    if (playerBottom > obstacleTop - 0.12) continue;
+    if (playerBottom > obstacleTop - getCollisionTopGrace()) continue;
 
     handleObstacleHit(obstacle);
     break;
@@ -14246,18 +14397,18 @@ function checkObstacleCollision() {
 }
 
 function handleObstacleHit(obstacle) {
-  hitCooldown = 1.2;
-  hitStun = hitStunDuration;
-  addScore(-obstacleScorePenalty);
+  hitCooldown = getHitCooldownDuration();
+  hitStun = getHitStunDuration();
+  addScore(-getObstacleScorePenalty());
   dashPadBoostStartSpeed = 0;
   dashPadBoostRemaining = 0;
   resetDashPadChain();
   quickStepQueued = 0;
   quickStepTimer = 0;
-  player.position.z = Math.min(player.position.z + 3.2, stageStartZ + 8);
+  player.position.z = Math.min(player.position.z + getCollisionHitPushbackZ(), stageStartZ + 8);
   player.velocity.z = Math.max(player.velocity.z, 12);
-  player.velocity.y = Math.max(player.velocity.y, 9.5);
-  player.velocity.x += Math.sign(player.position.x - obstacle.position.x || 1) * 7.5;
+  player.velocity.y = Math.max(player.velocity.y, getCollisionHitBounceY());
+  player.velocity.x += Math.sign(player.position.x - obstacle.position.x || 1) * getCollisionHitSideKick();
   jumpImpact = 1;
   obstacle.mesh.scale.set(1.2, 1.08, 1.2);
   setTimeout(() => obstacle.mesh.scale.set(1, 1, 1), 120);
@@ -14296,7 +14447,7 @@ function dropCollectedDna() {
         Math.sin(angle) * burstSpeed - Math.random() * 6,
       ),
       age: 0,
-      collectDelay: 0.65,
+      collectDelay: getLooseDnaCollectDelay(),
       spin: 5 + Math.random() * 6,
       spinAngle: 0,
     });

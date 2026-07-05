@@ -1,30 +1,55 @@
-# JetDashAdventure_DX
+# JetDashAdventure_DX Playtest
 
-A Three.js high-speed 3D platformer prototype inspired by Sonic-style stage flow. It includes a procedural blue speedster character, a tutorial stage, a curved Stage 1, a Gwangan Bridge-themed Stage 2 over open sea with 100 m bridge streetlights that extends into a coastal Busan skyline and Shinseondae underpass route, a straight Busan harbor-style Stage 3, shard collection, score tracking, jump pads, boost gauge management, a snappy obstacle-clearing jump, a closer fixed-center camera, obstacles, and dropped shards.
+Three.js 기반 3D 고속 플랫폼러 프로토타입 플레이테스트 빌드.
 
-## Run
+이 저장소는 공개 플레이 테스트용 실행 파일 중심으로 유지한다. 기획 문서, 실험 로그, 원본 작업 기록은 private/source 저장소에서 관리한다.
+
+## 현재 공개 플레이
+
+- 현재 버전 표기: `v0.001`
+- 실행 코드: `EXP-123H - 게임플레이 피드백 튜닝값 확장`
+- 공개 플레이 스테이지: Stage 1, Stage 2
+- Stage 1: 부산 해안, 광안대교, 해운대, 터널 느낌의 루트
+- Stage 2: 부산항을 모티브로 한 항구 루트
+- 주요 시스템: DNA 수집, 부스트, 퀵스텝, 대시패드, 대시콤보, 그래픽 옵션, 모바일 터치 조작, 디버그 TUNING 패널
+
+## 실행
+
+정적 Three.js 프로젝트이므로 HTTP 서버로 실행한다.
 
 ```powershell
-python -m http.server 4173
+python -m http.server 4178
 ```
 
-Open `http://localhost:4173` in your browser.
+브라우저에서 아래 주소를 연다.
 
-## Controls
+```text
+http://127.0.0.1:4178/
+```
 
-- `A`, `D` / `Left`, `Right`: move sideways
-- `Q`: quick dash left with almost no chain delay
-- `E`: quick dash right with almost no chain delay
-- `W` / `Up`: run forward
-- `S` / `Down`: brake; hold near a stop to reverse slowly
-- `Space`: jump
-- Hold `Space`: jump higher
-- `Shift`: boost while spending gauge
-- `M`: toggle stage BGM. Stage 2 uses `assets/audio/Salt_and_Steel.mp3`; other stages use `assets/audio/The_Final_Straightaway.mp3`.
-- `R`: restart
-- `1`: refill boost gauge for testing
-- `TUTORIAL`, `STAGE 1`, `STAGE 2`, `STAGE 3` buttons: jump directly to a stage
+스테이지를 바로 지정하려면 예를 들어 아래처럼 실행한다.
 
-Shards, dash pads, and obstacles are arranged around three lanes: left, center, and right. Shards restore 5 boost gauge each. Boost tops out at 300 displayed speed. Dash pads add exactly 100 displayed speed on top of the current speed, then fade back over 3 seconds. Total player speed is capped at 400. Hitting an obstacle knocks the character back and drops all currently held shards onto the track. The tutorial introduces movement, quick step, jump, dash pads, and boost before the main stages. Clearing Stage 1 unlocks Stage 2, and clearing Stage 2 unlocks Stage 3 with the current score carried over.
+```text
+http://127.0.0.1:4178/?stage=1
+http://127.0.0.1:4178/?stage=2
+```
 
-The HUD progress value shows the current position from stage start `0%` to the goal `100%`, which makes it easier to describe exact stage sections during iteration.
+## 기본 조작
+
+- `W` / `Up`: 전진
+- `S` / `Down`: 감속 / 후진
+- `A`, `D` / `Left`, `Right`: 좌우 이동
+- `Q`, `E`: 좌우 퀵스텝
+- `Space`: 점프
+- `Shift`: 부스트
+- `P` / `Esc`: 일시정지
+- `I`, `J`, `K`, `L`: 수동 카메라 회전
+- `O`: 카메라 초기화
+- `U`: 디버그 초고속 부스트
+- 숫자키: 디버그 진행도 워프
+
+## 테스트 메모
+
+- public/playtest 로컬 검증 포트는 `4178`로 고정한다.
+- private/source 로컬 실험 포트는 `4177`로 고정한다.
+- 브라우저 캐시가 남을 수 있으므로 테스트 URL에는 `?v=<test-name>` 쿼리를 붙여 확인한다.
