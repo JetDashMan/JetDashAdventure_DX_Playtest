@@ -54,6 +54,28 @@ const debugTuningPresetSaveButton = document.querySelector("#debug-tuning-preset
 const debugTuningPresetLoadButton = document.querySelector("#debug-tuning-preset-load");
 const debugTuningPresetDeleteButton = document.querySelector("#debug-tuning-preset-delete");
 const debugTuningOutputEl = document.querySelector("#debug-tuning-output");
+const debugMapEditorPanel = document.querySelector("#debug-map-editor-panel");
+const debugMapEditorOpenButton = document.querySelector("#debug-map-editor-open");
+const mapEditorStageSelect = document.querySelector("#map-editor-stage");
+const mapEditorProgressInput = document.querySelector("#map-editor-progress");
+const mapEditorProgressValueEl = document.querySelector("#map-editor-progress-value");
+const mapEditorViewSelect = document.querySelector("#map-editor-view");
+const mapEditorModeButtons = document.querySelectorAll("[data-map-editor-mode]");
+const mapEditorModeStatusEl = document.querySelector("#map-editor-mode-status");
+const mapEditorEditSelectedEl = document.querySelector("#map-editor-edit-selected");
+const mapEditorEditXInput = document.querySelector("#map-editor-edit-x");
+const mapEditorEditYInput = document.querySelector("#map-editor-edit-y");
+const mapEditorEditZInput = document.querySelector("#map-editor-edit-z");
+const mapEditorEditStepInput = document.querySelector("#map-editor-edit-step");
+const mapEditorNudgeButtons = document.querySelectorAll("[data-map-editor-nudge-axis]");
+const mapEditorResetPositionButton = document.querySelector("#map-editor-reset-position");
+const mapEditorChangeListEl = document.querySelector("#map-editor-change-list");
+const mapEditorStatusEl = document.querySelector("#map-editor-status");
+const mapEditorDetailsEl = document.querySelector("#map-editor-details");
+const mapEditorOutputEl = document.querySelector("#map-editor-output");
+const mapEditorCopyButton = document.querySelector("#map-editor-copy");
+const mapEditorHideButton = document.querySelector("#map-editor-hide");
+const mapEditorResetHiddenButton = document.querySelector("#map-editor-reset-hidden");
 const helpButton = document.querySelector("#help-toggle");
 const helpPanel = document.querySelector("#help-panel");
 const menuButton = document.querySelector("#menu-toggle");
@@ -1283,6 +1305,8 @@ postScene.add(postQuad);
 const clock = new THREE.Clock();
 const mouseObjectRaycaster = new THREE.Raycaster();
 const mouseObjectPointer = new THREE.Vector2();
+const mapEditorRaycaster = new THREE.Raycaster();
+const mapEditorPointer = new THREE.Vector2();
 const mouseObjectPointerState = {
   active: false,
   clientX: 0,
@@ -1363,9 +1387,68 @@ const launchPads = [];
 // Obstacle position is stage-local for gameplay; basePosition/baseQuaternion are world-space render anchors.
 const obstacles = [];
 const looseDnaItems = [];
+const mapEditorObjects = [];
+const mapEditorObjectById = new Map();
+const mapEditorHiddenObjectIds = new Set();
 const quickStepAfterimages = [];
 const staticStageFrameCache = new Map();
 const staticStageSceneryFrameCache = new Map();
+const mapEditorBox = new THREE.Box3();
+const mapEditorCenter = new THREE.Vector3();
+const mapEditorSize = new THREE.Vector3();
+const mapEditorCameraTarget = new THREE.Vector3();
+const mapEditorCameraOffset = new THREE.Vector3();
+const mapEditorLocalPositionScratch = new THREE.Vector3();
+const mapEditorBaseWorldPositionScratch = new THREE.Vector3();
+const mapEditorNextWorldPositionScratch = new THREE.Vector3();
+const mapEditorViewPresets = {
+  angled: {
+    yaw: THREE.MathUtils.degToRad(38),
+    pitch: THREE.MathUtils.degToRad(48),
+    distance: 250,
+  },
+  top: {
+    yaw: 0,
+    pitch: THREE.MathUtils.degToRad(86),
+    distance: 330,
+  },
+  side: {
+    yaw: THREE.MathUtils.degToRad(90),
+    pitch: THREE.MathUtils.degToRad(36),
+    distance: 230,
+  },
+  follow: {
+    yaw: 0,
+    pitch: THREE.MathUtils.degToRad(34),
+    distance: 132,
+  },
+};
+const mapEditorModeStatusText = Object.freeze({
+  inspect: "Inspect",
+  edit: "Edit Position",
+  export: "Export Ready",
+});
+const mapEditorState = {
+  active: false,
+  mode: "inspect",
+  view: "angled",
+  focusProgress: getStageProgress(playerStart.z),
+  yaw: mapEditorViewPresets.angled.yaw,
+  pitch: mapEditorViewPresets.angled.pitch,
+  distance: mapEditorViewPresets.angled.distance,
+  selectedRecord: null,
+  selectionHelper: null,
+};
+const mapEditorPointerState = {
+  active: false,
+  pointerId: null,
+  button: 0,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  dragMoved: false,
+};
 const jetFootContactBox = new THREE.Box3();
 const jetFootContactInverse = new THREE.Matrix4();
 const jetFootContactMatrix = new THREE.Matrix4();
@@ -2772,6 +2855,7 @@ function init() {
   applyGraphicsSettings(false);
   syncGraphicsControls();
   syncDebugControls();
+  syncMapEditorPanel();
   resize();
   resetGame({ scoreOverride: carriedStageScore });
   activateInitialMobileFullscreenRecovery();
@@ -4042,6 +4126,7 @@ function addGwangalliBeachEnvironment() {
   addGwangalliCoastalLandmarks();
   addYonghoBayLandmarkScenery();
   addGwangalliMidwayResidentialCorridor();
+  addGwangalliTunnelApproachCityDensity();
   addGwangalliDenseUrbanCorridor();
   addShinseondaeTunnelApproach();
   addShinseondaeTunnel();
@@ -4249,6 +4334,14 @@ function addGwangalliRightSideCityBlocks() {
   });
 
   scene.add(group);
+  registerMapEditorObject(group, {
+    id: "stage1-right-side-city-blocks",
+    label: "Stage 1 Right Side City Blocks",
+    kind: "building-cluster",
+    source: "addGwangalliRightSideCityBlocks",
+    localPosition: { x: 200, y: seaLevelY + 0.45, z: cityZ },
+    metadata: { spacingScale, towerCount: 6 },
+  });
   addGwangalliRightSideBexco(cityZ);
 }
 
@@ -4310,6 +4403,14 @@ function addGwangalliRightSidePark(cityZ) {
   }
 
   scene.add(group);
+  registerMapEditorObject(group, {
+    id: "stage1-right-side-park",
+    label: "Stage 1 Right Side Park",
+    kind: "landmark-park",
+    source: "addGwangalliRightSidePark",
+    localPosition: { x: 104, y: seaLevelY + 0.35, z: cityZ },
+    metadata: { trees: 22, benches: 9 },
+  });
 }
 
 function addGwangalliRightSideBexco(cityZ) {
@@ -4318,6 +4419,13 @@ function addGwangalliRightSideBexco(cityZ) {
   group.scale.setScalar(0.78);
   addBexcoExhibitionCenter(group, 0, 0);
   scene.add(group);
+  registerMapEditorObject(group, {
+    id: "stage1-bexco-right-side-landmark",
+    label: "Stage 1 BEXCO Right Side Landmark",
+    kind: "landmark-building",
+    source: "addGwangalliRightSideBexco",
+    localPosition: { x: 178, y: seaLevelY + 0.62, z: cityZ },
+  });
 }
 
 function addRightCityTower(group, {
@@ -5880,6 +5988,14 @@ function addGwangalliApartmentCluster({ x, z, count, seed }) {
   }
 
   scene.add(group);
+  registerMapEditorObject(group, {
+    id: `stage1-coastal-apartment-cluster-${Math.round(Math.abs(z))}`,
+    label: `Stage 1 Coastal Apartment Cluster ${Math.round(getGoalProgressForZ(z) * 100)}%`,
+    kind: "building-cluster",
+    source: "addGwangalliApartmentCluster",
+    localPosition: { x, y: ground.y - 2.4, z },
+    metadata: { count, seed },
+  });
 }
 
 function addYonghoBayLandmarkScenery() {
@@ -5902,6 +6018,14 @@ function addYonghoBayLandmarkScenery() {
   addYonghoBayWTowers(rotatedDistrict);
 
   scene.add(group);
+  registerMapEditorObject(group, {
+    id: "stage1-yongho-bay-landmarks",
+    label: "Stage 1 Yongho Bay Landmarks",
+    kind: "landmark-district",
+    source: "addYonghoBayLandmarkScenery",
+    localPosition: { x: -178, y: seaLevelY + 0.62, z: sceneryZ },
+    metadata: { district: "yongho-bay" },
+  });
 }
 
 function addYonghoBayWTowers(group) {
@@ -6221,6 +6345,14 @@ function addGwangalliMidwayResidentialCorridor() {
     addGwangalliMidwayApartmentRow(group, rowIndex);
     addGwangalliMidwayTreeVerge(group, rowIndex);
     scene.add(group);
+    registerMapEditorObject(group, {
+      id: `stage1-midway-residential-row-${rowIndex}`,
+      label: `Stage 1 Midway Residential Row ${rowIndex}`,
+      kind: "building-row",
+      source: "addGwangalliMidwayResidentialCorridor",
+      localPosition: { x: 0, y: ground.y - 0.8, z },
+      metadata: { rowIndex, progressPercent: Math.round(getGoalProgressForZ(z) * 100) },
+    });
     rowIndex += 1;
   }
 }
@@ -6344,6 +6476,470 @@ function addGwangalliMidwayRoadsideTrees(startZ, endZ) {
   scene.add(crownMesh);
 }
 
+function addGwangalliTunnelApproachCityDensity() {
+  if (!currentStage.gwangalliTheme) return;
+
+  const tunnelStartZ = getGwangalliTunnelStartZ();
+  if (!Number.isFinite(tunnelStartZ)) return;
+
+  const startZ = getGwangalliBridgeEndZ() - 150;
+  const endZ = tunnelStartZ + 430;
+  addGwangalliApproachRoadsideDensity(startZ, endZ);
+  addGwangalliApproachOverheadSigns(startZ, endZ);
+  addGwangalliApproachDistantSkyline(startZ, endZ);
+  addGwangalliApproachRightWaterfrontDistrict(startZ, endZ);
+  addGwangalliLaunchGapUrbanBackfill();
+
+  const rowSpacing = 285;
+  let rowIndex = 0;
+  for (let z = startZ - 90; z > endZ; z -= rowSpacing) {
+    const ground = getStageDefinitionGroundSample(0, z);
+    if (!ground) {
+      rowIndex += 1;
+      continue;
+    }
+
+    const group = new THREE.Group();
+    setStageSceneryTransform(group, new THREE.Vector3(0, ground.y - 0.95, z), 0, 0, true);
+
+    for (const side of [-1, 1]) {
+      addGwangalliApproachCityBlock(group, side, rowIndex);
+    }
+
+    scene.add(group);
+    registerMapEditorObject(group, {
+      id: `stage1-tunnel-approach-urban-row-${rowIndex}`,
+      label: `Stage 1 Tunnel Approach Urban Row ${rowIndex}`,
+      kind: "building-row",
+      source: "addGwangalliTunnelApproachCityDensity",
+      localPosition: { x: 0, y: ground.y - 0.95, z },
+      metadata: { rowIndex, progressPercent: Math.round(getGoalProgressForZ(z) * 100) },
+    });
+    rowIndex += 1;
+  }
+}
+
+function addGwangalliLaunchGapUrbanBackfill() {
+  if (!currentStage.gwangalliTheme) return;
+
+  const rows = [
+    { z: -6068, x: 138, width: 156, depth: 246 },
+    { z: -6238, x: 154, width: 172, depth: 252 },
+    { z: -6370, x: 146, width: 150, depth: 214 },
+  ];
+
+  rows.forEach((row, rowIndex) => {
+    const ground = getStageDefinitionGroundSample(0, row.z);
+    if (!ground) return;
+
+    for (const side of [-1, 1]) {
+      const group = new THREE.Group();
+      const sideName = side > 0 ? "right" : "left";
+      const x = side * row.x;
+      const y = Math.max(seaLevelY + 0.4, ground.y - 1.2);
+      setStageSceneryTransform(group, new THREE.Vector3(x, y, row.z), side * 0.04, 0, true);
+
+      const foundation = new THREE.Mesh(new THREE.BoxGeometry(row.width, 1.05, row.depth), materials.coastalRock);
+      foundation.position.set(0, 0.52, 0);
+      foundation.receiveShadow = true;
+      group.add(foundation);
+
+      const innerBoulevard = new THREE.Mesh(new THREE.BoxGeometry(row.width * 0.82, 0.18, 15), materials.gwangalliBoardwalk);
+      innerBoulevard.position.set(-side * 12, 1.12, -row.depth * 0.34);
+      innerBoulevard.receiveShadow = true;
+      group.add(innerBoulevard);
+
+      const greenDeck = new THREE.Mesh(new THREE.BoxGeometry(row.width * 0.88, 0.18, 38), materials.coastalForest);
+      greenDeck.position.set(0, 1.16, row.depth * 0.29);
+      greenDeck.receiveShadow = true;
+      group.add(greenDeck);
+
+      const serviceRoad = new THREE.Mesh(new THREE.BoxGeometry(row.width * 0.76, 0.16, 12), materials.gwangalliRoadAlt);
+      serviceRoad.position.set(-side * 6, 1.14, -row.depth * 0.2);
+      serviceRoad.receiveShadow = true;
+      group.add(serviceRoad);
+
+      for (let i = 0; i < 4; i += 1) {
+        const seed = rowIndex * 31 + i * 11 + (side > 0 ? 5 : 17);
+        const blockWidth = 14 + (seed % 3) * 3;
+        const blockHeight = 8 + (seed % 4) * 2.4;
+        const blockDepth = 18 + (seed % 3) * 4;
+        const block = new THREE.Mesh(
+          new THREE.BoxGeometry(blockWidth, blockHeight, blockDepth),
+          seed % 2 === 0 ? materials.rightCityFacade : materials.gwangalliBuilding,
+        );
+        block.position.set(-row.width * 0.32 + i * 24, blockHeight * 0.5 + 1.2, -row.depth * 0.32 + (i % 2) * 24);
+        block.castShadow = false;
+        block.receiveShadow = true;
+        group.add(block);
+
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(blockWidth * 0.62, blockHeight * 0.42, 0.12), materials.rightCityGlass);
+        glass.position.set(block.position.x, block.position.y + blockHeight * 0.03, block.position.z - blockDepth * 0.5 - 0.08);
+        group.add(glass);
+      }
+
+      for (let i = 0; i < 7; i += 1) {
+        const seed = rowIndex * 43 + i * 13 + (side > 0 ? 29 : 41);
+        const towerX = -row.width * 0.4 + i * (row.width * 0.8 / 6) + ((seed % 5) - 2) * 1.6;
+        const towerZ = -row.depth * 0.02 + (i % 3) * 44 + Math.floor(i / 3) * 20;
+        const height = 48 + (seed % 9) * 7 + (rowIndex === 1 ? 18 : 0) + (i % 2) * 12;
+        const width = 12 + (seed % 4) * 2.2;
+        const depth = 15 + ((seed + i) % 4) * 2.8;
+        addGwangalliApproachSkylineTower(group, towerX, towerZ, width, depth, height, seed);
+      }
+
+      scene.add(group);
+      registerMapEditorObject(group, {
+        id: `stage1-launch-gap-${sideName}-urban-backfill-${rowIndex}`,
+        label: `Stage 1 Launch Gap ${sideName} Urban Backfill ${rowIndex}`,
+        kind: "gap-background-district",
+        source: "addGwangalliLaunchGapUrbanBackfill",
+        localPosition: { x, y, z: row.z },
+        metadata: { rowIndex, side: sideName, towerCount: 7, lowBlockCount: 4 },
+      });
+    }
+  });
+}
+
+function addGwangalliApproachRoadsideDensity(startZ, endZ) {
+  for (const side of [-1, 1]) {
+    const retainingWall = new THREE.Mesh(
+      makeContinuousSceneryVerticalBoxGeometry(side * 12.7, startZ, endZ, 0.08, 2.15, 0.38, 18),
+      materials.noiseWallConcrete,
+    );
+    retainingWall.castShadow = false;
+    retainingWall.receiveShadow = true;
+    scene.add(retainingWall);
+
+    const wallStripe = new THREE.Mesh(
+      makeContinuousSceneryVerticalBoxGeometry(side * 12.28, startZ, endZ, 1.42, 1.7, 0.14, 18),
+      materials.noiseWallGreen,
+    );
+    wallStripe.castShadow = false;
+    scene.add(wallStripe);
+
+    const serviceLane = new THREE.Mesh(
+      makeContinuousScenerySideBoxGeometry(side * 18.2, startZ, endZ, 0.14, 6.6, 0.34, 18),
+      materials.gwangalliRoadAlt,
+    );
+    serviceLane.receiveShadow = true;
+    scene.add(serviceLane);
+
+    const planter = new THREE.Mesh(
+      makeContinuousScenerySideBoxGeometry(side * 25.4, startZ, endZ, 0.28, 3.8, 0.42, 18),
+      materials.coastalForest,
+    );
+    planter.receiveShadow = true;
+    scene.add(planter);
+  }
+}
+
+function addGwangalliApproachOverheadSigns(startZ, endZ) {
+  const labels = ["CITY ROUTE", "SHINSEONDAE", "UNDERPASS"];
+  let signIndex = 0;
+  for (let z = startZ - 180; z > endZ + 120; z -= 520) {
+    const sample = getStageDefinitionGroundSample(0, z);
+    if (!sample) continue;
+
+    const group = new THREE.Group();
+    setStageSceneryTransform(group, new THREE.Vector3(0, sample.y, z), 0, 0, true);
+
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.36, 7.8, 0.36), materials.gwangalliBridgeCable);
+      post.position.set(side * 13.4, 3.9, 0);
+      post.castShadow = true;
+      group.add(post);
+    }
+
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(27.4, 0.38, 0.4), materials.gwangalliBridgeCable);
+    beam.position.y = 7.75;
+    beam.castShadow = true;
+    group.add(beam);
+
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(13.8, 1.62, 0.18),
+      createCanvasLabelMaterial(labels[signIndex % labels.length], 420, 120, "#ecf8ff", "#173044"),
+    );
+    board.position.set(0, 6.9, 0.32);
+    group.add(board);
+
+    const caution = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.28, 0.18), materials.obstacleStripe);
+    caution.position.set(0, 8.32, 0.28);
+    group.add(caution);
+
+    scene.add(group);
+    signIndex += 1;
+  }
+}
+
+function addGwangalliApproachCityBlock(group, side, rowIndex) {
+  const base = new THREE.Mesh(new THREE.BoxGeometry(104, 0.92, 218), materials.coastalRock);
+  base.position.set(side * 80, 0.46, 0);
+  base.receiveShadow = true;
+  group.add(base);
+
+  const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.18, 196), materials.gwangalliBoardwalk);
+  sidewalk.position.set(side * 33.5, 1.02, 0);
+  sidewalk.receiveShadow = true;
+  group.add(sidewalk);
+
+  const serviceRoad = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.16, 184), materials.gwangalliRoadAlt);
+  serviceRoad.position.set(side * 46, 1.04, 0);
+  serviceRoad.receiveShadow = true;
+  group.add(serviceRoad);
+
+  const greenBuffer = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.2, 198), materials.coastalForest);
+  greenBuffer.position.set(side * 61, 1.08, 0);
+  greenBuffer.receiveShadow = true;
+  group.add(greenBuffer);
+
+  for (let i = 0; i < 4; i += 1) {
+    const seed = rowIndex * 19 + i * 7 + (side > 0 ? 5 : 13);
+    const width = 12 + (seed % 3) * 1.8;
+    const height = 7.5 + (seed % 4) * 1.8;
+    const depth = 17 + (seed % 3) * 3.4;
+    const x = side * (39 + (i % 2) * 12.5);
+    const z = -76 + i * 50 + ((seed % 5) - 2) * 2.2;
+    addGwangalliApproachLowBlock(group, { x, z, width, height, depth, side, seed });
+  }
+
+  for (let column = 0; column < 4; column += 1) {
+    const seed = rowIndex * 23 + column * 11 + (side > 0 ? 2 : 9);
+    const height = 34 + (seed % 8) * 6 + column * 8 + (rowIndex % 3) * 5;
+    const width = 13 + (seed % 4) * 2.4;
+    const depth = 18 + ((seed + column) % 4) * 3.2;
+    const x = side * (67 + column * 17 + ((seed % 3) - 1) * 2.0);
+    const z = -70 + column * 48 + ((seed % 7) - 3) * 2.8;
+    addGwangalliApproachTower(group, { x, z, width, depth, height, side, seed });
+  }
+}
+
+function addGwangalliApproachLowBlock(group, {
+  x,
+  z,
+  width,
+  height,
+  depth,
+  side,
+  seed,
+}) {
+  const block = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    seed % 2 === 0 ? materials.rightCityFacade : materials.gwangalliBuilding,
+  );
+  block.position.set(x, height * 0.5 + 1.08, z);
+  block.castShadow = false;
+  block.receiveShadow = true;
+  group.add(block);
+
+  const shopFront = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, height * 0.48, depth * 0.72),
+    materials.rightCityGlass,
+  );
+  shopFront.position.set(x - side * (width * 0.5 + 0.08), height * 0.48 + 1.1, z);
+  group.add(shopFront);
+
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.9, 0.42, depth + 0.8), materials.gwangalliBridge);
+  roof.position.set(x, height + 1.34, z);
+  roof.receiveShadow = true;
+  group.add(roof);
+}
+
+function addGwangalliApproachTower(group, {
+  x,
+  z,
+  width,
+  depth,
+  height,
+  side,
+  seed,
+}) {
+  const material = seed % 3 === 0
+    ? materials.rightCityDarkGlass
+    : seed % 3 === 1
+      ? materials.gwangalliBuilding
+      : materials.rightCityFacade;
+
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  tower.position.set(x, height * 0.5 + 1.12, z);
+  tower.castShadow = height > 48;
+  tower.receiveShadow = true;
+  group.add(tower);
+
+  const innerFaceX = x - side * (width * 0.5 + 0.08);
+  const glassPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, height * 0.7, depth * 0.76),
+    seed % 3 === 1 ? materials.gwangalliWindow : materials.rightCityGlass,
+  );
+  glassPanel.position.set(innerFaceX, height * 0.52 + 1.12, z);
+  group.add(glassPanel);
+
+  const floorCount = Math.min(7, Math.max(3, Math.floor(height / 12)));
+  for (let floor = 1; floor <= floorCount; floor += 1) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.38, depth * 0.78),
+      floor % 2 === 0 ? materials.gwangalliBuildingLight : materials.gwangalliWindow,
+    );
+    strip.position.set(innerFaceX - side * 0.04, 3.1 + floor * (height - 5) / (floorCount + 1), z);
+    group.add(strip);
+  }
+
+  if (seed % 5 === 0) {
+    const rooftop = new THREE.Mesh(new THREE.BoxGeometry(width * 0.64, 3.1, depth * 0.58), materials.rightCityFacade);
+    rooftop.position.set(x, height + 3.0, z);
+    rooftop.receiveShadow = true;
+    group.add(rooftop);
+  }
+}
+
+function addGwangalliApproachDistantSkyline(startZ, endZ) {
+  let skylineIndex = 0;
+  for (let z = startZ - 150; z > endZ - 80; z -= 430) {
+    const ground = getStageDefinitionGroundSample(0, z);
+    if (!ground) {
+      skylineIndex += 1;
+      continue;
+    }
+
+    for (const side of [-1, 1]) {
+      const group = new THREE.Group();
+      const sideName = side > 0 ? "right" : "left";
+      const x = side * (172 + (skylineIndex % 2) * 16);
+      const y = Math.max(seaLevelY + 0.34, ground.y - 4.3);
+      setStageSceneryTransform(group, new THREE.Vector3(x, y, z), side * 0.06, 0, true);
+
+      const foundation = new THREE.Mesh(new THREE.BoxGeometry(168, 1.05, 270), materials.coastalRock);
+      foundation.position.set(0, 0.5, 0);
+      foundation.receiveShadow = true;
+      group.add(foundation);
+
+      const promenade = new THREE.Mesh(new THREE.BoxGeometry(146, 0.18, 18), materials.gwangalliBoardwalk);
+      promenade.position.set(0, 1.12, -104);
+      promenade.receiveShadow = true;
+      group.add(promenade);
+
+      const greenDeck = new THREE.Mesh(new THREE.BoxGeometry(156, 0.16, 46), materials.coastalForest);
+      greenDeck.position.set(0, 1.16, 84);
+      greenDeck.receiveShadow = true;
+      group.add(greenDeck);
+
+      for (let i = 0; i < 6; i += 1) {
+        const seed = skylineIndex * 31 + i * 13 + (side > 0 ? 17 : 23);
+        const towerX = -58 + i * 22 + ((seed % 5) - 2) * 1.6;
+        const towerZ = -62 + (i % 3) * 58 + Math.floor(i / 3) * 22;
+        const height = 44 + (seed % 9) * 7 + (i % 2) * 16;
+        const width = 12 + (seed % 4) * 2;
+        const depth = 14 + ((seed + i) % 4) * 2.4;
+        addGwangalliApproachSkylineTower(group, towerX, towerZ, width, depth, height, seed);
+      }
+
+      scene.add(group);
+      registerMapEditorObject(group, {
+        id: `stage1-approach-${sideName}-skyline-${skylineIndex}`,
+        label: `Stage 1 Approach ${sideName} Skyline ${skylineIndex}`,
+        kind: "distant-skyline",
+        source: "addGwangalliApproachDistantSkyline",
+        localPosition: { x, y, z },
+        metadata: { side: sideName, skylineIndex, towerCount: 6 },
+      });
+    }
+    skylineIndex += 1;
+  }
+}
+
+function addGwangalliApproachRightWaterfrontDistrict(startZ, endZ) {
+  let districtIndex = 0;
+  for (let z = startZ - 260; z > endZ - 120; z -= 460) {
+    const ground = getStageDefinitionGroundSample(0, z);
+    if (!ground) {
+      districtIndex += 1;
+      continue;
+    }
+
+    const group = new THREE.Group();
+    const x = 236 + (districtIndex % 2) * 18;
+    const y = Math.max(seaLevelY + 0.42, ground.y - 3.6);
+    setStageSceneryTransform(group, new THREE.Vector3(x, y, z), -0.08, 0, true);
+
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(228, 1.18, 360), materials.coastalRock);
+    foundation.position.set(0, 0.58, 0);
+    foundation.receiveShadow = true;
+    group.add(foundation);
+
+    const waterfrontWalk = new THREE.Mesh(new THREE.BoxGeometry(206, 0.18, 20), materials.gwangalliBoardwalk);
+    waterfrontWalk.position.set(-4, 1.22, -146);
+    waterfrontWalk.receiveShadow = true;
+    group.add(waterfrontWalk);
+
+    const greenMedian = new THREE.Mesh(new THREE.BoxGeometry(196, 0.18, 54), materials.coastalForest);
+    greenMedian.position.set(0, 1.26, 108);
+    greenMedian.receiveShadow = true;
+    group.add(greenMedian);
+
+    const serviceRoad = new THREE.Mesh(new THREE.BoxGeometry(176, 0.16, 13), materials.gwangalliRoadAlt);
+    serviceRoad.position.set(-2, 1.24, -112);
+    serviceRoad.receiveShadow = true;
+    group.add(serviceRoad);
+
+    for (let i = 0; i < 5; i += 1) {
+      const seed = districtIndex * 29 + i * 9 + 7;
+      const block = new THREE.Mesh(
+        new THREE.BoxGeometry(16 + (seed % 3) * 3, 8 + (seed % 4) * 2.2, 20 + (seed % 3) * 4),
+        seed % 2 === 0 ? materials.rightCityFacade : materials.gwangalliBuilding,
+      );
+      block.position.set(-78 + i * 28, 5.2 + (seed % 4) * 1.1, -104 + (i % 2) * 22);
+      block.castShadow = false;
+      block.receiveShadow = true;
+      group.add(block);
+
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(block.geometry.parameters.width * 0.62, 3.2, 0.12), materials.rightCityGlass);
+      glass.position.set(block.position.x, block.position.y + 0.4, block.position.z - block.geometry.parameters.depth * 0.5 - 0.08);
+      group.add(glass);
+    }
+
+    for (let i = 0; i < 8; i += 1) {
+      const seed = districtIndex * 37 + i * 13 + 11;
+      const towerX = -88 + i * 25 + ((seed % 5) - 2) * 1.8;
+      const towerZ = -48 + (i % 4) * 46 + Math.floor(i / 4) * 34;
+      const height = 52 + (seed % 10) * 7 + (i % 3) * 11;
+      const width = 13 + (seed % 4) * 2.2;
+      const depth = 16 + ((seed + i) % 4) * 2.8;
+      addGwangalliApproachSkylineTower(group, towerX, towerZ, width, depth, height, seed);
+    }
+
+    scene.add(group);
+    registerMapEditorObject(group, {
+      id: `stage1-right-waterfront-density-${districtIndex}`,
+      label: `Stage 1 Right Waterfront Density ${districtIndex}`,
+      kind: "right-side-waterfront-district",
+      source: "addGwangalliApproachRightWaterfrontDistrict",
+      localPosition: { x, y, z },
+      metadata: { districtIndex, towerCount: 8, lowBlockCount: 5 },
+    });
+    districtIndex += 1;
+  }
+}
+
+function addGwangalliApproachSkylineTower(group, x, z, width, depth, height, seed) {
+  const material = seed % 3 === 0
+    ? materials.gwangalliBuilding
+    : seed % 3 === 1
+      ? materials.rightCityGlass
+      : materials.rightCityDarkGlass;
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  tower.position.set(x, height * 0.5 + 1.2, z);
+  tower.castShadow = false;
+  tower.receiveShadow = true;
+  group.add(tower);
+
+  const face = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.72, height * 0.62, 0.12),
+    seed % 2 === 0 ? materials.gwangalliWindow : materials.gwangalliBuildingLight,
+  );
+  face.position.set(x, height * 0.52 + 1.1, z - depth * 0.5 - 0.08);
+  group.add(face);
+}
+
 function addGwangalliDenseUrbanCorridor() {
   if (!currentStage.gwangalliTheme) return;
 
@@ -6392,6 +6988,14 @@ function addGwangalliDenseUrbanCorridor() {
     }
 
     scene.add(group);
+    registerMapEditorObject(group, {
+      id: `stage1-dense-urban-row-${rowIndex}`,
+      label: `Stage 1 Dense Urban Row ${rowIndex}`,
+      kind: "building-row",
+      source: "addGwangalliDenseUrbanCorridor",
+      localPosition: { x: 0, y: ground.y - 1.05, z },
+      metadata: { rowIndex, progressPercent: Math.round(getGoalProgressForZ(z) * 100) },
+    });
     rowIndex += 1;
   }
 }
@@ -6652,7 +7256,7 @@ function addShinseondaeVariableMessageSign(z) {
 
   const message = new THREE.Mesh(
     new THREE.PlaneGeometry(17.8, 2.05),
-    createCanvasMultilineLabelMaterial(["SMART TRAFFIC SYSTEM"], 1024, 220, "#b8ff7a", "rgba(0, 0, 0, 0)"),
+    createCanvasMultilineLabelMaterial(["\uC9C4\uC785", "\uAE08\uC9C0"], 180, 160, "#183043", "#f5f7fb"),
   );
   message.position.set(0, 6.8, 0.32);
   group.add(message);
@@ -6744,7 +7348,7 @@ function addShinseondaeWarningSignStack(group, side) {
 
   const sideNotice = new THREE.Mesh(
     new THREE.BoxGeometry(1.28, 1.02, 0.12),
-    createCanvasMultilineLabelMaterial(["吏꾩엯", "湲덉?"], 180, 160, "#183043", "#f5f7fb"),
+    createCanvasMultilineLabelMaterial(["\uC9C4\uC785", "\uAE08\uC9C0"], 180, 160, "#183043", "#f5f7fb"),
   );
   sideNotice.position.set(x, 6.86, 0.46);
   group.add(sideNotice);
@@ -13451,7 +14055,15 @@ function bindInput() {
 
   bindDebugConsole();
   bindDebugTuningPanel();
+  bindDebugMapEditorPanel();
   bindTouchControls();
+  canvas.addEventListener("pointerdown", handleMapEditorPointerDown);
+  canvas.addEventListener("pointermove", handleMapEditorPointerMove);
+  canvas.addEventListener("pointerup", handleMapEditorPointerEnd);
+  canvas.addEventListener("pointercancel", handleMapEditorPointerEnd);
+  canvas.addEventListener("lostpointercapture", handleMapEditorPointerEnd);
+  canvas.addEventListener("wheel", handleMapEditorWheel, { passive: false });
+  canvas.addEventListener("contextmenu", handleMapEditorContextMenu);
   canvas.addEventListener("pointermove", handleMouseObjectPointerMove);
   canvas.addEventListener("pointerleave", handleMouseObjectPointerLeave);
   canvas.addEventListener("pointercancel", handleMouseObjectPointerLeave);
@@ -13998,6 +14610,11 @@ function tick(now = performance.now()) {
 }
 
 function updateGame(dt) {
+  if (mapEditorState.active) {
+    updateMapEditorFrozenSimulation(dt);
+    return;
+  }
+
   updateDnaItems(dt);
   updateLooseDnaItems(dt);
   updateObstacles(dt);
@@ -14659,7 +15276,7 @@ function showDashChainFeedback(count, bonus, climax, pulse) {
   dashChainFeedbackEl.classList.toggle("is-climax", climax);
   dashChainFeedbackEl.classList.toggle("is-overdrive", count >= getDashComboOverdriveStartCount());
   if (dashChainLabelEl) {
-    dashChainLabelEl.textContent = "대시콤보";
+    dashChainLabelEl.textContent = "\uB300\uC2DC\uCF64\uBCF4";
   }
   if (dashChainCountEl) {
     dashChainCountEl.textContent = `X${count}`;
@@ -15080,6 +15697,7 @@ function setMainMenuOpen(open) {
   menuButton.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
     setDebugTuningPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
   }
   if (!open) {
     setStageMenuOpen(false);
@@ -15092,6 +15710,7 @@ function setStageMenuOpen(open) {
   stageMenuToggle.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
     setDebugTuningPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
   }
 }
 
@@ -16728,6 +17347,10 @@ function applyHarborImpactCameraShake(dt, frame) {
 }
 
 function updateCamera(dt) {
+  if (mapEditorState.active && updateMapEditorCamera(dt)) {
+    return;
+  }
+
   const frame = getStageFrame(player.position.z);
   if (isHarborGantryIntroCinematicActive() && updateHarborGantryIntroCinematicCamera(dt)) {
     return;
@@ -16878,6 +17501,7 @@ function setPaused(paused, reason = "manual") {
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
     pauseMusicForGame();
   } else {
     if (pauseStartedAt > 0) {
@@ -18223,6 +18847,729 @@ function hideMouseObjectLabel() {
   mouseObjectLabelEl.classList.add("hidden");
 }
 
+function registerMapEditorObject(group, config = {}) {
+  if (!group) return null;
+
+  const baseId = String(config.id || `map-object-${mapEditorObjects.length + 1}`);
+  let id = baseId;
+  let suffix = 2;
+  while (mapEditorObjectById.has(id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  const label = config.label || titleCaseIdentifier(id);
+  const localPosition = cloneMapEditorLocalPosition(config.localPosition);
+  const originalLocalPosition = cloneMapEditorLocalPosition(config.localPosition);
+  const progress = Number.isFinite(config.progress)
+    ? THREE.MathUtils.clamp(config.progress, 0, 1)
+    : localPosition
+      ? getGoalProgressForZ(localPosition.z)
+      : null;
+  const record = {
+    id,
+    label,
+    kind: config.kind || "scenery",
+    stage: currentStage.label,
+    stageRoute: getStageRoute(currentStageIndex),
+    source: config.source || "",
+    group,
+    localPosition,
+    originalLocalPosition,
+    originalGroupPosition: group.position.clone(),
+    editOffset: new THREE.Vector3(),
+    progress,
+    metadata: { ...(config.metadata || {}) },
+  };
+
+  group.userData.mapEditorId = id;
+  group.userData.debugName = group.userData.debugName || label;
+  group.traverse((object) => {
+    object.userData.mapEditorId = id;
+    object.userData.debugName = object.userData.debugName || label;
+  });
+
+  mapEditorObjects.push(record);
+  mapEditorObjectById.set(id, record);
+  return record;
+}
+
+function cloneMapEditorLocalPosition(value) {
+  if (!value) return null;
+  const x = Number(value.x);
+  const y = Number(value.y);
+  const z = Number(value.z);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  return { x, y, z };
+}
+
+function getMapEditorRecordFromObject(object) {
+  for (let current = object; current; current = current.parent) {
+    const id = current.userData?.mapEditorId;
+    if (id && mapEditorObjectById.has(id)) {
+      return mapEditorObjectById.get(id);
+    }
+  }
+  return null;
+}
+
+function getMapEditorCurrentLocalPosition(record) {
+  if (!record?.originalLocalPosition) return null;
+  return {
+    x: record.originalLocalPosition.x + record.editOffset.x,
+    y: record.originalLocalPosition.y + record.editOffset.y,
+    z: record.originalLocalPosition.z + record.editOffset.z,
+  };
+}
+
+function isMapEditorRecordPositionEdited(record) {
+  return Boolean(record?.editOffset && record.editOffset.lengthSq() > 0.000001);
+}
+
+function formatMapEditorInputNumber(value) {
+  return Number(Number(value).toFixed(2)).toString();
+}
+
+function formatMapEditorDeltaNumber(value) {
+  const rounded = roundMapEditorNumber(value);
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+}
+
+function setMapEditorSelection(record) {
+  mapEditorState.selectedRecord = record || null;
+  updateMapEditorSelectionHelper();
+  syncMapEditorPanel();
+  if (record) {
+    setMapEditorStatus(`${record.label} selected`);
+  } else {
+    setMapEditorStatus("No registered map object selected");
+  }
+}
+
+function updateMapEditorSelectionHelper() {
+  const record = mapEditorState.selectedRecord;
+  if (!mapEditorState.active || !record || !record.group.visible) {
+    if (mapEditorState.selectionHelper) {
+      mapEditorState.selectionHelper.visible = false;
+    }
+    return;
+  }
+
+  if (!mapEditorState.selectionHelper) {
+    mapEditorState.selectionHelper = new THREE.BoxHelper(record.group, 0xffd344);
+    mapEditorState.selectionHelper.name = "MapEditorSelectionBox";
+    mapEditorState.selectionHelper.renderOrder = 500;
+    if (mapEditorState.selectionHelper.material) {
+      mapEditorState.selectionHelper.material.depthTest = false;
+      mapEditorState.selectionHelper.material.transparent = true;
+      mapEditorState.selectionHelper.material.opacity = 0.96;
+    }
+    scene.add(mapEditorState.selectionHelper);
+  }
+
+  mapEditorState.selectionHelper.visible = true;
+  mapEditorState.selectionHelper.setFromObject(record.group);
+}
+
+function createMapEditorSnapshot(record) {
+  record.group.updateMatrixWorld(true);
+  mapEditorBox.setFromObject(record.group);
+  const hasBounds = !mapEditorBox.isEmpty();
+  if (hasBounds) {
+    mapEditorBox.getCenter(mapEditorCenter);
+    mapEditorBox.getSize(mapEditorSize);
+  } else {
+    record.group.getWorldPosition(mapEditorCenter);
+    mapEditorSize.set(0, 0, 0);
+  }
+
+  const groupWorldPosition = record.group.getWorldPosition(new THREE.Vector3());
+  const currentLocalPosition = getMapEditorCurrentLocalPosition(record);
+  const currentProgress = currentLocalPosition
+    ? getGoalProgressForZ(currentLocalPosition.z)
+    : record.progress;
+  return {
+    id: record.id,
+    label: record.label,
+    kind: record.kind,
+    stage: record.stage,
+    stageRoute: record.stageRoute,
+    source: record.source,
+    progress: Number.isFinite(currentProgress) ? roundMapEditorNumber(currentProgress) : null,
+    progressPercent: Number.isFinite(currentProgress) ? Math.round(currentProgress * 100) : null,
+    localPosition: currentLocalPosition
+      ? {
+        x: roundMapEditorNumber(currentLocalPosition.x),
+        y: roundMapEditorNumber(currentLocalPosition.y),
+        z: roundMapEditorNumber(currentLocalPosition.z),
+      }
+      : null,
+    originalLocalPosition: record.originalLocalPosition
+      ? {
+        x: roundMapEditorNumber(record.originalLocalPosition.x),
+        y: roundMapEditorNumber(record.originalLocalPosition.y),
+        z: roundMapEditorNumber(record.originalLocalPosition.z),
+      }
+      : null,
+    worldPosition: {
+      x: roundMapEditorNumber(groupWorldPosition.x),
+      y: roundMapEditorNumber(groupWorldPosition.y),
+      z: roundMapEditorNumber(groupWorldPosition.z),
+    },
+    worldBounds: {
+      center: {
+        x: roundMapEditorNumber(mapEditorCenter.x),
+        y: roundMapEditorNumber(mapEditorCenter.y),
+        z: roundMapEditorNumber(mapEditorCenter.z),
+      },
+      size: {
+        x: roundMapEditorNumber(mapEditorSize.x),
+        y: roundMapEditorNumber(mapEditorSize.y),
+        z: roundMapEditorNumber(mapEditorSize.z),
+      },
+    },
+    visible: record.group.visible,
+    hiddenInSession: mapEditorHiddenObjectIds.has(record.id),
+    edit: {
+      positionChanged: isMapEditorRecordPositionEdited(record),
+      offset: {
+        x: roundMapEditorNumber(record.editOffset.x),
+        y: roundMapEditorNumber(record.editOffset.y),
+        z: roundMapEditorNumber(record.editOffset.z),
+      },
+    },
+    metadata: record.metadata,
+  };
+}
+
+function roundMapEditorNumber(value) {
+  return Number(Number(value).toFixed(3));
+}
+
+function formatMapEditorDetails(record = mapEditorState.selectedRecord) {
+  if (!record) {
+    return [
+      `Registered objects: ${mapEditorObjects.length}`,
+      `Hidden this session: ${mapEditorHiddenObjectIds.size}`,
+      "Click a highlighted map/building group in the scene.",
+      "Left drag: orbit camera",
+      "Mouse wheel: zoom",
+    ].join("\n");
+  }
+
+  const snapshot = createMapEditorSnapshot(record);
+  return [
+    snapshot.label,
+    `id: ${snapshot.id}`,
+    `kind: ${snapshot.kind}`,
+    `stage: ${snapshot.stage}`,
+    `progress: ${snapshot.progressPercent ?? "-"}%`,
+    snapshot.localPosition
+      ? `local: x ${snapshot.localPosition.x}, y ${snapshot.localPosition.y}, z ${snapshot.localPosition.z}`
+      : "local: -",
+    snapshot.edit.positionChanged
+      ? `edit offset: x ${formatMapEditorDeltaNumber(snapshot.edit.offset.x)}, y ${formatMapEditorDeltaNumber(snapshot.edit.offset.y)}, z ${formatMapEditorDeltaNumber(snapshot.edit.offset.z)}`
+      : "edit offset: -",
+    `center: x ${snapshot.worldBounds.center.x}, y ${snapshot.worldBounds.center.y}, z ${snapshot.worldBounds.center.z}`,
+    `size: x ${snapshot.worldBounds.size.x}, y ${snapshot.worldBounds.size.y}, z ${snapshot.worldBounds.size.z}`,
+    `visible: ${snapshot.visible ? "yes" : "no"}`,
+    snapshot.source ? `source: ${snapshot.source}` : "source: -",
+  ].join("\n");
+}
+
+function setMapEditorStatus(text) {
+  if (mapEditorStatusEl) {
+    mapEditorStatusEl.textContent = text;
+  }
+}
+
+function setMapEditorMode(mode) {
+  if (!Object.hasOwn(mapEditorModeStatusText, mode)) return;
+  if (mapEditorState.mode === mode) {
+    syncMapEditorPanel(true);
+    return;
+  }
+  mapEditorState.mode = mode;
+  syncMapEditorPanel(true);
+  setMapEditorStatus(`${mapEditorModeStatusText[mode]} mode`);
+}
+
+function setMapEditorInputValue(input, value, preserveFocus = false) {
+  if (!input) return;
+  if (preserveFocus && document.activeElement === input) return;
+  input.value = Number.isFinite(value) ? formatMapEditorInputNumber(value) : "";
+}
+
+function formatMapEditorChangeList() {
+  const changedRecords = mapEditorObjects.filter(isMapEditorRecordPositionEdited);
+  if (changedRecords.length === 0) {
+    return "No position changes";
+  }
+
+  return changedRecords
+    .map((record) => {
+      const currentLocal = getMapEditorCurrentLocalPosition(record);
+      const originalLocal = record.originalLocalPosition;
+      if (!currentLocal || !originalLocal) {
+        return `${record.label}\n  position changed`;
+      }
+      return [
+        record.label,
+        `  X ${roundMapEditorNumber(originalLocal.x)} -> ${roundMapEditorNumber(currentLocal.x)} (${formatMapEditorDeltaNumber(record.editOffset.x)})`,
+        `  Y ${roundMapEditorNumber(originalLocal.y)} -> ${roundMapEditorNumber(currentLocal.y)} (${formatMapEditorDeltaNumber(record.editOffset.y)})`,
+        `  Z ${roundMapEditorNumber(originalLocal.z)} -> ${roundMapEditorNumber(currentLocal.z)} (${formatMapEditorDeltaNumber(record.editOffset.z)})`,
+      ].join("\n");
+    })
+    .join("\n\n");
+}
+
+function syncMapEditorEditControls(preserveFocus = false) {
+  const record = mapEditorState.selectedRecord;
+  const currentLocal = getMapEditorCurrentLocalPosition(record);
+  const hasLocalSelection = Boolean(record && currentLocal);
+
+  if (mapEditorEditSelectedEl) {
+    mapEditorEditSelectedEl.textContent = record ? record.label : "None";
+  }
+
+  setMapEditorInputValue(mapEditorEditXInput, currentLocal?.x, preserveFocus);
+  setMapEditorInputValue(mapEditorEditYInput, currentLocal?.y, preserveFocus);
+  setMapEditorInputValue(mapEditorEditZInput, currentLocal?.z, preserveFocus);
+
+  [mapEditorEditXInput, mapEditorEditYInput, mapEditorEditZInput].forEach((input) => {
+    if (input) input.disabled = !hasLocalSelection;
+  });
+  mapEditorNudgeButtons.forEach((button) => {
+    button.disabled = !hasLocalSelection;
+  });
+  if (mapEditorResetPositionButton) {
+    mapEditorResetPositionButton.disabled = !isMapEditorRecordPositionEdited(record);
+  }
+  if (mapEditorChangeListEl) {
+    mapEditorChangeListEl.textContent = formatMapEditorChangeList();
+  }
+}
+
+function applyMapEditorLocalPosition(record, nextLocalPosition) {
+  if (!record?.originalLocalPosition || !nextLocalPosition) return false;
+  const x = Number(nextLocalPosition.x);
+  const y = Number(nextLocalPosition.y);
+  const z = Number(nextLocalPosition.z);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false;
+
+  record.editOffset.set(
+    x - record.originalLocalPosition.x,
+    y - record.originalLocalPosition.y,
+    z - record.originalLocalPosition.z,
+  );
+  record.localPosition = { x, y, z };
+
+  mapEditorLocalPositionScratch.set(x, y, z);
+  mapEditorBaseWorldPositionScratch.copy(toSceneryWorldPosition(
+    mapEditorLocalPositionScratch.set(
+      record.originalLocalPosition.x,
+      record.originalLocalPosition.y,
+      record.originalLocalPosition.z,
+    ),
+    true,
+  ));
+  mapEditorNextWorldPositionScratch.copy(toSceneryWorldPosition(
+    mapEditorLocalPositionScratch.set(x, y, z),
+    true,
+  ));
+  record.group.position.copy(record.originalGroupPosition)
+    .add(mapEditorNextWorldPositionScratch.sub(mapEditorBaseWorldPositionScratch));
+  record.group.updateMatrixWorld(true);
+  updateMapEditorSelectionHelper();
+  syncMapEditorPanel(true);
+  return true;
+}
+
+function applyMapEditorPositionInputs() {
+  const record = mapEditorState.selectedRecord;
+  const currentLocal = getMapEditorCurrentLocalPosition(record);
+  if (!record || !currentLocal) {
+    setMapEditorStatus("Select an editable map object first");
+    return;
+  }
+
+  const readInputNumber = (input, fallback) => {
+    const value = input?.value?.trim() ?? "";
+    if (!value) return fallback;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const nextLocal = {
+    x: readInputNumber(mapEditorEditXInput, currentLocal.x),
+    y: readInputNumber(mapEditorEditYInput, currentLocal.y),
+    z: readInputNumber(mapEditorEditZInput, currentLocal.z),
+  };
+  if (applyMapEditorLocalPosition(record, nextLocal)) {
+    setMapEditorStatus(`${record.label} moved`);
+  }
+}
+
+function getMapEditorNudgeStep() {
+  const value = Number(mapEditorEditStepInput?.value);
+  return THREE.MathUtils.clamp(Number.isFinite(value) ? Math.abs(value) : 1, 0.1, 100);
+}
+
+function nudgeMapEditorSelection(axis, direction) {
+  const record = mapEditorState.selectedRecord;
+  const currentLocal = getMapEditorCurrentLocalPosition(record);
+  if (!record || !currentLocal || !["x", "y", "z"].includes(axis)) {
+    setMapEditorStatus("Select an editable map object first");
+    return;
+  }
+
+  const nextLocal = { ...currentLocal };
+  nextLocal[axis] += getMapEditorNudgeStep() * direction;
+  if (applyMapEditorLocalPosition(record, nextLocal)) {
+    setMapEditorStatus(`${record.label} ${axis.toUpperCase()} ${formatMapEditorDeltaNumber(nextLocal[axis] - currentLocal[axis])}`);
+  }
+}
+
+function resetMapEditorSelectionPosition() {
+  const record = mapEditorState.selectedRecord;
+  if (!record?.originalLocalPosition) {
+    setMapEditorStatus("Select an editable map object first");
+    return;
+  }
+  if (applyMapEditorLocalPosition(record, record.originalLocalPosition)) {
+    setMapEditorStatus(`${record.label} position reset`);
+  }
+}
+
+function syncMapEditorPanel(preserveProgressFocus = false) {
+  if (mapEditorStageSelect) {
+    mapEditorStageSelect.value = getStageRoute(currentStageIndex);
+  }
+  const percent = Math.round(THREE.MathUtils.clamp(mapEditorState.focusProgress, 0, 1) * 100);
+  if (mapEditorProgressInput && (!preserveProgressFocus || document.activeElement !== mapEditorProgressInput)) {
+    mapEditorProgressInput.value = `${percent}`;
+  }
+  if (mapEditorProgressValueEl) {
+    mapEditorProgressValueEl.textContent = `${percent}%`;
+  }
+  if (mapEditorViewSelect) {
+    mapEditorViewSelect.value = mapEditorState.view;
+  }
+  if (mapEditorModeStatusEl) {
+    mapEditorModeStatusEl.textContent = mapEditorModeStatusText[mapEditorState.mode] ?? "Inspect";
+  }
+  mapEditorModeButtons.forEach((button) => {
+    const active = button.dataset.mapEditorMode === mapEditorState.mode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+  debugMapEditorPanel?.setAttribute("data-mode", mapEditorState.mode);
+  if (mapEditorDetailsEl) {
+    mapEditorDetailsEl.textContent = formatMapEditorDetails();
+  }
+  const hasVisibleSelection = Boolean(mapEditorState.selectedRecord?.group.visible);
+  if (mapEditorCopyButton) {
+    mapEditorCopyButton.disabled = !mapEditorState.selectedRecord;
+  }
+  if (mapEditorHideButton) {
+    mapEditorHideButton.disabled = !hasVisibleSelection;
+  }
+  if (mapEditorResetHiddenButton) {
+    mapEditorResetHiddenButton.disabled = mapEditorHiddenObjectIds.size === 0;
+  }
+  syncMapEditorEditControls(preserveProgressFocus);
+}
+
+function applyMapEditorViewPreset(view) {
+  const preset = mapEditorViewPresets[view] || mapEditorViewPresets.angled;
+  mapEditorState.view = mapEditorViewPresets[view] ? view : "angled";
+  mapEditorState.yaw = preset.yaw;
+  mapEditorState.pitch = preset.pitch;
+  mapEditorState.distance = preset.distance;
+  syncMapEditorPanel();
+}
+
+function setDebugMapEditorPanelOpen(open) {
+  if (!debugMapEditorPanel) return;
+  const nextOpen = Boolean(open);
+  mapEditorState.active = nextOpen;
+  debugMapEditorPanel.classList.toggle("hidden", !nextOpen);
+  document.body.classList.toggle("map-editor-active", nextOpen);
+
+  if (!nextOpen) {
+    setMapEditorOrbitActive(false);
+    updateMapEditorSelectionHelper();
+    return;
+  }
+
+  mapEditorState.focusProgress = getGoalProgressForZ(player.position.z);
+  player.velocity.set(0, 0, 0);
+  keys.clear();
+  quickStepQueued = 0;
+  jumpQueued = false;
+  if (touchControlsEnabled) {
+    touchInput.activePointers.clear();
+    touchInput.brake = false;
+    touchInput.jump = false;
+    stopTouchLateralMove();
+    resetTouchQuickStepGesture();
+    syncTouchControls();
+  }
+  setMainMenuOpen(false);
+  setStageMenuOpen(false);
+  setGraphicsPanelOpen(false);
+  setDebugPanelOpen(false);
+  setDebugTuningPanelOpen(false);
+  setHelpPanelOpen(false);
+  updateMapEditorCamera(0);
+  syncMapEditorPanel();
+  setMapEditorStatus(`Map editor ready: ${mapEditorObjects.length} registered objects`);
+}
+
+function isMapEditorPointerEvent(event) {
+  return mapEditorState.active && event.target === canvas;
+}
+
+function handleMapEditorPointerDown(event) {
+  if (!isMapEditorPointerEvent(event)) return;
+  if (event.pointerType && event.pointerType !== "mouse" && event.pointerType !== "pen") return;
+  if (![0, 1, 2].includes(event.button)) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  mapEditorPointerState.active = true;
+  mapEditorPointerState.pointerId = event.pointerId;
+  mapEditorPointerState.button = event.button;
+  mapEditorPointerState.startX = event.clientX;
+  mapEditorPointerState.startY = event.clientY;
+  mapEditorPointerState.lastX = event.clientX;
+  mapEditorPointerState.lastY = event.clientY;
+  mapEditorPointerState.dragMoved = false;
+  setMapEditorOrbitActive(true);
+  canvas.setPointerCapture?.(event.pointerId);
+}
+
+function handleMapEditorPointerMove(event) {
+  if (!mapEditorPointerState.active || event.pointerId !== mapEditorPointerState.pointerId) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const dx = event.clientX - mapEditorPointerState.lastX;
+  const dy = event.clientY - mapEditorPointerState.lastY;
+  mapEditorPointerState.lastX = event.clientX;
+  mapEditorPointerState.lastY = event.clientY;
+  if (Math.hypot(event.clientX - mapEditorPointerState.startX, event.clientY - mapEditorPointerState.startY) > 4) {
+    mapEditorPointerState.dragMoved = true;
+  }
+
+  if (mapEditorPointerState.button === 0) {
+    mapEditorState.yaw -= dx * 0.006;
+    mapEditorState.pitch = THREE.MathUtils.clamp(
+      mapEditorState.pitch - dy * 0.005,
+      THREE.MathUtils.degToRad(12),
+      THREE.MathUtils.degToRad(88),
+    );
+    mapEditorState.view = "angled";
+    syncMapEditorPanel(true);
+  }
+}
+
+function handleMapEditorPointerEnd(event) {
+  if (!mapEditorPointerState.active || event.pointerId !== mapEditorPointerState.pointerId) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const shouldSelect = !mapEditorPointerState.dragMoved && mapEditorPointerState.button === 0;
+  try {
+    canvas.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Pointer capture may already be released by the browser.
+  }
+  setMapEditorOrbitActive(false);
+  if (shouldSelect) {
+    selectMapEditorObjectAt(event.clientX, event.clientY);
+  }
+}
+
+function setMapEditorOrbitActive(active) {
+  mapEditorPointerState.active = Boolean(active);
+  if (!active) {
+    mapEditorPointerState.pointerId = null;
+  }
+  document.body.classList.toggle("map-editor-orbiting", Boolean(active));
+}
+
+function handleMapEditorWheel(event) {
+  if (!isMapEditorPointerEvent(event)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  mapEditorState.distance = THREE.MathUtils.clamp(
+    mapEditorState.distance * Math.exp(event.deltaY * 0.0012),
+    42,
+    980,
+  );
+}
+
+function handleMapEditorContextMenu(event) {
+  if (!mapEditorState.active || event.target !== canvas) return;
+  event.preventDefault();
+}
+
+function selectMapEditorObjectAt(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const localX = clientX - rect.left;
+  const localY = clientY - rect.top;
+  if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) {
+    setMapEditorSelection(null);
+    return;
+  }
+
+  mapEditorPointer.set((localX / rect.width) * 2 - 1, -(localY / rect.height) * 2 + 1);
+  mapEditorRaycaster.setFromCamera(mapEditorPointer, camera);
+  const roots = mapEditorObjects
+    .filter((record) => record.group.visible)
+    .map((record) => record.group);
+  const hits = mapEditorRaycaster.intersectObjects(roots, true);
+  const hit = hits.find(({ object }) => getMapEditorRecordFromObject(object));
+  setMapEditorSelection(hit ? getMapEditorRecordFromObject(hit.object) : null);
+}
+
+function handleMapEditorProgressInput() {
+  if (!mapEditorProgressInput) return;
+  const progress = THREE.MathUtils.clamp(Number(mapEditorProgressInput.value) / 100, 0, 1);
+  mapEditorState.focusProgress = progress;
+  if (mapEditorProgressValueEl) {
+    mapEditorProgressValueEl.textContent = `${Math.round(progress * 100)}%`;
+  }
+  warpToGoalProgress(progress);
+  player.velocity.set(0, 0, 0);
+  updateMapEditorCamera(0);
+  syncMapEditorPanel(true);
+}
+
+function handleMapEditorStageChange() {
+  if (!mapEditorStageSelect) return;
+  const stageRoute = mapEditorStageSelect.value;
+  if (stageRoute === getStageRoute(currentStageIndex)) return;
+
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("stage", stageRoute);
+  nextUrl.searchParams.set("skipIntro", "1");
+  nextUrl.searchParams.delete("debugStartZ");
+  nextUrl.searchParams.set("v", "exp123s-gap-background-density");
+  window.location.href = nextUrl.toString();
+}
+
+async function copyMapEditorSelection() {
+  const record = mapEditorState.selectedRecord;
+  if (!record) {
+    setMapEditorStatus("Select a map object first");
+    return;
+  }
+  const text = JSON.stringify(createMapEditorSnapshot(record), null, 2);
+  if (mapEditorOutputEl) {
+    mapEditorOutputEl.value = text;
+    mapEditorOutputEl.classList.remove("hidden");
+  }
+  const copied = await copyTunerTextToClipboard(text, mapEditorOutputEl);
+  setMapEditorStatus(copied ? "selected object JSON copied" : "JSON ready for manual copy");
+}
+
+function hideMapEditorSelection() {
+  const record = mapEditorState.selectedRecord;
+  if (!record || !record.group.visible) return;
+  record.group.visible = false;
+  mapEditorHiddenObjectIds.add(record.id);
+  updateMapEditorSelectionHelper();
+  syncMapEditorPanel();
+  setMapEditorStatus(`${record.label} hidden for this session`);
+}
+
+function resetMapEditorHiddenObjects() {
+  for (const id of mapEditorHiddenObjectIds) {
+    const record = mapEditorObjectById.get(id);
+    if (record) {
+      record.group.visible = true;
+    }
+  }
+  mapEditorHiddenObjectIds.clear();
+  updateMapEditorSelectionHelper();
+  syncMapEditorPanel();
+  setMapEditorStatus("hidden map objects restored");
+}
+
+function updateMapEditorFrozenSimulation(dt) {
+  updateGwangalliTourBoats(dt);
+  updateWater(dt);
+  updateMusicState();
+  updateMapEditorSelectionHelper();
+  syncMapEditorPanel(true);
+  updateHud();
+}
+
+function updateMapEditorCamera(dt) {
+  if (!mapEditorState.active) return false;
+
+  const focusProgress = THREE.MathUtils.clamp(mapEditorState.focusProgress, 0, 1);
+  const focusZ = focusProgress >= 1
+    ? goalZ + 4
+    : getStageZAtGoalProgress(THREE.MathUtils.clamp(focusProgress, 0, 0.98));
+  const frame = getStageFrame(focusZ, true);
+  const ground = getStageDefinitionGroundSample(0, focusZ);
+  const focusY = (ground?.y ?? player.position.y) + 16;
+  const targetWorld = toWorldPosition(new THREE.Vector3(0, focusY, focusZ), true);
+  const lerpAmount = dt > 0 ? 1 - Math.exp(-12 * dt) : 1;
+  mapEditorCameraTarget.lerp(targetWorld, lerpAmount);
+
+  const pitch = THREE.MathUtils.clamp(
+    mapEditorState.pitch,
+    THREE.MathUtils.degToRad(12),
+    THREE.MathUtils.degToRad(88),
+  );
+  const yaw = mapEditorState.yaw;
+  const distance = THREE.MathUtils.clamp(mapEditorState.distance, 42, 980);
+  const horizontalDistance = Math.cos(pitch) * distance;
+  const lift = Math.sin(pitch) * distance;
+  mapEditorCameraOffset.copy(frame.tangent)
+    .multiplyScalar(-Math.cos(yaw) * horizontalDistance)
+    .addScaledVector(frame.right, Math.sin(yaw) * horizontalDistance)
+    .addScaledVector(frame.up, lift);
+
+  const desired = mapEditorCameraTarget.clone().add(mapEditorCameraOffset);
+  camera.position.lerp(desired, lerpAmount);
+  camera.up.lerp(frame.up, lerpAmount).normalize();
+  camera.lookAt(mapEditorCameraTarget);
+  camera.fov = THREE.MathUtils.lerp(camera.fov, 48, lerpAmount);
+  camera.updateProjectionMatrix();
+  updateMapEditorSelectionHelper();
+  return true;
+}
+
+function bindDebugMapEditorPanel() {
+  debugMapEditorOpenButton?.addEventListener("click", () => setDebugMapEditorPanelOpen(true));
+  document.querySelector("[data-close-panel='debug-map-editor']")
+    ?.addEventListener("click", () => setDebugMapEditorPanelOpen(false));
+  mapEditorStageSelect?.addEventListener("change", handleMapEditorStageChange);
+  mapEditorProgressInput?.addEventListener("input", handleMapEditorProgressInput);
+  mapEditorViewSelect?.addEventListener("change", () => applyMapEditorViewPreset(mapEditorViewSelect.value));
+  mapEditorModeButtons.forEach((button) => {
+    button.addEventListener("click", () => setMapEditorMode(button.dataset.mapEditorMode));
+  });
+  [mapEditorEditXInput, mapEditorEditYInput, mapEditorEditZInput].forEach((input) => {
+    input?.addEventListener("change", applyMapEditorPositionInputs);
+  });
+  mapEditorNudgeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      nudgeMapEditorSelection(button.dataset.mapEditorNudgeAxis, Number(button.dataset.mapEditorNudge));
+    });
+  });
+  mapEditorResetPositionButton?.addEventListener("click", resetMapEditorSelectionPosition);
+  mapEditorCopyButton?.addEventListener("click", copyMapEditorSelection);
+  mapEditorHideButton?.addEventListener("click", hideMapEditorSelection);
+  mapEditorResetHiddenButton?.addEventListener("click", resetMapEditorHiddenObjects);
+}
+
 function updatePerformanceHudVisibility() {
   if (!performanceHudEl) return;
 
@@ -18479,6 +19826,7 @@ function setGraphicsPanelOpen(open) {
     setStageMenuOpen(false);
     setDebugPanelOpen(false);
     setDebugTuningPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
     setHelpPanelOpen(false);
   }
 }
@@ -18493,6 +19841,7 @@ function setDebugPanelOpen(open) {
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugTuningPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
     setHelpPanelOpen(false);
   }
 }
@@ -18507,6 +19856,7 @@ function setDebugTuningPanelOpen(open) {
     setStageMenuOpen(false);
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
     setHelpPanelOpen(false);
   }
 }
@@ -18524,6 +19874,7 @@ function setHelpPanelOpen(open) {
     setGraphicsPanelOpen(false);
     setDebugPanelOpen(false);
     setDebugTuningPanelOpen(false);
+    setDebugMapEditorPanelOpen(false);
   }
 }
 

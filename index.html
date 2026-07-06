@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JetDashAdventure_DX</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./src/styles.css?v=exp123m-remove-sixty-percent-sea-cluster" />
+    <link rel="stylesheet" href="./src/styles.css?v=exp123s-gap-background-density" />
     <script type="importmap">
       {
         "imports": {
@@ -59,7 +59,7 @@
         <input id="debug-console-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" />
       </form>
     </section>
-    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-123M: 60% 우측 고립 건물 제거.</div>
+    <div id="build-summary" class="build-summary" aria-label="Current work summary">EXP-123S: 고가도로 gap 배경 도시 밀도 보강.</div>
     <div id="game-version" class="game-version" aria-label="Game version">v0.001</div>
 
     <section id="loading-screen" class="loading-screen" aria-live="polite" aria-label="Loading game assets">
@@ -430,6 +430,10 @@
         <span>Tuning</span>
         <button id="debug-tuning-open" type="button">OPEN TUNING PANEL</button>
       </div>
+      <div class="debug-block debug-map-editor-launch">
+        <span>Map Editor</span>
+        <button id="debug-map-editor-open" type="button">OPEN MAP EDITOR</button>
+      </div>
       <label class="debug-check">
         <span>Opening Trailer</span>
         <input id="debug-opening-trailer" type="checkbox" />
@@ -564,6 +568,90 @@
       <output id="debug-tuning-status" class="debug-tuning-status">Session only</output>
     </section>
 
+    <section id="debug-map-editor-panel" class="settings-panel map-editor-panel hidden" aria-label="Map editor panel">
+      <div class="panel-title map-editor-title">
+        <strong>MAP EDITOR</strong>
+        <div class="map-editor-actions">
+          <button id="map-editor-copy" type="button">Copy JSON</button>
+          <button id="map-editor-hide" type="button">Hide</button>
+          <button id="map-editor-reset-hidden" type="button">Reset</button>
+          <button type="button" data-close-panel="debug-map-editor" aria-label="Close map editor panel">x</button>
+        </div>
+      </div>
+      <div class="map-editor-mode-tabs" role="tablist" aria-label="Map editor modes">
+        <button type="button" data-map-editor-mode="inspect" aria-pressed="true">Inspect</button>
+        <button type="button" data-map-editor-mode="edit" aria-pressed="false">Edit</button>
+        <button type="button" data-map-editor-mode="export" aria-pressed="false">Export</button>
+      </div>
+      <div class="map-editor-tools">
+        <label>
+          <span>Stage</span>
+          <select id="map-editor-stage">
+            <option value="1">Stage 1</option>
+            <option value="2">Stage 2</option>
+            <option value="test-room">Test Room</option>
+          </select>
+        </label>
+        <label>
+          <span>Progress</span>
+          <div class="map-editor-range">
+            <input id="map-editor-progress" type="range" min="0" max="100" step="1" value="0" />
+            <output id="map-editor-progress-value">0%</output>
+          </div>
+        </label>
+        <label>
+          <span>View</span>
+          <select id="map-editor-view">
+            <option value="angled">Angled</option>
+            <option value="top">Top</option>
+            <option value="side">Side</option>
+            <option value="follow">Follow</option>
+          </select>
+        </label>
+      </div>
+      <output id="map-editor-mode-status" class="map-editor-mode-status">Inspect</output>
+      <div id="map-editor-edit-panel" class="map-editor-edit-panel" aria-label="Map editor position controls">
+        <div class="map-editor-edit-selected">
+          <span>Selected</span>
+          <output id="map-editor-edit-selected">None</output>
+        </div>
+        <div class="map-editor-axis-grid">
+          <label>
+            <span>X</span>
+            <input id="map-editor-edit-x" type="number" step="0.5" inputmode="decimal" />
+          </label>
+          <label>
+            <span>Y</span>
+            <input id="map-editor-edit-y" type="number" step="0.5" inputmode="decimal" />
+          </label>
+          <label>
+            <span>Z</span>
+            <input id="map-editor-edit-z" type="number" step="0.5" inputmode="decimal" />
+          </label>
+        </div>
+        <div class="map-editor-nudge-tools">
+          <label>
+            <span>Step</span>
+            <input id="map-editor-edit-step" type="number" min="0.1" max="100" step="0.1" value="1" inputmode="decimal" />
+          </label>
+          <button type="button" data-map-editor-nudge-axis="x" data-map-editor-nudge="-1">X-</button>
+          <button type="button" data-map-editor-nudge-axis="x" data-map-editor-nudge="1">X+</button>
+          <button type="button" data-map-editor-nudge-axis="y" data-map-editor-nudge="-1">Y-</button>
+          <button type="button" data-map-editor-nudge-axis="y" data-map-editor-nudge="1">Y+</button>
+          <button type="button" data-map-editor-nudge-axis="z" data-map-editor-nudge="-1">Z-</button>
+          <button type="button" data-map-editor-nudge-axis="z" data-map-editor-nudge="1">Z+</button>
+          <button id="map-editor-reset-position" type="button">Reset Pos</button>
+        </div>
+        <div class="map-editor-change-panel">
+          <span>Changes</span>
+          <pre id="map-editor-change-list">No position changes</pre>
+        </div>
+      </div>
+      <output id="map-editor-status" class="map-editor-status">Drag to orbit. Wheel to zoom. Click a registered map object.</output>
+      <pre id="map-editor-details" class="map-editor-details">No selection</pre>
+      <textarea id="map-editor-output" class="map-editor-output hidden" readonly aria-label="Selected map object JSON"></textarea>
+    </section>
+
     <section id="pause-menu" class="pause-menu hidden" aria-label="Pause menu" aria-modal="true" role="dialog">
       <div class="pause-panel">
         <div class="panel-title">
@@ -655,6 +743,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/main.js?v=exp123m-remove-sixty-percent-sea-cluster"></script>
+    <script type="module" src="./src/main.js?v=exp123s-gap-background-density"></script>
   </body>
 </html>

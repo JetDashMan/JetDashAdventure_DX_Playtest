@@ -1047,6 +1047,280 @@ body.is-resizing-debug-tuning {
   width: 26px;
 }
 
+.settings-panel.map-editor-panel {
+  top: 126px;
+  width: min(380px, calc(100vw - 36px));
+  max-height: calc(100vh - 148px);
+  padding: 10px;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, backdrop-filter 0.16s ease;
+}
+
+.settings-panel.map-editor-panel:not(:hover):not(:focus-within) {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(7, 18, 31, 0.2);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(4px);
+}
+
+.map-editor-title {
+  position: sticky;
+  top: -10px;
+  z-index: 2;
+  align-items: flex-start;
+  margin: -10px -10px 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(7, 18, 31, 0.96);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.map-editor-panel:not(:hover):not(:focus-within) .map-editor-title {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(7, 18, 31, 0.16);
+}
+
+.map-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.map-editor-actions button,
+.debug-map-editor-launch button {
+  min-height: 26px;
+  padding: 0 7px;
+  border-radius: 5px;
+  font-size: 0.62rem;
+}
+
+.map-editor-actions [data-close-panel="debug-map-editor"] {
+  min-width: 26px;
+  width: 26px;
+  padding: 0;
+}
+
+.map-editor-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.map-editor-mode-tabs button {
+  min-height: 26px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border-color: rgba(120, 214, 255, 0.18);
+  background: rgba(4, 13, 22, 0.34);
+  font-size: 0.62rem;
+}
+
+.map-editor-mode-tabs button.is-active {
+  border-color: rgba(255, 211, 68, 0.58);
+  background: rgba(255, 211, 68, 0.16);
+  color: #fff8d7;
+}
+
+.map-editor-tools {
+  display: grid;
+  gap: 4px;
+}
+
+.map-editor-tools label {
+  min-height: 34px;
+  padding: 5px 0;
+  font-size: 0.72rem;
+}
+
+.map-editor-tools select {
+  min-height: 28px;
+  font-size: 0.68rem;
+}
+
+.map-editor-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.map-editor-range input {
+  width: 100%;
+  min-width: 0;
+}
+
+.map-editor-range output,
+.map-editor-mode-status,
+.map-editor-status,
+.map-editor-details {
+  color: #effaff;
+  font-weight: 800;
+}
+
+.map-editor-range output {
+  font-size: 0.65rem;
+  text-align: right;
+}
+
+.map-editor-status {
+  display: block;
+  min-height: 28px;
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(120, 214, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.36);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.map-editor-mode-status {
+  display: block;
+  min-height: 22px;
+  margin-top: 7px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(120, 214, 255, 0.12);
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
+
+.map-editor-edit-panel {
+  display: none;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 7px;
+  border: 1px solid rgba(120, 214, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.28);
+}
+
+.map-editor-panel[data-mode="edit"] .map-editor-edit-panel {
+  display: grid;
+}
+
+.map-editor-edit-selected {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.map-editor-edit-selected span,
+.map-editor-change-panel > span {
+  color: rgba(241, 249, 255, 0.72);
+  text-transform: uppercase;
+}
+
+.map-editor-edit-selected output {
+  min-width: 0;
+  overflow: hidden;
+  color: #effaff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-editor-axis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.map-editor-axis-grid label,
+.map-editor-nudge-tools label {
+  display: grid;
+  gap: 2px;
+  min-height: 0;
+  padding: 0;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.map-editor-axis-grid input,
+.map-editor-nudge-tools input {
+  min-width: 0;
+  height: 25px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 0.62rem;
+}
+
+.map-editor-nudge-tools {
+  display: grid;
+  grid-template-columns: minmax(56px, 0.9fr) repeat(6, minmax(32px, 0.52fr)) minmax(68px, 1fr);
+  align-items: end;
+  gap: 4px;
+}
+
+.map-editor-nudge-tools button {
+  min-width: 0;
+  min-height: 25px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 0.58rem;
+}
+
+.map-editor-change-panel {
+  display: grid;
+  gap: 4px;
+}
+
+.map-editor-change-panel pre {
+  min-height: 44px;
+  max-height: 96px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid rgba(120, 214, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(2, 8, 15, 0.36);
+  color: #effaff;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.58rem;
+  line-height: 1.34;
+  white-space: pre-wrap;
+}
+
+.map-editor-details {
+  min-height: 116px;
+  max-height: 190px;
+  margin: 8px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid rgba(120, 214, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.3);
+  font-size: 0.62rem;
+  line-height: 1.36;
+  white-space: pre-wrap;
+}
+
+.map-editor-output {
+  width: 100%;
+  min-height: 70px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid rgba(120, 214, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(2, 8, 15, 0.72);
+  color: #effaff;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.62rem;
+  resize: vertical;
+}
+
+body.map-editor-active #game {
+  cursor: grab;
+}
+
+body.map-editor-orbiting #game {
+  cursor: grabbing;
+}
+
 .debug-block {
   display: grid;
   gap: 10px;
