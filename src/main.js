@@ -646,6 +646,7 @@ const debugTuneGroupOrder = Object.freeze([
   "Movement",
   "Boost",
   "Jump",
+  "Launch Pad",
   "Quickstep",
   "Gameplay",
   "DNA",
@@ -734,6 +735,12 @@ const debugTuneDefaults = Object.freeze({
   "jump.holdAccel": 9,
   "jump.gravityUp": 128,
   "jump.gravityDown": 82,
+  "launchPad.jumpVelocity": 92,
+  "launchPad.forwardSpeed": 470,
+  "launchPad.gravityScale": 0.62,
+  "launchPad.boostDuration": 3.2,
+  "launchPad.inputWindow": 0.42,
+  "launchPad.cameraKick": 1.05,
   "quickstep.duration": 0.2,
   "quickstep.distance": 4.2,
   "quickstep.cooldown": 0.015,
@@ -837,6 +844,12 @@ const debugTuneRegistry = Object.freeze({
   "jump.holdAccel": { group: "Jump", label: "Hold Accel", min: 0, max: 32, step: 0.5, precision: 2 },
   "jump.gravityUp": { group: "Jump", label: "Gravity Up", min: 40, max: 220, step: 1, precision: 2 },
   "jump.gravityDown": { group: "Jump", label: "Gravity Down", min: 30, max: 180, step: 1, precision: 2 },
+  "launchPad.jumpVelocity": { group: "Launch Pad", label: "Jump Velocity", min: 36, max: 140, step: 0.5, precision: 2 },
+  "launchPad.forwardSpeed": { group: "Launch Pad", label: "Forward SPEED", min: 220, max: 680, step: 5, precision: 0 },
+  "launchPad.gravityScale": { group: "Launch Pad", label: "Air Gravity Scale", min: 0.25, max: 1.25, step: 0.01, precision: 3 },
+  "launchPad.boostDuration": { group: "Launch Pad", label: "Boost Duration", min: 0.2, max: 6, step: 0.05, precision: 3 },
+  "launchPad.inputWindow": { group: "Launch Pad", label: "Input Window", min: 0.05, max: 1.2, step: 0.01, precision: 3 },
+  "launchPad.cameraKick": { group: "Launch Pad", label: "Camera Kick", min: 0, max: 2, step: 0.05, precision: 3 },
   "quickstep.duration": { group: "Quickstep", label: "Duration", min: 0.08, max: 0.45, step: 0.005, precision: 3 },
   "quickstep.distance": { group: "Quickstep", label: "Lane Distance", min: 3.4, max: 5.2, step: 0.05, precision: 3 },
   "quickstep.cooldown": { group: "Quickstep", label: "Cooldown", min: 0, max: 0.35, step: 0.005, precision: 3 },
@@ -1292,6 +1305,11 @@ const worldUp = new THREE.Vector3(0, 1, 0);
 const sunFollowOffset = new THREE.Vector3(-28, 46, 24);
 const playerStart = new THREE.Vector3(0, 2.2, 20);
 const lanes = [-4.2, 0, 4.2];
+const groundLayerMainRoad = "main-road";
+const groundLayerLaunchRoute = "launch-route";
+const groundSurfaceTrack = "track";
+const groundSurfaceLaunchRoute = "launch-route";
+const groundSurfaceLaunchPad = "launch-pad";
 const stageRoutes = ["1", "2", "test-room"];
 const defaultStageRoute = "1";
 const playableStageCount = 2;
@@ -1332,6 +1350,7 @@ const openingTrailerEndHoldMs = 650;
 const jetModelBaseY = 1.14;
 const jetFootGroundClearance = 0.015;
 const dashPadPlacements = currentStage.dashPads;
+const launchPadPlacements = currentStage.launchPads ?? [];
 const obstaclePlacements = currentStage.obstacles;
 const storedStageScore = Number(window.sessionStorage.getItem("dx-speed-stage-score"));
 const carriedStageScore = currentStageIndex > 0 && Number.isFinite(storedStageScore) ? storedStageScore : 0;
@@ -1340,6 +1359,7 @@ window.sessionStorage.removeItem("dx-speed-stage-score");
 const trackSegments = [];
 const dnaItems = [];
 const dashPads = [];
+const launchPads = [];
 // Obstacle position is stage-local for gameplay; basePosition/baseQuaternion are world-space render anchors.
 const obstacles = [];
 const looseDnaItems = [];
@@ -1432,6 +1452,9 @@ let dashPadChainCount = 0;
 let dashPadChainTimer = 0;
 let dashPadChainPulse = 0;
 let dashPadComboOverdriveBoosting = false;
+let launchPadBoostRemaining = 0;
+let launchPadBoostStartSpeed = 0;
+let launchPadBoostTargetSpeed = 0;
 let debugSuperBoostActive = false;
 const defaultStageMusicUrl = "./assets/audio/The_Final_Straightaway.mp3";
 const stageMusicUrls = [
@@ -1495,6 +1518,7 @@ const player = {
   position: stageStart.clone(),
   velocity: new THREE.Vector3(),
 };
+let playerGroundContext = createGroundSurfaceContext(null, false);
 
 let loadingScreenHideScheduled = false;
 const loadingManager = new THREE.LoadingManager();
@@ -1596,6 +1620,19 @@ const materials = {
     emissive: 0xb9f7ff,
     emissiveIntensity: 0.5,
     roughness: 0.3,
+  }),
+  launchPad: new THREE.MeshStandardMaterial({
+    color: 0x9c58ff,
+    emissive: 0x23f0ff,
+    emissiveIntensity: 1.0,
+    roughness: 0.18,
+    metalness: 0.12,
+  }),
+  launchPadArrow: new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xff78ff,
+    emissiveIntensity: 0.75,
+    roughness: 0.25,
   }),
   goal: new THREE.MeshStandardMaterial({
     color: 0xffdf50,
@@ -2726,6 +2763,7 @@ function init() {
   addStageThreeHarbor();
   addDnaItems();
   addDashPads();
+  addLaunchPads();
   addObstacles();
   addGoal();
   addPlayer();
@@ -3148,6 +3186,12 @@ function createStageTwoDefinition(label = "STAGE 2") {
     { lane: 0, z: -10740 },
   ];
   const dashPadEntryDnaPlan = makeDashPadEntryDnaPlan(dashPads);
+  const launchRouteSegments = [
+    { zStart: -5220, zEnd: -5480, yStart: 4.2, yEnd: 18.0, width: 12.4, xOffset: 0, launchRoute: true, edgeFallEnabled: true },
+    { zStart: -5480, zEnd: -6080, yStart: 18.0, yEnd: 23.0, width: 12.4, xOffset: 0, launchRoute: true, edgeFallEnabled: true },
+    { zStart: -6240, zEnd: -6740, yStart: 23.0, yEnd: 20.0, width: 12.4, xOffset: 0, launchRoute: true, edgeFallEnabled: true },
+    { zStart: -6740, zEnd: -7050, yStart: 20.0, yEnd: 7.4, width: 12.4, xOffset: 0, launchRoute: true, edgeFallEnabled: true },
+  ];
 
   return {
       label,
@@ -3199,8 +3243,12 @@ function createStageTwoDefinition(label = "STAGE 2") {
         [535, 0, goalZ - 60],
       ],
       trackSegments: makeTrackSegments(bridgeTrackNodes),
+      launchRouteSegments,
       sidePlatforms: [],
       dashPads,
+      launchPads: [
+        { lane5: 2, z: -6038, width: 11.2, depth: 15.5 },
+      ],
       obstacles: [
         { lanes: [0], z: startZ - 280, height: 2.0 },
         { lanes: [1, 2], z: startZ - 560, height: 2.1 },
@@ -3236,9 +3284,12 @@ function createStageTwoDefinition(label = "STAGE 2") {
         { type: "trail", lane: 0, zStart: -4190, count: 8, spacing: 11.0 },
         { type: "switch", pattern: [2, 1, 0, 1], zStart: -4520, count: 12, spacing: 10.0 },
         { type: "trail", lane: 1, zStart: -5120, count: 8, spacing: 8.5 },
+        { type: "trail", lane: 1, zStart: -5365, count: 8, spacing: 11.0 },
         { type: "trail", lane: 2, zStart: -5435, count: 8, spacing: 8.5 },
         { type: "trail", lane: 2, zStart: -5670, count: 8, spacing: 8.5 },
+        { type: "trail", lane: 1, zStart: -5785, count: 8, spacing: 10.5 },
         { type: "trail", lane: 2, zStart: -6000, count: 8, spacing: 8.5 },
+        { type: "rows", zStart: -6320, rowCount: 3, spacing: 16.0 },
         { type: "trail", lane: 0, zStart: -6215, count: 8, spacing: 7.0 },
         { type: "trail", lane: 0, zStart: -6365, count: 8, spacing: 8.5 },
         { type: "trail", lane: 0, zStart: -6680, count: 8, spacing: 9.5 },
@@ -5752,7 +5803,8 @@ function getGoalProgressForZ(z) {
 
 function isGwangalliBuildingRemovalZone(z) {
   const progress = getGoalProgressForZ(z);
-  return progress >= 0.35 && progress <= 0.56;
+  const isIsolatedSeaClusterAtSixtyPercent = Math.abs(z + 6200) < 1;
+  return isIsolatedSeaClusterAtSixtyPercent || (progress >= 0.35 && progress <= 0.56);
 }
 
 function addGwangalliIsland({ x, z, radius, height }) {
@@ -7180,6 +7232,9 @@ function addTrack() {
   for (const segment of currentStage.trackSegments) {
     addTrackSegment(segment);
   }
+  for (const segment of currentStage.launchRouteSegments ?? []) {
+    addTrackSegment(segment);
+  }
 
   const platformMaterial = new THREE.MeshStandardMaterial({
     color: 0xffc85a,
@@ -7326,6 +7381,7 @@ function addHarborRoadSlideObstacle(config) {
     baseQuaternion: group.quaternion.clone(),
     baseScale: group.scale.clone(),
     size: new THREE.Vector3(27.4, 8.4, 8.2),
+    ...getGroundSurfaceFields(sample),
     noIdleMotion: true,
     slideUnderRequired: true,
     dnaFrontClearance: 62,
@@ -7460,6 +7516,7 @@ function addHarborRoadContainerObstacle(config) {
     baseQuaternion: cargo.quaternion.clone(),
     baseScale: cargo.scale.clone(),
     size: new THREE.Vector3(sizeX, containerSize.height * collisionScale.y, sizeZ),
+    ...getGroundSurfaceFields(sample),
     noIdleMotion: true,
     harborRoadContainerObstacle: true,
     suppressGuideDna: config.guideDna === false,
@@ -8353,6 +8410,7 @@ function addHarborInfectedDrone(config) {
     baseQuaternion: group.quaternion.clone(),
     baseScale: group.scale.clone(),
     size: new THREE.Vector3(4.2, 4.9, 3.0),
+    ...getGroundSurfaceFields(sample),
     noIdleMotion: true,
     harborInfectedDrone: true,
     dnaFrontClearance: 42,
@@ -9843,6 +9901,7 @@ function addHarborCraneDropEvent(config) {
     blockedLane5Centers: getHarborCraneDropBlockedLane5Centers(config),
     phase: config.phase,
     groundY: sample.y,
+    groundSample: sample,
     startCenterY,
     landedCenterY,
     halfHeight,
@@ -10539,6 +10598,7 @@ function registerHarborDropObstacle(event) {
     baseQuaternion: event.cargo.quaternion.clone(),
     baseScale: event.cargo.scale.clone(),
     size: new THREE.Vector3(sizeX, containerSize.height * cargoScale.y, sizeZ),
+    ...getGroundSurfaceFields(event.groundSample),
     noIdleMotion: true,
   };
   obstacles.push(event.obstacle);
@@ -10566,11 +10626,15 @@ function updateHarborVehicleTransform(vehicle) {
   }
 }
 
-function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
+function addTrackSegment(segmentConfig) {
+  const { zStart, zEnd, yStart, yEnd, width } = segmentConfig;
+  const xOffset = segmentConfig.xOffset ?? 0;
   let material = trackSegments.length % 2 === 0 ? materials.track : materials.trackAlt;
   const segmentMidZ = (zStart + zEnd) * 0.5;
   if (currentStage.testRoom) {
     material = materials.testRoomGlass;
+  } else if (segmentConfig.launchRoute) {
+    material = materials.gwangalliBoardwalk;
   } else if (currentStage.harborTheme) {
     material = trackSegments.length % 2 === 0 ? materials.harborRoad : materials.harborRoadAlt;
   } else if (currentStage.gwangalliTheme) {
@@ -10578,14 +10642,33 @@ function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
     material = inTunnel ? materials.gwangalliTunnelRoad : materials.gwangalliRoad;
   }
   const track = new THREE.Mesh(
-    makeSlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, 1.25),
+    makeSlopedBoxGeometry(width, zStart, zEnd, yStart, yEnd, 1.25, xOffset),
     material,
   );
   track.receiveShadow = true;
   track.castShadow = false;
   scene.add(track);
 
-  const segment = { zStart, zEnd, yStart, yEnd, width, rail: true };
+  const groundLayer = segmentConfig.groundLayer
+    ?? (segmentConfig.launchRoute ? groundLayerLaunchRoute : groundLayerMainRoad);
+  const surfaceKind = segmentConfig.surfaceKind
+    ?? (segmentConfig.launchRoute ? groundSurfaceLaunchRoute : groundSurfaceTrack);
+  const surfaceId = segmentConfig.surfaceId
+    ?? `${groundLayer}:${trackSegments.length}`;
+  const segment = {
+    zStart,
+    zEnd,
+    yStart,
+    yEnd,
+    width,
+    xOffset,
+    rail: true,
+    launchRoute: Boolean(segmentConfig.launchRoute),
+    edgeFallEnabled: Boolean(segmentConfig.edgeFallEnabled),
+    groundLayer,
+    surfaceKind,
+    surfaceId,
+  };
   trackSegments.push(segment);
   if (currentStage.testRoom) return;
 
@@ -10593,8 +10676,47 @@ function addTrackSegment({ zStart, zEnd, yStart, yEnd, width }) {
     && isStageZInRange(segmentMidZ, getGwangalliTunnelStartZ(), currentStage.gwangalliTunnelEndZ ?? currentStage.goalZ);
   const useDefaultRailVisuals = !(currentStage.gwangalliTheme && segmentMidZ >= getGwangalliBridgeEndZ()) && !inGwangalliTunnel;
   if (useDefaultRailVisuals) {
-    addRail(segment, -width * 0.5 - 0.28);
-    addRail(segment, width * 0.5 + 0.28);
+    addRail(segment, xOffset - width * 0.5 - 0.28);
+    addRail(segment, xOffset + width * 0.5 + 0.28);
+  }
+  if (segment.launchRoute) {
+    addLaunchRouteSupports(segment);
+  }
+}
+
+function addLaunchRouteSupports(segment) {
+  const zStart = Math.max(segment.zStart, segment.zEnd);
+  const zEnd = Math.min(segment.zStart, segment.zEnd);
+  const length = Math.abs(zStart - zEnd);
+  const count = Math.max(2, Math.floor(length / 150));
+  const sideX = segment.width * 0.5 - 1.1;
+
+  for (let i = 0; i <= count; i += 1) {
+    const t = count === 0 ? 0 : i / count;
+    const z = THREE.MathUtils.lerp(zStart - 24, zEnd + 24, t);
+    if (!isStageZInRange(z, segment.zStart, segment.zEnd)) continue;
+    const baseSample = getStageDefinitionGroundSample(0, z);
+    if (!baseSample) continue;
+    const segmentT = (segment.zStart - z) / (segment.zStart - segment.zEnd);
+    const deckY = THREE.MathUtils.lerp(segment.yStart, segment.yEnd, segmentT);
+    const supportHeight = Math.max(2.6, deckY - baseSample.y - 0.7);
+
+    for (const x of [segment.xOffset - sideX, segment.xOffset + sideX]) {
+      const support = new THREE.Mesh(
+        new THREE.BoxGeometry(0.52, supportHeight, 0.52),
+        materials.gwangalliBridge,
+      );
+      support.castShadow = true;
+      support.receiveShadow = true;
+      setStageObjectTransform(
+        support,
+        new THREE.Vector3(x, baseSample.y + supportHeight * 0.5 - 0.08, z),
+        0,
+        0,
+        true,
+      );
+      scene.add(support);
+    }
   }
 }
 
@@ -10778,6 +10900,7 @@ function addDnaItems() {
       basePosition,
       baseQuaternion: getStageQuaternion(frame),
       up: frame.up.clone(),
+      ...getGroundSurfaceFields(sample),
       collected: false,
       spin: 1 + Math.random() * 0.8,
       spinAngle: 0,
@@ -10838,6 +10961,10 @@ function isDnaPlacementClear(x, z) {
   const clearOfDashPads = !dashPadPlacements.some((placement) => (
     Math.abs(x - getDashPadPlacementX(placement)) < 0.01 && Math.abs(z - placement.z) <= 3.7
   ));
+  const clearOfLaunchPads = !launchPadPlacements.some((placement) => (
+    Math.abs(x - getLaunchPadPlacementX(placement)) <= (placement.width ?? 9.8) * 0.5
+      && Math.abs(z - placement.z) <= (placement.depth ?? 8.4) * 0.5 + 1.6
+  ));
   const clearOfObstacles = !obstaclePlacements.some((placement) => (
     placement.lanes.some((lane) => Math.abs(x - lanes[lane]) < 0.01)
       && Math.abs(z - placement.z) <= 5.8
@@ -10851,7 +10978,7 @@ function isDnaPlacementClear(x, z) {
       && z <= obstacle.position.z + obstacle.size.z * 0.5 + frontClearance;
     return overlapsX && overlapsZ;
   });
-  return clearOfDashPads && clearOfObstacles && clearOfRuntimeObstacles;
+  return clearOfDashPads && clearOfLaunchPads && clearOfObstacles && clearOfRuntimeObstacles;
 }
 
 function shouldSkipSparseDnaGroup(itemCount) {
@@ -11007,6 +11134,12 @@ function addDashPads() {
   }
 }
 
+function addLaunchPads() {
+  for (const placement of launchPadPlacements) {
+    createLaunchPad(getLaunchPadPlacementX(placement), placement.z, placement);
+  }
+}
+
 function getDashPadPlacementX(placement) {
   if (Number.isFinite(placement.x)) return placement.x;
 
@@ -11019,6 +11152,15 @@ function getDashPadPlacementX(placement) {
     return harborCraneDropLane5Centers[lane5] ?? lanes[placement.lane] ?? 0;
   }
 
+  return lanes[placement.lane] ?? 0;
+}
+
+function getLaunchPadPlacementX(placement) {
+  if (Number.isFinite(placement.x)) return placement.x;
+  if (Number.isFinite(placement.lane5)) {
+    const lane5 = THREE.MathUtils.clamp(Math.round(placement.lane5), 0, harborCraneDropLane5Centers.length - 1);
+    return harborCraneDropLane5Centers[lane5] ?? 0;
+  }
   return lanes[placement.lane] ?? 0;
 }
 
@@ -11046,8 +11188,136 @@ function createDashPad(x, z) {
     mesh: group,
     position: new THREE.Vector3(x, sample.y + 0.42, z),
     radius: 3.2,
+    ...getGroundSurfaceFields(sample),
     cooldown: 0,
   });
+}
+
+function createLaunchPad(x, z, placement = {}) {
+  const sample = getGroundSample(x, z);
+  if (!sample) return;
+
+  const width = placement.width ?? 9.8;
+  const depth = placement.depth ?? 8.4;
+  const rampHeight = placement.rampHeight ?? Math.min(2.35, Math.max(1.18, depth * 0.13));
+  const visualYOffset = 0.06;
+  const entryHeight = 0.16;
+  const group = new THREE.Group();
+  setStageObjectTransform(group, new THREE.Vector3(x, sample.y + visualYOffset, z), 0, 0, true);
+
+  const ramp = new THREE.Mesh(makeLaunchPadRampGeometry(width, depth, rampHeight), materials.launchPad);
+  ramp.castShadow = false;
+  ramp.receiveShadow = true;
+  group.add(ramp);
+
+  const entryPlate = new THREE.Mesh(new THREE.BoxGeometry(width * 0.96, 0.12, depth * 0.24), materials.launchPad);
+  entryPlate.position.set(0, 0.08, depth * 0.38);
+  entryPlate.castShadow = false;
+  entryPlate.receiveShadow = true;
+  group.add(entryPlate);
+
+  for (const side of [-1, 1]) {
+    const sideRail = new THREE.Mesh(makeLaunchPadRampGeometry(0.34, depth * 1.02, rampHeight + 0.28), materials.launchPadArrow);
+    sideRail.position.set(side * (width * 0.5 + 0.24), 0.04, 0);
+    sideRail.castShadow = false;
+    sideRail.receiveShadow = true;
+    group.add(sideRail);
+  }
+
+  for (const t of [0.28, 0.48, 0.68, 0.86]) {
+    const ribZ = THREE.MathUtils.lerp(depth * 0.34, -depth * 0.36, t);
+    const slopeT = THREE.MathUtils.clamp((depth * 0.5 - ribZ) / depth, 0, 1);
+    const ribY = THREE.MathUtils.lerp(0.16, rampHeight, slopeT) + 0.08;
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(width * 0.76, 0.11, 0.2), materials.launchPadArrow);
+    rib.position.set(0, ribY, ribZ);
+    rib.castShadow = false;
+    rib.receiveShadow = true;
+    group.add(rib);
+  }
+
+  for (let i = 0; i < 3; i += 1) {
+    const arrow = new THREE.Mesh(makeArrowGeometry(1.45, 1.7), materials.launchPadArrow);
+    arrow.rotation.x = -Math.PI / 2;
+    arrow.position.set((i - 1) * width * 0.22, rampHeight + 0.08, -depth * 0.12);
+    arrow.scale.set(1, 1.18, 1);
+    group.add(arrow);
+  }
+
+  const lip = new THREE.Mesh(new THREE.BoxGeometry(width * 0.95, 0.24, 0.34), materials.launchPadArrow);
+  lip.position.set(0, rampHeight + 0.11, -depth * 0.46);
+  group.add(lip);
+
+  scene.add(group);
+  const launchPadSurfaceId = `launch-pad:${launchPads.length}`;
+  launchPads.push({
+    mesh: group,
+    position: new THREE.Vector3(x, sample.y, z),
+    segment: {
+      width,
+      xOffset: x,
+      rail: false,
+      launchRoute: Boolean(sample.segment.launchRoute),
+      launchPadSurface: true,
+      edgeFallEnabled: Boolean(sample.segment.edgeFallEnabled),
+      groundLayer: getGroundSampleLayer(sample),
+      surfaceKind: groundSurfaceLaunchPad,
+      surfaceId: launchPadSurfaceId,
+    },
+    ...getGroundSurfaceFields(sample),
+    groundLayer: getGroundSampleLayer(sample),
+    surfaceKind: groundSurfaceLaunchPad,
+    surfaceId: launchPadSurfaceId,
+    baseY: sample.y,
+    visualYOffset,
+    entryHeight,
+    rampHeight,
+    width,
+    depth,
+    halfWidth: width * 0.5,
+    halfDepth: depth * 0.5,
+    cooldown: 0,
+    activationTimer: 0,
+  });
+}
+
+function makeLaunchPadRampGeometry(width, depth, rampHeight) {
+  const halfWidth = width * 0.5;
+  const halfDepth = depth * 0.5;
+  const entryHeight = 0.16;
+  const vertices = [
+    -halfWidth, 0, halfDepth,
+    halfWidth, 0, halfDepth,
+    -halfWidth, 0, -halfDepth,
+    halfWidth, 0, -halfDepth,
+    -halfWidth, entryHeight, halfDepth,
+    halfWidth, entryHeight, halfDepth,
+    -halfWidth, rampHeight, -halfDepth,
+    halfWidth, rampHeight, -halfDepth,
+  ];
+  const uvs = [
+    0, 0,
+    1, 0,
+    0, 1,
+    1, 1,
+    0, 0,
+    1, 0,
+    0, 1,
+    1, 1,
+  ];
+  const indices = [
+    0, 2, 3, 0, 3, 1,
+    0, 1, 5, 0, 5, 4,
+    2, 6, 7, 2, 7, 3,
+    0, 4, 6, 0, 6, 2,
+    1, 3, 7, 1, 7, 5,
+    4, 5, 7, 4, 7, 6,
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vertices), 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function makeArrowGeometry(width, length) {
@@ -11115,6 +11385,7 @@ function createObstacle(x, z, width, height, depth) {
     basePosition: group.position.clone(),
     baseQuaternion: group.quaternion.clone(),
     size: new THREE.Vector3(width, height, depth),
+    ...getGroundSurfaceFields(sample),
   });
 }
 
@@ -12002,6 +12273,30 @@ function getJumpGravityUp() {
 
 function getJumpGravityDown() {
   return getDebugTuneValue("jump.gravityDown");
+}
+
+function getLaunchPadJumpVelocity() {
+  return getDebugTuneValue("launchPad.jumpVelocity");
+}
+
+function getLaunchPadForwardSpeed() {
+  return getDisplaySpeedDebugTuneValue("launchPad.forwardSpeed");
+}
+
+function getLaunchPadGravityScale() {
+  return getDebugTuneValue("launchPad.gravityScale");
+}
+
+function getLaunchPadBoostDuration() {
+  return getDebugTuneValue("launchPad.boostDuration");
+}
+
+function getLaunchPadInputWindow() {
+  return getDebugTuneValue("launchPad.inputWindow");
+}
+
+function getLaunchPadCameraKick() {
+  return getDebugTuneValue("launchPad.cameraKick");
 }
 
 function getDnaScoreValue() {
@@ -13707,6 +14002,7 @@ function updateGame(dt) {
   updateLooseDnaItems(dt);
   updateObstacles(dt);
   updateDashPads(dt);
+  updateLaunchPads(dt);
   updateDashPadChain(dt);
   updateStageThreeHarbor(dt);
   updateHarborImpactEffects(dt);
@@ -13770,7 +14066,7 @@ function updatePlayer(dt) {
   const strafeInput = THREE.MathUtils.clamp(keyboardStrafeInput + touchStrafeInput, -1, 1);
   const speedLimit = debugSuperBoostActive
     ? debugSuperBoostSpeed
-    : Math.max(getMaxHorizontalSpeed(), getDashPadComboOverdriveSpeedLimit());
+    : Math.max(getMaxHorizontalSpeed(), getDashPadComboOverdriveSpeedLimit(), getLaunchPadBoostSpeedLimit());
 
   if (boosting) {
     boostGauge = Math.max(0, boostGauge - getBoostDrainPerSecond() * dt);
@@ -13782,7 +14078,7 @@ function updatePlayer(dt) {
     slideTimer = 0;
   }
 
-  const dashPadTargetSpeed = Math.max(getDashPadTargetSpeed(), getDashPadComboOverdriveTargetSpeed());
+  const dashPadTargetSpeed = Math.max(getDashPadTargetSpeed(), getLaunchPadTargetSpeed(), getDashPadComboOverdriveTargetSpeed());
   const currentForwardSpeed = Math.max(0, -player.velocity.z);
   let targetVelocityZ = 0;
   let forwardAccel = 52;
@@ -13859,11 +14155,17 @@ function updatePlayer(dt) {
   const canJump = player.grounded || debugSettings.infiniteJump;
 
   if (!stunned && jumpQueued && canJump && !isPlayerSliding()) {
-    player.velocity.y = getJumpInitialVelocity()
+    const baseJumpVelocity = getJumpInitialVelocity()
       + Math.min(speed * getJumpSpeedBonusScale(), getJumpSpeedBonusCap());
-    player.grounded = false;
-    jumpHoldRemaining = getJumpHoldDuration();
-    jumpImpact = 1;
+    const launchPad = getLaunchPadJumpCandidate();
+    if (launchPad) {
+      triggerLaunchPadJump(launchPad, baseJumpVelocity);
+    } else {
+      player.velocity.y = baseJumpVelocity;
+      player.grounded = false;
+      jumpHoldRemaining = getJumpHoldDuration();
+      jumpImpact = 1;
+    }
   }
   jumpQueued = false;
 
@@ -13874,7 +14176,10 @@ function updatePlayer(dt) {
     jumpHoldRemaining = 0;
   }
 
-  player.velocity.y -= (player.velocity.y > 0 ? getJumpGravityUp() : getJumpGravityDown()) * dt;
+  const launchPadAirGravityScale = launchPadBoostRemaining > 0 && !player.grounded
+    ? getLaunchPadGravityScale()
+    : 1;
+  player.velocity.y -= (player.velocity.y > 0 ? getJumpGravityUp() : getJumpGravityDown()) * launchPadAirGravityScale * dt;
   player.position.addScaledVector(player.velocity, dt);
   if (player.position.z > stageStartZ + 8) {
     player.position.z = stageStartZ + 8;
@@ -13920,13 +14225,21 @@ function isPlayerSliding() {
 }
 
 function snapToGround() {
-  const sample = getGroundSample(player.position.x, player.position.z);
+  const wasGrounded = player.grounded;
+  const footY = player.position.y - player.radius;
+  const sample = getPlayerGroundSample(player.position.x, player.position.z, {
+    footY,
+    wasGrounded,
+  });
   player.grounded = false;
 
   if (sample) {
+    const segmentCenterX = sample.segment.xOffset ?? 0;
     const halfWidth = sample.segment.width * 0.5 - player.radius * 0.72;
-    if (sample.segment.rail && Math.abs(player.position.x) > halfWidth) {
-      player.position.x = Math.sign(player.position.x) * halfWidth;
+    const distanceFromSegmentCenter = player.position.x - segmentCenterX;
+    const canFallFromEdge = sample.segment.edgeFallEnabled && !wasGrounded;
+    if (sample.segment.rail && !canFallFromEdge && Math.abs(distanceFromSegmentCenter) > halfWidth) {
+      player.position.x = segmentCenterX + Math.sign(distanceFromSegmentCenter) * halfWidth;
       player.velocity.x *= -0.24;
     }
 
@@ -13942,43 +14255,182 @@ function snapToGround() {
       player.grounded = true;
     }
   }
+  updatePlayerGroundContext(sample, player.grounded);
 
   if (player.position.y < -18 || player.position.z > stageStartZ + 16) {
     resetGame();
   }
 }
 
-function getGroundSampleFromSegments(x, z, segments) {
+function getGroundSampleFromSegments(x, z, segments, options = {}) {
+  return chooseGroundSample(collectGroundSamplesFromSegments(x, z, segments), options);
+}
+
+function collectGroundSamplesFromSegments(x, z, segments) {
+  const samples = [];
   for (const segment of segments) {
     const zMin = Math.min(segment.zStart, segment.zEnd);
     const zMax = Math.max(segment.zStart, segment.zEnd);
-    if (z >= zMin && z <= zMax && Math.abs(x) <= segment.width * 0.5 + 0.2) {
+    const xOffset = segment.xOffset ?? 0;
+    if (z >= zMin && z <= zMax && Math.abs(x - xOffset) <= segment.width * 0.5 + 0.2) {
       const t = (segment.zStart - z) / (segment.zStart - segment.zEnd);
-      return {
+      samples.push({
         y: THREE.MathUtils.lerp(segment.yStart, segment.yEnd, t),
         segment,
-      };
+      });
     }
   }
-  return null;
+  return samples;
 }
 
-function getStageDefinitionGroundSample(x, z) {
-  return getGroundSampleFromSegments(x, z, currentStage.trackSegments);
+function getHighestGroundSample(samples) {
+  let bestSample = null;
+  for (const sample of samples) {
+    if (!bestSample || sample.y > bestSample.y) {
+      bestSample = sample;
+    }
+  }
+  return bestSample;
 }
 
-function getGroundSample(x, z) {
-  return getGroundSampleFromSegments(x, z, trackSegments);
+function chooseGroundSample(samples, options = {}) {
+  if (!hasGroundSampleFilter(options)) return getHighestGroundSample(samples);
+  const filteredSamples = filterGroundSamples(samples, options);
+  return getHighestGroundSample(filteredSamples);
+}
+
+function filterGroundSamples(samples, options = {}) {
+  if (!hasGroundSampleFilter(options)) return samples;
+
+  return samples.filter((sample) => {
+    if (options.groundLayer && getGroundSampleLayer(sample) !== options.groundLayer) return false;
+    if (options.surfaceId && getGroundSampleSurfaceId(sample) !== options.surfaceId) return false;
+    if (options.surfaceKind && getGroundSampleSurfaceKind(sample) !== options.surfaceKind) return false;
+    return true;
+  });
+}
+
+function hasGroundSampleFilter(options = {}) {
+  return Boolean(options.groundLayer || options.surfaceId || options.surfaceKind);
+}
+
+function getPlayerGroundSample(x, z, options = {}) {
+  const samples = [
+    ...collectGroundSamplesFromSegments(x, z, trackSegments),
+    ...getLaunchPadSurfaceSamples(x, z),
+  ];
+  const footY = options.footY;
+  const elevatedStepUp = options.wasGrounded ? 1.45 : 0.08;
+  const eligibleSamples = Number.isFinite(footY)
+    ? samples.filter((sample) => {
+      if (!isElevatedGroundSample(sample)) return true;
+      return sample.y <= footY + elevatedStepUp;
+    })
+    : samples;
+  return getHighestGroundSample(eligibleSamples);
+}
+
+function isElevatedGroundSample(sample) {
+  return Boolean(sample?.segment?.launchRoute || sample?.segment?.launchPadSurface);
+}
+
+function getGroundSampleLayer(sample) {
+  return sample?.segment?.groundLayer ?? groundLayerMainRoad;
+}
+
+function getGroundSampleSurfaceKind(sample) {
+  return sample?.segment?.surfaceKind ?? groundSurfaceTrack;
+}
+
+function getGroundSampleSurfaceId(sample) {
+  return sample?.segment?.surfaceId ?? getGroundSampleLayer(sample);
+}
+
+function getGroundSurfaceFields(sample) {
+  return {
+    groundLayer: getGroundSampleLayer(sample),
+    surfaceKind: getGroundSampleSurfaceKind(sample),
+    surfaceId: getGroundSampleSurfaceId(sample),
+  };
+}
+
+function createGroundSurfaceContext(sample, grounded) {
+  return {
+    sample,
+    segment: sample?.segment ?? null,
+    layer: sample ? getGroundSampleLayer(sample) : null,
+    surfaceKind: sample ? getGroundSampleSurfaceKind(sample) : null,
+    surfaceId: sample ? getGroundSampleSurfaceId(sample) : null,
+    grounded,
+  };
+}
+
+function updatePlayerGroundContext(sample, grounded) {
+  playerGroundContext = createGroundSurfaceContext(sample, grounded);
+}
+
+function getPlayerInteractionGroundSample() {
+  return getPlayerGroundSample(player.position.x, player.position.z, {
+    footY: player.position.y - player.radius,
+    wasGrounded: player.grounded,
+  });
+}
+
+function getObjectGroundLayer(object) {
+  return object?.groundLayer ?? object?.segment?.groundLayer ?? null;
+}
+
+function isPlayerGroundLayerCompatible(object) {
+  const objectLayer = getObjectGroundLayer(object);
+  if (!objectLayer || !playerGroundContext.layer) return true;
+  return objectLayer === playerGroundContext.layer;
+}
+
+function canGroundedPlayerInteractWithLayeredObject(object) {
+  return !player.grounded || isPlayerGroundLayerCompatible(object);
+}
+
+function getLaunchPadSurfaceSamples(x, z) {
+  const samples = [];
+  for (const pad of launchPads) {
+    const sample = getLaunchPadSurfaceSampleForPad(pad, x, z);
+    if (sample) samples.push(sample);
+  }
+  return samples;
+}
+
+function getLaunchPadSurfaceSampleForPad(pad, x, z) {
+  if (Math.abs(x - pad.position.x) > pad.halfWidth + 0.18) return null;
+  if (Math.abs(z - pad.position.z) > pad.halfDepth + 0.18) return null;
+
+  const localZ = z - pad.position.z;
+  const slopeT = THREE.MathUtils.clamp((pad.halfDepth - localZ) / Math.max(0.01, pad.depth), 0, 1);
+  return {
+    y: pad.baseY + pad.visualYOffset + THREE.MathUtils.lerp(pad.entryHeight, pad.rampHeight, slopeT),
+    segment: pad.segment,
+    launchPad: pad,
+  };
+}
+
+function getStageDefinitionGroundSample(x, z, options = {}) {
+  return getGroundSampleFromSegments(x, z, currentStage.trackSegments, options);
+}
+
+function getGroundSample(x, z, options = {}) {
+  return getGroundSampleFromSegments(x, z, trackSegments, options);
 }
 
 function startQuickStep(direction) {
-  const sample = getGroundSample(player.position.x, player.position.z);
+  const sample = getPlayerInteractionGroundSample();
   if (!sample) return;
 
   const laneDirection = Math.sign(direction);
   if (laneDirection === 0) return;
 
-  const halfWidth = sample.segment.width * 0.5 - player.radius * 1.2;
+  let halfWidth = sample.segment.width * 0.5 - player.radius * 1.2;
+  if (sample.segment.edgeFallEnabled && !player.grounded) {
+    halfWidth = Math.max(halfWidth, getQuickStepDistance() * 2);
+  }
   quickStepDirection = laneDirection;
   quickStepStartX = player.position.x;
   quickStepTargetX = getQuickStepTargetX(laneDirection, halfWidth);
@@ -14038,12 +14490,31 @@ function getClosestQuickStepLaneIndex(laneCenters, x) {
 function checkDashPads() {
   for (const pad of dashPads) {
     if (pad.cooldown > 0) continue;
+    if (!canGroundedPlayerInteractWithLayeredObject(pad)) continue;
 
     const distance = player.position.distanceTo(pad.position);
     if (distance < pad.radius && player.grounded) {
       triggerDashPad(pad);
     }
   }
+}
+
+function getLaunchPadJumpCandidate() {
+  let bestPad = null;
+  let bestDistanceZ = Infinity;
+  for (const pad of launchPads) {
+    if (pad.cooldown > 0 || pad.activationTimer <= 0) continue;
+    if (!canGroundedPlayerInteractWithLayeredObject(pad)) continue;
+    const withinX = Math.abs(player.position.x - pad.position.x) <= pad.halfWidth + player.radius * 0.4;
+    const withinZ = Math.abs(player.position.z - pad.position.z) <= pad.halfDepth + player.radius * 0.6;
+    if (!withinX || !withinZ) continue;
+    const distanceZ = Math.abs(player.position.z - pad.position.z);
+    if (distanceZ < bestDistanceZ) {
+      bestDistanceZ = distanceZ;
+      bestPad = pad;
+    }
+  }
+  return bestPad;
 }
 
 function getDashComboTimeout() {
@@ -14108,6 +14579,29 @@ function triggerDashPad(pad) {
   dashPadChainPulse = Math.max(dashPadChainPulse, chain.pulse);
   boostCameraKick = Math.max(boostCameraKick, chain.climax ? 1 : 0.85);
   boostCameraSustain = Math.max(boostCameraSustain, chain.climax ? 0.62 : 0.42);
+  playerBoostEffectActive = true;
+  pulseDashPad(pad.mesh);
+}
+
+function triggerLaunchPadJump(pad, baseJumpVelocity) {
+  const currentSpeed = Math.min(getHorizontalSpeed(), Math.max(getMaxHorizontalSpeed(), getLaunchPadForwardSpeed()));
+  const targetSpeed = Math.max(currentSpeed, getLaunchPadForwardSpeed());
+  const jumpVelocity = Math.max(baseJumpVelocity, getLaunchPadJumpVelocity());
+
+  launchPadBoostStartSpeed = currentSpeed;
+  launchPadBoostTargetSpeed = targetSpeed;
+  launchPadBoostRemaining = getLaunchPadBoostDuration();
+  player.velocity.x *= 0.25;
+  player.velocity.z = -targetSpeed;
+  player.velocity.y = jumpVelocity;
+  player.grounded = false;
+  jumpHoldRemaining = getJumpHoldDuration();
+  jumpImpact = 1.25;
+  pad.cooldown = Math.max(0.75, getLaunchPadInputWindow() + 0.35);
+  pad.activationTimer = 0;
+  quickStepFlash = 1;
+  boostCameraKick = Math.max(boostCameraKick, getLaunchPadCameraKick());
+  boostCameraSustain = Math.max(boostCameraSustain, 0.55);
   playerBoostEffectActive = true;
   pulseDashPad(pad.mesh);
 }
@@ -14198,6 +14692,16 @@ function resetDashPadChain() {
   hideDashChainFeedback();
 }
 
+function resetLaunchPadBoost() {
+  launchPadBoostRemaining = 0;
+  launchPadBoostStartSpeed = 0;
+  launchPadBoostTargetSpeed = 0;
+  for (const pad of launchPads) {
+    pad.cooldown = 0;
+    pad.activationTimer = 0;
+  }
+}
+
 function pulseDashPad(mesh) {
   mesh.scale.set(1.08, 1.08, 1.08);
   setTimeout(() => mesh.scale.set(1, 1, 1), 95);
@@ -14214,6 +14718,31 @@ function updateDashPads(dt) {
   }
 }
 
+function updateLaunchPads(dt) {
+  launchPadBoostRemaining = Math.max(0, launchPadBoostRemaining - dt);
+  if (launchPadBoostRemaining <= 0) {
+    launchPadBoostStartSpeed = 0;
+    launchPadBoostTargetSpeed = 0;
+  }
+
+  for (const pad of launchPads) {
+    pad.cooldown = Math.max(0, pad.cooldown - dt);
+    const surfaceSample = getLaunchPadSurfaceSampleForPad(pad, player.position.x, player.position.z);
+    const playerFootY = player.position.y - player.radius;
+    const onPad = player.grounded
+      && surfaceSample
+      && isPlayerGroundLayerCompatible(pad)
+      && Math.abs(player.position.x - pad.position.x) <= pad.halfWidth + player.radius * 0.45
+      && Math.abs(player.position.z - pad.position.z) <= pad.halfDepth + player.radius * 0.7
+      && Math.abs(playerFootY - surfaceSample.y) <= 1.2;
+    if (onPad && pad.cooldown <= 0) {
+      pad.activationTimer = getLaunchPadInputWindow();
+    } else {
+      pad.activationTimer = Math.max(0, pad.activationTimer - dt);
+    }
+  }
+}
+
 function getDashPadTargetSpeed() {
   if (dashPadBoostRemaining <= 0) return 0;
 
@@ -14222,12 +14751,19 @@ function getDashPadTargetSpeed() {
   return THREE.MathUtils.lerp(dashPadBoostStartSpeed, boostedTarget, fade);
 }
 
+function getLaunchPadTargetSpeed() {
+  if (launchPadBoostRemaining <= 0) return 0;
+  const duration = Math.max(0.01, getLaunchPadBoostDuration());
+  const fade = THREE.MathUtils.clamp(launchPadBoostRemaining / duration, 0, 1);
+  return THREE.MathUtils.lerp(launchPadBoostStartSpeed, launchPadBoostTargetSpeed, fade);
+}
+
 function isDashPadComboOverdriveActive() {
   return dashPadChainTimer > 0 && dashPadChainCount >= getDashComboOverdriveStartCount();
 }
 
 function isDashPadBoostMotionActive() {
-  return dashPadBoostRemaining > 0 || isDashPadComboOverdriveActive();
+  return dashPadBoostRemaining > 0 || launchPadBoostRemaining > 0 || isDashPadComboOverdriveActive();
 }
 
 function getDashPadComboOverdriveTargetSpeed() {
@@ -14238,6 +14774,10 @@ function getDashPadComboOverdriveTargetSpeed() {
 function getDashPadComboOverdriveSpeedLimit() {
   if (!dashPadComboOverdriveBoosting) return 0;
   return getDashComboOverdriveTopSpeed();
+}
+
+function getLaunchPadBoostSpeedLimit() {
+  return launchPadBoostRemaining > 0 ? getLaunchPadForwardSpeed() : 0;
 }
 
 function syncDashComboOverdrivePresentation() {
@@ -14322,7 +14862,9 @@ function updateLooseDnaItems(dt) {
     loose.localPosition.addScaledVector(loose.velocity, dt);
     loose.spinAngle += dt * loose.spin * 1.4;
 
-    const sample = getGroundSample(loose.localPosition.x, loose.localPosition.z);
+    const sample = getGroundSample(loose.localPosition.x, loose.localPosition.z, {
+      groundLayer: loose.groundLayer,
+    });
     if (sample && loose.localPosition.y <= sample.y + 0.46) {
       loose.localPosition.y = sample.y + 0.46;
       if (loose.velocity.y < 0) {
@@ -14334,7 +14876,11 @@ function updateLooseDnaItems(dt) {
 
     setStageObjectTransform(loose.mesh, loose.localPosition, loose.spinAngle);
 
-    if (loose.age > loose.collectDelay && loose.localPosition.distanceTo(player.position) < getLooseDnaCollectRadius()) {
+    if (
+      loose.age > loose.collectDelay
+      && canGroundedPlayerInteractWithLayeredObject(loose)
+      && loose.localPosition.distanceTo(player.position) < getLooseDnaCollectRadius()
+    ) {
       collectedDna += 1;
       addScore(getDnaScoreValue());
       restoreBoostGauge(getDnaBoostGaugeGain());
@@ -14353,6 +14899,7 @@ function updateLooseDnaItems(dt) {
 function checkDnaCollection() {
   for (const dna of dnaItems) {
     if (dna.collected) continue;
+    if (!canGroundedPlayerInteractWithLayeredObject(dna)) continue;
     if (dna.localPosition.distanceTo(player.position) < getDnaCollectRadius()) {
       dna.collected = true;
       hideDnaInstance(dna);
@@ -14375,6 +14922,8 @@ function checkObstacleCollision() {
   if (hitCooldown > 0) return;
 
   for (const obstacle of obstacles) {
+    if (!canGroundedPlayerInteractWithLayeredObject(obstacle)) continue;
+
     const dx = Math.abs(player.position.x - obstacle.position.x);
     const dz = Math.abs(player.position.z - obstacle.position.z);
     const collisionRadius = player.radius * getCollisionPlayerRadiusScale();
@@ -14387,8 +14936,11 @@ function checkObstacleCollision() {
       continue;
     }
 
+    const obstacleBottom = obstacle.position.y - obstacle.size.y * 0.5;
     const obstacleTop = obstacle.position.y + obstacle.size.y * 0.5;
+    const playerTop = player.position.y + player.radius;
     const playerBottom = player.position.y - player.radius;
+    if (playerTop < obstacleBottom + getCollisionTopGrace()) continue;
     if (playerBottom > obstacleTop - getCollisionTopGrace()) continue;
 
     handleObstacleHit(obstacle);
@@ -14402,6 +14954,7 @@ function handleObstacleHit(obstacle) {
   addScore(-getObstacleScorePenalty());
   dashPadBoostStartSpeed = 0;
   dashPadBoostRemaining = 0;
+  resetLaunchPadBoost();
   resetDashPadChain();
   quickStepQueued = 0;
   quickStepTimer = 0;
@@ -14421,6 +14974,9 @@ function dropCollectedDna() {
 
   collectedDna = 0;
   const origin = player.position.clone();
+  const looseDnaSurface = playerGroundContext.sample
+    ? getGroundSurfaceFields(playerGroundContext.sample)
+    : {};
 
   for (let i = 0; i < count; i += 1) {
     const meteor = new THREE.Mesh(dnaGeometry, materials.dna);
@@ -14450,6 +15006,7 @@ function dropCollectedDna() {
       collectDelay: getLooseDnaCollectDelay(),
       spin: 5 + Math.random() * 6,
       spinAngle: 0,
+      ...looseDnaSurface,
     });
   }
 }
@@ -18063,6 +18620,8 @@ function updateHud() {
     ? 2000
     : dashPadComboOverdriveBoosting
     ? getDashComboOverdriveDisplayTopSpeed()
+    : launchPadBoostRemaining > 0
+    ? Math.max(400, Math.round(getLaunchPadForwardSpeed() * speedDisplayScale))
     : 400;
   dnaEl.textContent = `${collectedDna}/${dnaItems.length}`;
   speedEl.textContent = `${Math.round(Math.min(getHorizontalSpeed() * speedDisplayScale, speedCap))}`;
@@ -18108,6 +18667,7 @@ function warpToGoalProgress(progress) {
   jetFootContactOffsetY = 0;
   clearQuickStepAfterimages();
   dashPadBoostRemaining = 0;
+  resetLaunchPadBoost();
   resetDashPadChain();
   velocityMotionBlurTarget = 0;
   velocityMotionBlurStrength = 0;
@@ -18192,6 +18752,7 @@ function resetGame(options = {}) {
   resetVelocityMotionHistory();
   dashPadBoostStartSpeed = 0;
   dashPadBoostRemaining = 0;
+  resetLaunchPadBoost();
   resetDashPadChain();
   debugSuperBoostActive = false;
   startedAt = performance.now();
