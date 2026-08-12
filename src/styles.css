@@ -1102,7 +1102,7 @@ body.is-resizing-debug-tuning {
 
 .map-editor-mode-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   margin-bottom: 7px;
 }
@@ -1201,6 +1201,49 @@ body.is-resizing-debug-tuning {
   display: grid;
 }
 
+.map-editor-place-panel {
+  display: none;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 7px;
+  border: 1px solid rgba(120, 214, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(4, 13, 22, 0.28);
+}
+
+.map-editor-panel[data-mode="place"] .map-editor-place-panel {
+  display: grid;
+}
+
+.map-editor-place-panel > label,
+.map-editor-place-options label {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0;
+  color: rgba(241, 249, 255, 0.72);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.map-editor-place-panel select,
+.map-editor-place-options input {
+  min-width: 0;
+  height: 27px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 0.62rem;
+}
+
+.map-editor-place-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
 .map-editor-edit-selected {
   display: grid;
   grid-template-columns: 66px minmax(0, 1fr);
@@ -1264,6 +1307,80 @@ body.is-resizing-debug-tuning {
   font-size: 0.58rem;
 }
 
+.map-editor-place-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.map-editor-place-primary-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.map-editor-place-secondary-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.map-editor-place-actions button {
+  min-width: 0;
+  min-height: 25px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 0.56rem;
+}
+
+.map-editor-place-import {
+  width: 100%;
+  min-height: 48px;
+  max-height: 92px;
+  padding: 6px;
+  resize: vertical;
+  border: 1px solid rgba(120, 214, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(2, 8, 15, 0.36);
+  color: #effaff;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.58rem;
+  line-height: 1.34;
+}
+
+.map-editor-placed-list {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  max-height: 112px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid rgba(120, 214, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(2, 8, 15, 0.36);
+  color: #effaff;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.58rem;
+  line-height: 1.34;
+}
+
+.map-editor-placed-list button {
+  width: 100%;
+  min-height: 24px;
+  padding: 3px 5px;
+  overflow: hidden;
+  border: 1px solid rgba(120, 214, 255, 0.18);
+  border-radius: 4px;
+  background: rgba(22, 53, 78, 0.46);
+  color: #effaff;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-editor-placed-list button:hover,
+.map-editor-placed-list button[aria-selected="true"] {
+  border-color: rgba(255, 211, 68, 0.82);
+  background: rgba(117, 83, 15, 0.54);
+}
+
 .map-editor-change-panel {
   display: grid;
   gap: 4px;
@@ -1315,6 +1432,10 @@ body.is-resizing-debug-tuning {
 
 body.map-editor-active #game {
   cursor: grab;
+}
+
+body.map-editor-active.map-editor-place-ready #game {
+  cursor: crosshair;
 }
 
 body.map-editor-orbiting #game {

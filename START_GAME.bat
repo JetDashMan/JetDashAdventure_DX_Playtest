@@ -2,18 +2,20 @@
 setlocal
 
 cd /d "%~dp0"
+set "PORT=4178"
+set "BIND_ADDRESS=0.0.0.0"
 
 where py >nul 2>nul
 if %errorlevel%==0 (
-  start "" "http://localhost:4173"
-  py -m http.server 4173
+  start "" "http://127.0.0.1:%PORT%"
+  py -m http.server %PORT% --bind %BIND_ADDRESS%
   goto :end
 )
 
 where python >nul 2>nul
 if %errorlevel%==0 (
-  start "" "http://localhost:4173"
-  python -m http.server 4173
+  start "" "http://127.0.0.1:%PORT%"
+  python -m http.server %PORT% --bind %BIND_ADDRESS%
   goto :end
 )
 

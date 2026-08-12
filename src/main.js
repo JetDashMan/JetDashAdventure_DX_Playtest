@@ -70,6 +70,23 @@ const mapEditorEditStepInput = document.querySelector("#map-editor-edit-step");
 const mapEditorNudgeButtons = document.querySelectorAll("[data-map-editor-nudge-axis]");
 const mapEditorResetPositionButton = document.querySelector("#map-editor-reset-position");
 const mapEditorChangeListEl = document.querySelector("#map-editor-change-list");
+const mapEditorPlaceObjectSelect = document.querySelector("#map-editor-place-object");
+const mapEditorPlaceXInput = document.querySelector("#map-editor-place-x");
+const mapEditorPlaceYInput = document.querySelector("#map-editor-place-y");
+const mapEditorPlaceZInput = document.querySelector("#map-editor-place-z");
+const mapEditorPlaceScaleInput = document.querySelector("#map-editor-place-scale");
+const mapEditorPlaceRotationInput = document.querySelector("#map-editor-place-rotation");
+const mapEditorPlaceAtFocusButton = document.querySelector("#map-editor-place-at-focus");
+const mapEditorPlaceCommitButton = document.querySelector("#map-editor-place-commit");
+const mapEditorDuplicatePlacedButton = document.querySelector("#map-editor-duplicate-placed");
+const mapEditorDeleteSelectedPlacedButton = document.querySelector("#map-editor-delete-selected-placed");
+const mapEditorUndoPlacedButton = document.querySelector("#map-editor-undo-placed");
+const mapEditorRedoPlacedButton = document.querySelector("#map-editor-redo-placed");
+const mapEditorCopyPlacedButton = document.querySelector("#map-editor-copy-placed");
+const mapEditorImportPlacedButton = document.querySelector("#map-editor-import-placed");
+const mapEditorClearPlacedButton = document.querySelector("#map-editor-clear-placed");
+const mapEditorPlaceImportInput = document.querySelector("#map-editor-place-import");
+const mapEditorPlacedListEl = document.querySelector("#map-editor-placed-list");
 const mapEditorStatusEl = document.querySelector("#map-editor-status");
 const mapEditorDetailsEl = document.querySelector("#map-editor-details");
 const mapEditorOutputEl = document.querySelector("#map-editor-output");
@@ -1390,6 +1407,11 @@ const looseDnaItems = [];
 const mapEditorObjects = [];
 const mapEditorObjectById = new Map();
 const mapEditorHiddenObjectIds = new Set();
+const mapEditorPlacedObjects = [];
+const mapEditorPlaceHistory = [];
+const mapEditorPlaceRedoHistory = [];
+const mapEditorPlacementStoragePrefix = "dx-map-editor-placements-v1";
+const mapEditorPlacementHistoryLimit = 40;
 const quickStepAfterimages = [];
 const staticStageFrameCache = new Map();
 const staticStageSceneryFrameCache = new Map();
@@ -1401,6 +1423,61 @@ const mapEditorCameraOffset = new THREE.Vector3();
 const mapEditorLocalPositionScratch = new THREE.Vector3();
 const mapEditorBaseWorldPositionScratch = new THREE.Vector3();
 const mapEditorNextWorldPositionScratch = new THREE.Vector3();
+const mapEditorPlacementLocalPoint = new THREE.Vector3();
+const mapEditorPlacementPlaneSize = Object.freeze({ width: 560, depth: 680 });
+const mapEditorPlacePresets = Object.freeze({
+  urbanTowerMedium: {
+    label: "Urban Tower M",
+    kind: "visual-building",
+    width: 16,
+    depth: 20,
+    height: 72,
+    material: "gwangalliBuilding",
+    glassMaterial: "gwangalliWindow",
+    windowRows: 7,
+  },
+  urbanTowerTall: {
+    label: "Urban Tower L",
+    kind: "visual-building",
+    width: 22,
+    depth: 24,
+    height: 118,
+    material: "rightCityDarkGlass",
+    glassMaterial: "rightCityGlass",
+    windowRows: 9,
+    crown: true,
+  },
+  lowCityBlock: {
+    label: "Low City Block",
+    kind: "visual-building",
+    width: 38,
+    depth: 30,
+    height: 18,
+    material: "rightCityFacade",
+    glassMaterial: "rightCityGlass",
+    windowRows: 3,
+    roof: true,
+  },
+  apartmentCluster: {
+    label: "Apartment Cluster",
+    kind: "visual-building-cluster",
+    width: 54,
+    depth: 42,
+    height: 62,
+    material: "gwangalliIparkFacade",
+    glassMaterial: "haeundaeExordiumGlass",
+    cluster: 3,
+  },
+  treeCluster: {
+    label: "Tree Cluster",
+    kind: "visual-nature",
+    width: 34,
+    depth: 28,
+    height: 16,
+    material: "coastalForest",
+    cluster: 5,
+  },
+});
 const mapEditorViewPresets = {
   angled: {
     yaw: THREE.MathUtils.degToRad(38),
@@ -1426,6 +1503,7 @@ const mapEditorViewPresets = {
 const mapEditorModeStatusText = Object.freeze({
   inspect: "Inspect",
   edit: "Edit Position",
+  place: "Place Object",
   export: "Export Ready",
 });
 const mapEditorState = {
@@ -1438,6 +1516,20 @@ const mapEditorState = {
   distance: mapEditorViewPresets.angled.distance,
   selectedRecord: null,
   selectionHelper: null,
+  placementSurface: null,
+  placePreview: null,
+  placedFootprintHelper: null,
+  placeValid: false,
+  placePresetKey: "urbanTowerMedium",
+  placeLocalPosition: {
+    x: 160,
+    y: 0,
+    z: playerStart.z,
+  },
+  placeScale: 1,
+  placeRotation: 0,
+  placedObjectSerial: 0,
+  placedRestoredStage: null,
 };
 const mapEditorPointerState = {
   active: false,
@@ -4126,7 +4218,6 @@ function addGwangalliBeachEnvironment() {
   addGwangalliCoastalLandmarks();
   addYonghoBayLandmarkScenery();
   addGwangalliMidwayResidentialCorridor();
-  addGwangalliTunnelApproachCityDensity();
   addGwangalliDenseUrbanCorridor();
   addShinseondaeTunnelApproach();
   addShinseondaeTunnel();
@@ -6474,470 +6565,6 @@ function addGwangalliMidwayRoadsideTrees(startZ, endZ) {
   crownMesh.receiveShadow = true;
   scene.add(trunkMesh);
   scene.add(crownMesh);
-}
-
-function addGwangalliTunnelApproachCityDensity() {
-  if (!currentStage.gwangalliTheme) return;
-
-  const tunnelStartZ = getGwangalliTunnelStartZ();
-  if (!Number.isFinite(tunnelStartZ)) return;
-
-  const startZ = getGwangalliBridgeEndZ() - 150;
-  const endZ = tunnelStartZ + 430;
-  addGwangalliApproachRoadsideDensity(startZ, endZ);
-  addGwangalliApproachOverheadSigns(startZ, endZ);
-  addGwangalliApproachDistantSkyline(startZ, endZ);
-  addGwangalliApproachRightWaterfrontDistrict(startZ, endZ);
-  addGwangalliLaunchGapUrbanBackfill();
-
-  const rowSpacing = 285;
-  let rowIndex = 0;
-  for (let z = startZ - 90; z > endZ; z -= rowSpacing) {
-    const ground = getStageDefinitionGroundSample(0, z);
-    if (!ground) {
-      rowIndex += 1;
-      continue;
-    }
-
-    const group = new THREE.Group();
-    setStageSceneryTransform(group, new THREE.Vector3(0, ground.y - 0.95, z), 0, 0, true);
-
-    for (const side of [-1, 1]) {
-      addGwangalliApproachCityBlock(group, side, rowIndex);
-    }
-
-    scene.add(group);
-    registerMapEditorObject(group, {
-      id: `stage1-tunnel-approach-urban-row-${rowIndex}`,
-      label: `Stage 1 Tunnel Approach Urban Row ${rowIndex}`,
-      kind: "building-row",
-      source: "addGwangalliTunnelApproachCityDensity",
-      localPosition: { x: 0, y: ground.y - 0.95, z },
-      metadata: { rowIndex, progressPercent: Math.round(getGoalProgressForZ(z) * 100) },
-    });
-    rowIndex += 1;
-  }
-}
-
-function addGwangalliLaunchGapUrbanBackfill() {
-  if (!currentStage.gwangalliTheme) return;
-
-  const rows = [
-    { z: -6068, x: 138, width: 156, depth: 246 },
-    { z: -6238, x: 154, width: 172, depth: 252 },
-    { z: -6370, x: 146, width: 150, depth: 214 },
-  ];
-
-  rows.forEach((row, rowIndex) => {
-    const ground = getStageDefinitionGroundSample(0, row.z);
-    if (!ground) return;
-
-    for (const side of [-1, 1]) {
-      const group = new THREE.Group();
-      const sideName = side > 0 ? "right" : "left";
-      const x = side * row.x;
-      const y = Math.max(seaLevelY + 0.4, ground.y - 1.2);
-      setStageSceneryTransform(group, new THREE.Vector3(x, y, row.z), side * 0.04, 0, true);
-
-      const foundation = new THREE.Mesh(new THREE.BoxGeometry(row.width, 1.05, row.depth), materials.coastalRock);
-      foundation.position.set(0, 0.52, 0);
-      foundation.receiveShadow = true;
-      group.add(foundation);
-
-      const innerBoulevard = new THREE.Mesh(new THREE.BoxGeometry(row.width * 0.82, 0.18, 15), materials.gwangalliBoardwalk);
-      innerBoulevard.position.set(-side * 12, 1.12, -row.depth * 0.34);
-      innerBoulevard.receiveShadow = true;
-      group.add(innerBoulevard);
-
-      const greenDeck = new THREE.Mesh(new THREE.BoxGeometry(row.width * 0.88, 0.18, 38), materials.coastalForest);
-      greenDeck.position.set(0, 1.16, row.depth * 0.29);
-      greenDeck.receiveShadow = true;
-      group.add(greenDeck);
-
-      const serviceRoad = new THREE.Mesh(new THREE.BoxGeometry(row.width * 0.76, 0.16, 12), materials.gwangalliRoadAlt);
-      serviceRoad.position.set(-side * 6, 1.14, -row.depth * 0.2);
-      serviceRoad.receiveShadow = true;
-      group.add(serviceRoad);
-
-      for (let i = 0; i < 4; i += 1) {
-        const seed = rowIndex * 31 + i * 11 + (side > 0 ? 5 : 17);
-        const blockWidth = 14 + (seed % 3) * 3;
-        const blockHeight = 8 + (seed % 4) * 2.4;
-        const blockDepth = 18 + (seed % 3) * 4;
-        const block = new THREE.Mesh(
-          new THREE.BoxGeometry(blockWidth, blockHeight, blockDepth),
-          seed % 2 === 0 ? materials.rightCityFacade : materials.gwangalliBuilding,
-        );
-        block.position.set(-row.width * 0.32 + i * 24, blockHeight * 0.5 + 1.2, -row.depth * 0.32 + (i % 2) * 24);
-        block.castShadow = false;
-        block.receiveShadow = true;
-        group.add(block);
-
-        const glass = new THREE.Mesh(new THREE.BoxGeometry(blockWidth * 0.62, blockHeight * 0.42, 0.12), materials.rightCityGlass);
-        glass.position.set(block.position.x, block.position.y + blockHeight * 0.03, block.position.z - blockDepth * 0.5 - 0.08);
-        group.add(glass);
-      }
-
-      for (let i = 0; i < 7; i += 1) {
-        const seed = rowIndex * 43 + i * 13 + (side > 0 ? 29 : 41);
-        const towerX = -row.width * 0.4 + i * (row.width * 0.8 / 6) + ((seed % 5) - 2) * 1.6;
-        const towerZ = -row.depth * 0.02 + (i % 3) * 44 + Math.floor(i / 3) * 20;
-        const height = 48 + (seed % 9) * 7 + (rowIndex === 1 ? 18 : 0) + (i % 2) * 12;
-        const width = 12 + (seed % 4) * 2.2;
-        const depth = 15 + ((seed + i) % 4) * 2.8;
-        addGwangalliApproachSkylineTower(group, towerX, towerZ, width, depth, height, seed);
-      }
-
-      scene.add(group);
-      registerMapEditorObject(group, {
-        id: `stage1-launch-gap-${sideName}-urban-backfill-${rowIndex}`,
-        label: `Stage 1 Launch Gap ${sideName} Urban Backfill ${rowIndex}`,
-        kind: "gap-background-district",
-        source: "addGwangalliLaunchGapUrbanBackfill",
-        localPosition: { x, y, z: row.z },
-        metadata: { rowIndex, side: sideName, towerCount: 7, lowBlockCount: 4 },
-      });
-    }
-  });
-}
-
-function addGwangalliApproachRoadsideDensity(startZ, endZ) {
-  for (const side of [-1, 1]) {
-    const retainingWall = new THREE.Mesh(
-      makeContinuousSceneryVerticalBoxGeometry(side * 12.7, startZ, endZ, 0.08, 2.15, 0.38, 18),
-      materials.noiseWallConcrete,
-    );
-    retainingWall.castShadow = false;
-    retainingWall.receiveShadow = true;
-    scene.add(retainingWall);
-
-    const wallStripe = new THREE.Mesh(
-      makeContinuousSceneryVerticalBoxGeometry(side * 12.28, startZ, endZ, 1.42, 1.7, 0.14, 18),
-      materials.noiseWallGreen,
-    );
-    wallStripe.castShadow = false;
-    scene.add(wallStripe);
-
-    const serviceLane = new THREE.Mesh(
-      makeContinuousScenerySideBoxGeometry(side * 18.2, startZ, endZ, 0.14, 6.6, 0.34, 18),
-      materials.gwangalliRoadAlt,
-    );
-    serviceLane.receiveShadow = true;
-    scene.add(serviceLane);
-
-    const planter = new THREE.Mesh(
-      makeContinuousScenerySideBoxGeometry(side * 25.4, startZ, endZ, 0.28, 3.8, 0.42, 18),
-      materials.coastalForest,
-    );
-    planter.receiveShadow = true;
-    scene.add(planter);
-  }
-}
-
-function addGwangalliApproachOverheadSigns(startZ, endZ) {
-  const labels = ["CITY ROUTE", "SHINSEONDAE", "UNDERPASS"];
-  let signIndex = 0;
-  for (let z = startZ - 180; z > endZ + 120; z -= 520) {
-    const sample = getStageDefinitionGroundSample(0, z);
-    if (!sample) continue;
-
-    const group = new THREE.Group();
-    setStageSceneryTransform(group, new THREE.Vector3(0, sample.y, z), 0, 0, true);
-
-    for (const side of [-1, 1]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.36, 7.8, 0.36), materials.gwangalliBridgeCable);
-      post.position.set(side * 13.4, 3.9, 0);
-      post.castShadow = true;
-      group.add(post);
-    }
-
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(27.4, 0.38, 0.4), materials.gwangalliBridgeCable);
-    beam.position.y = 7.75;
-    beam.castShadow = true;
-    group.add(beam);
-
-    const board = new THREE.Mesh(
-      new THREE.BoxGeometry(13.8, 1.62, 0.18),
-      createCanvasLabelMaterial(labels[signIndex % labels.length], 420, 120, "#ecf8ff", "#173044"),
-    );
-    board.position.set(0, 6.9, 0.32);
-    group.add(board);
-
-    const caution = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.28, 0.18), materials.obstacleStripe);
-    caution.position.set(0, 8.32, 0.28);
-    group.add(caution);
-
-    scene.add(group);
-    signIndex += 1;
-  }
-}
-
-function addGwangalliApproachCityBlock(group, side, rowIndex) {
-  const base = new THREE.Mesh(new THREE.BoxGeometry(104, 0.92, 218), materials.coastalRock);
-  base.position.set(side * 80, 0.46, 0);
-  base.receiveShadow = true;
-  group.add(base);
-
-  const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.18, 196), materials.gwangalliBoardwalk);
-  sidewalk.position.set(side * 33.5, 1.02, 0);
-  sidewalk.receiveShadow = true;
-  group.add(sidewalk);
-
-  const serviceRoad = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.16, 184), materials.gwangalliRoadAlt);
-  serviceRoad.position.set(side * 46, 1.04, 0);
-  serviceRoad.receiveShadow = true;
-  group.add(serviceRoad);
-
-  const greenBuffer = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.2, 198), materials.coastalForest);
-  greenBuffer.position.set(side * 61, 1.08, 0);
-  greenBuffer.receiveShadow = true;
-  group.add(greenBuffer);
-
-  for (let i = 0; i < 4; i += 1) {
-    const seed = rowIndex * 19 + i * 7 + (side > 0 ? 5 : 13);
-    const width = 12 + (seed % 3) * 1.8;
-    const height = 7.5 + (seed % 4) * 1.8;
-    const depth = 17 + (seed % 3) * 3.4;
-    const x = side * (39 + (i % 2) * 12.5);
-    const z = -76 + i * 50 + ((seed % 5) - 2) * 2.2;
-    addGwangalliApproachLowBlock(group, { x, z, width, height, depth, side, seed });
-  }
-
-  for (let column = 0; column < 4; column += 1) {
-    const seed = rowIndex * 23 + column * 11 + (side > 0 ? 2 : 9);
-    const height = 34 + (seed % 8) * 6 + column * 8 + (rowIndex % 3) * 5;
-    const width = 13 + (seed % 4) * 2.4;
-    const depth = 18 + ((seed + column) % 4) * 3.2;
-    const x = side * (67 + column * 17 + ((seed % 3) - 1) * 2.0);
-    const z = -70 + column * 48 + ((seed % 7) - 3) * 2.8;
-    addGwangalliApproachTower(group, { x, z, width, depth, height, side, seed });
-  }
-}
-
-function addGwangalliApproachLowBlock(group, {
-  x,
-  z,
-  width,
-  height,
-  depth,
-  side,
-  seed,
-}) {
-  const block = new THREE.Mesh(
-    new THREE.BoxGeometry(width, height, depth),
-    seed % 2 === 0 ? materials.rightCityFacade : materials.gwangalliBuilding,
-  );
-  block.position.set(x, height * 0.5 + 1.08, z);
-  block.castShadow = false;
-  block.receiveShadow = true;
-  group.add(block);
-
-  const shopFront = new THREE.Mesh(
-    new THREE.BoxGeometry(0.12, height * 0.48, depth * 0.72),
-    materials.rightCityGlass,
-  );
-  shopFront.position.set(x - side * (width * 0.5 + 0.08), height * 0.48 + 1.1, z);
-  group.add(shopFront);
-
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.9, 0.42, depth + 0.8), materials.gwangalliBridge);
-  roof.position.set(x, height + 1.34, z);
-  roof.receiveShadow = true;
-  group.add(roof);
-}
-
-function addGwangalliApproachTower(group, {
-  x,
-  z,
-  width,
-  depth,
-  height,
-  side,
-  seed,
-}) {
-  const material = seed % 3 === 0
-    ? materials.rightCityDarkGlass
-    : seed % 3 === 1
-      ? materials.gwangalliBuilding
-      : materials.rightCityFacade;
-
-  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
-  tower.position.set(x, height * 0.5 + 1.12, z);
-  tower.castShadow = height > 48;
-  tower.receiveShadow = true;
-  group.add(tower);
-
-  const innerFaceX = x - side * (width * 0.5 + 0.08);
-  const glassPanel = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14, height * 0.7, depth * 0.76),
-    seed % 3 === 1 ? materials.gwangalliWindow : materials.rightCityGlass,
-  );
-  glassPanel.position.set(innerFaceX, height * 0.52 + 1.12, z);
-  group.add(glassPanel);
-
-  const floorCount = Math.min(7, Math.max(3, Math.floor(height / 12)));
-  for (let floor = 1; floor <= floorCount; floor += 1) {
-    const strip = new THREE.Mesh(
-      new THREE.BoxGeometry(0.16, 0.38, depth * 0.78),
-      floor % 2 === 0 ? materials.gwangalliBuildingLight : materials.gwangalliWindow,
-    );
-    strip.position.set(innerFaceX - side * 0.04, 3.1 + floor * (height - 5) / (floorCount + 1), z);
-    group.add(strip);
-  }
-
-  if (seed % 5 === 0) {
-    const rooftop = new THREE.Mesh(new THREE.BoxGeometry(width * 0.64, 3.1, depth * 0.58), materials.rightCityFacade);
-    rooftop.position.set(x, height + 3.0, z);
-    rooftop.receiveShadow = true;
-    group.add(rooftop);
-  }
-}
-
-function addGwangalliApproachDistantSkyline(startZ, endZ) {
-  let skylineIndex = 0;
-  for (let z = startZ - 150; z > endZ - 80; z -= 430) {
-    const ground = getStageDefinitionGroundSample(0, z);
-    if (!ground) {
-      skylineIndex += 1;
-      continue;
-    }
-
-    for (const side of [-1, 1]) {
-      const group = new THREE.Group();
-      const sideName = side > 0 ? "right" : "left";
-      const x = side * (172 + (skylineIndex % 2) * 16);
-      const y = Math.max(seaLevelY + 0.34, ground.y - 4.3);
-      setStageSceneryTransform(group, new THREE.Vector3(x, y, z), side * 0.06, 0, true);
-
-      const foundation = new THREE.Mesh(new THREE.BoxGeometry(168, 1.05, 270), materials.coastalRock);
-      foundation.position.set(0, 0.5, 0);
-      foundation.receiveShadow = true;
-      group.add(foundation);
-
-      const promenade = new THREE.Mesh(new THREE.BoxGeometry(146, 0.18, 18), materials.gwangalliBoardwalk);
-      promenade.position.set(0, 1.12, -104);
-      promenade.receiveShadow = true;
-      group.add(promenade);
-
-      const greenDeck = new THREE.Mesh(new THREE.BoxGeometry(156, 0.16, 46), materials.coastalForest);
-      greenDeck.position.set(0, 1.16, 84);
-      greenDeck.receiveShadow = true;
-      group.add(greenDeck);
-
-      for (let i = 0; i < 6; i += 1) {
-        const seed = skylineIndex * 31 + i * 13 + (side > 0 ? 17 : 23);
-        const towerX = -58 + i * 22 + ((seed % 5) - 2) * 1.6;
-        const towerZ = -62 + (i % 3) * 58 + Math.floor(i / 3) * 22;
-        const height = 44 + (seed % 9) * 7 + (i % 2) * 16;
-        const width = 12 + (seed % 4) * 2;
-        const depth = 14 + ((seed + i) % 4) * 2.4;
-        addGwangalliApproachSkylineTower(group, towerX, towerZ, width, depth, height, seed);
-      }
-
-      scene.add(group);
-      registerMapEditorObject(group, {
-        id: `stage1-approach-${sideName}-skyline-${skylineIndex}`,
-        label: `Stage 1 Approach ${sideName} Skyline ${skylineIndex}`,
-        kind: "distant-skyline",
-        source: "addGwangalliApproachDistantSkyline",
-        localPosition: { x, y, z },
-        metadata: { side: sideName, skylineIndex, towerCount: 6 },
-      });
-    }
-    skylineIndex += 1;
-  }
-}
-
-function addGwangalliApproachRightWaterfrontDistrict(startZ, endZ) {
-  let districtIndex = 0;
-  for (let z = startZ - 260; z > endZ - 120; z -= 460) {
-    const ground = getStageDefinitionGroundSample(0, z);
-    if (!ground) {
-      districtIndex += 1;
-      continue;
-    }
-
-    const group = new THREE.Group();
-    const x = 236 + (districtIndex % 2) * 18;
-    const y = Math.max(seaLevelY + 0.42, ground.y - 3.6);
-    setStageSceneryTransform(group, new THREE.Vector3(x, y, z), -0.08, 0, true);
-
-    const foundation = new THREE.Mesh(new THREE.BoxGeometry(228, 1.18, 360), materials.coastalRock);
-    foundation.position.set(0, 0.58, 0);
-    foundation.receiveShadow = true;
-    group.add(foundation);
-
-    const waterfrontWalk = new THREE.Mesh(new THREE.BoxGeometry(206, 0.18, 20), materials.gwangalliBoardwalk);
-    waterfrontWalk.position.set(-4, 1.22, -146);
-    waterfrontWalk.receiveShadow = true;
-    group.add(waterfrontWalk);
-
-    const greenMedian = new THREE.Mesh(new THREE.BoxGeometry(196, 0.18, 54), materials.coastalForest);
-    greenMedian.position.set(0, 1.26, 108);
-    greenMedian.receiveShadow = true;
-    group.add(greenMedian);
-
-    const serviceRoad = new THREE.Mesh(new THREE.BoxGeometry(176, 0.16, 13), materials.gwangalliRoadAlt);
-    serviceRoad.position.set(-2, 1.24, -112);
-    serviceRoad.receiveShadow = true;
-    group.add(serviceRoad);
-
-    for (let i = 0; i < 5; i += 1) {
-      const seed = districtIndex * 29 + i * 9 + 7;
-      const block = new THREE.Mesh(
-        new THREE.BoxGeometry(16 + (seed % 3) * 3, 8 + (seed % 4) * 2.2, 20 + (seed % 3) * 4),
-        seed % 2 === 0 ? materials.rightCityFacade : materials.gwangalliBuilding,
-      );
-      block.position.set(-78 + i * 28, 5.2 + (seed % 4) * 1.1, -104 + (i % 2) * 22);
-      block.castShadow = false;
-      block.receiveShadow = true;
-      group.add(block);
-
-      const glass = new THREE.Mesh(new THREE.BoxGeometry(block.geometry.parameters.width * 0.62, 3.2, 0.12), materials.rightCityGlass);
-      glass.position.set(block.position.x, block.position.y + 0.4, block.position.z - block.geometry.parameters.depth * 0.5 - 0.08);
-      group.add(glass);
-    }
-
-    for (let i = 0; i < 8; i += 1) {
-      const seed = districtIndex * 37 + i * 13 + 11;
-      const towerX = -88 + i * 25 + ((seed % 5) - 2) * 1.8;
-      const towerZ = -48 + (i % 4) * 46 + Math.floor(i / 4) * 34;
-      const height = 52 + (seed % 10) * 7 + (i % 3) * 11;
-      const width = 13 + (seed % 4) * 2.2;
-      const depth = 16 + ((seed + i) % 4) * 2.8;
-      addGwangalliApproachSkylineTower(group, towerX, towerZ, width, depth, height, seed);
-    }
-
-    scene.add(group);
-    registerMapEditorObject(group, {
-      id: `stage1-right-waterfront-density-${districtIndex}`,
-      label: `Stage 1 Right Waterfront Density ${districtIndex}`,
-      kind: "right-side-waterfront-district",
-      source: "addGwangalliApproachRightWaterfrontDistrict",
-      localPosition: { x, y, z },
-      metadata: { districtIndex, towerCount: 8, lowBlockCount: 5 },
-    });
-    districtIndex += 1;
-  }
-}
-
-function addGwangalliApproachSkylineTower(group, x, z, width, depth, height, seed) {
-  const material = seed % 3 === 0
-    ? materials.gwangalliBuilding
-    : seed % 3 === 1
-      ? materials.rightCityGlass
-      : materials.rightCityDarkGlass;
-  const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
-  tower.position.set(x, height * 0.5 + 1.2, z);
-  tower.castShadow = false;
-  tower.receiveShadow = true;
-  group.add(tower);
-
-  const face = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.72, height * 0.62, 0.12),
-    seed % 2 === 0 ? materials.gwangalliWindow : materials.gwangalliBuildingLight,
-  );
-  face.position.set(x, height * 0.52 + 1.1, z - depth * 0.5 - 0.08);
-  group.add(face);
 }
 
 function addGwangalliDenseUrbanCorridor() {
@@ -18894,6 +18521,910 @@ function registerMapEditorObject(group, config = {}) {
   return record;
 }
 
+function unregisterMapEditorObject(record, { sync = true, disposePlacedGeometry = false } = {}) {
+  if (!record) return;
+  mapEditorObjectById.delete(record.id);
+  const objectIndex = mapEditorObjects.indexOf(record);
+  if (objectIndex >= 0) mapEditorObjects.splice(objectIndex, 1);
+  const placedIndex = mapEditorPlacedObjects.indexOf(record);
+  if (placedIndex >= 0) mapEditorPlacedObjects.splice(placedIndex, 1);
+  mapEditorHiddenObjectIds.delete(record.id);
+  if (mapEditorState.selectedRecord === record) {
+    mapEditorState.selectedRecord = null;
+  }
+  if (record.group?.parent) {
+    record.group.parent.remove(record.group);
+  }
+  if (disposePlacedGeometry && record.group) {
+    record.group.traverse((object) => object.geometry?.dispose?.());
+  }
+  updateMapEditorSelectionHelper();
+  updateMapEditorPlacedFootprintHelper();
+  if (sync) {
+    syncMapEditorPanel(true);
+  }
+}
+
+function getMapEditorPlacePreset(key = mapEditorState.placePresetKey) {
+  return mapEditorPlacePresets[key] || mapEditorPlacePresets.urbanTowerMedium;
+}
+
+function populateMapEditorPlacePresets() {
+  if (!mapEditorPlaceObjectSelect || mapEditorPlaceObjectSelect.options.length > 0) return;
+  Object.entries(mapEditorPlacePresets).forEach(([key, preset]) => {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = preset.label;
+    mapEditorPlaceObjectSelect.append(option);
+  });
+  mapEditorPlaceObjectSelect.value = mapEditorState.placePresetKey;
+}
+
+function getMapEditorPlaceInputs() {
+  const fallback = mapEditorState.placeLocalPosition;
+  const scaleFallback = Number.isFinite(mapEditorState.placeScale) ? mapEditorState.placeScale : 1;
+  return {
+    x: readInputNumber(mapEditorPlaceXInput, fallback.x),
+    y: readInputNumber(mapEditorPlaceYInput, fallback.y),
+    z: readInputNumber(mapEditorPlaceZInput, fallback.z),
+    scale: THREE.MathUtils.clamp(readInputNumber(mapEditorPlaceScaleInput, scaleFallback), 0.25, 4),
+    rotation: readInputNumber(mapEditorPlaceRotationInput, mapEditorState.placeRotation),
+  };
+}
+
+function setMapEditorPlaceInputValue(input, value, preserveFocus = false) {
+  if (!input) return;
+  if (preserveFocus && document.activeElement === input) return;
+  input.value = Number.isFinite(value) ? formatMapEditorInputNumber(value) : "";
+}
+
+function syncMapEditorPlaceInputs(preserveFocus = false) {
+  const local = mapEditorState.placeLocalPosition;
+  setMapEditorPlaceInputValue(mapEditorPlaceXInput, local.x, preserveFocus);
+  setMapEditorPlaceInputValue(mapEditorPlaceYInput, local.y, preserveFocus);
+  setMapEditorPlaceInputValue(mapEditorPlaceZInput, local.z, preserveFocus);
+  setMapEditorPlaceInputValue(mapEditorPlaceScaleInput, mapEditorState.placeScale, preserveFocus);
+  setMapEditorPlaceInputValue(mapEditorPlaceRotationInput, mapEditorState.placeRotation, preserveFocus);
+  if (mapEditorPlaceObjectSelect) {
+    mapEditorPlaceObjectSelect.value = mapEditorState.placePresetKey;
+  }
+}
+
+function createMapEditorPlaceMaterial(preview = false, valid = true, materialKey = "gwangalliBuilding") {
+  if (preview) {
+    return new THREE.MeshStandardMaterial({
+      color: valid ? 0x4ef5b0 : 0xff4c67,
+      emissive: valid ? 0x0f5a44 : 0x5c0a16,
+      emissiveIntensity: 0.3,
+      roughness: 0.5,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+    });
+  }
+  return materials[materialKey] || materials.gwangalliBuilding;
+}
+
+function addMapEditorPlaceBox(group, {
+  x = 0,
+  y = 0,
+  z = 0,
+  width = 1,
+  height = 1,
+  depth = 1,
+  material,
+  preview = false,
+}) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = !preview && height > 12;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  return mesh;
+}
+
+function addMapEditorPlaceTowerDetails(group, preset, previewMaterial, preview = false) {
+  if (preview) return;
+  const width = preset.width;
+  const depth = preset.depth;
+  const height = preset.height;
+  const glassMaterial = materials[preset.glassMaterial] || materials.gwangalliWindow;
+  const face = new THREE.Mesh(new THREE.BoxGeometry(width * 0.7, height * 0.66, 0.12), glassMaterial);
+  face.position.set(0, height * 0.53, -depth * 0.5 - 0.08);
+  group.add(face);
+
+  const rows = Math.max(2, preset.windowRows ?? Math.floor(height / 14));
+  for (let row = 1; row <= rows; row += 1) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(width * 0.78, 0.32, 0.13), glassMaterial);
+    strip.position.set(0, 3.2 + row * (height - 7) / (rows + 1), -depth * 0.5 - 0.1);
+    group.add(strip);
+  }
+
+  if (preset.roof || preset.crown) {
+    const roofHeight = preset.crown ? 5.2 : 1.2;
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(width * (preset.crown ? 0.82 : 1.08), roofHeight, depth * (preset.crown ? 0.78 : 1.06)),
+      materials.rightCityFacade,
+    );
+    roof.position.set(0, height + roofHeight * 0.5, 0);
+    roof.receiveShadow = true;
+    group.add(roof);
+  }
+}
+
+function createMapEditorBuildingPlaceGroup(preset, { preview = false, valid = true } = {}) {
+  const group = new THREE.Group();
+  const material = createMapEditorPlaceMaterial(preview, valid, preset.material);
+  addMapEditorPlaceBox(group, {
+    width: preset.width,
+    height: preset.height,
+    depth: preset.depth,
+    y: preset.height * 0.5,
+    material,
+    preview,
+  });
+  addMapEditorPlaceTowerDetails(group, preset, material, preview);
+  return group;
+}
+
+function createMapEditorApartmentClusterPlaceGroup(preset, { preview = false, valid = true } = {}) {
+  const group = new THREE.Group();
+  const material = createMapEditorPlaceMaterial(preview, valid, preset.material);
+  const towerCount = Math.max(2, preset.cluster ?? 3);
+  for (let index = 0; index < towerCount; index += 1) {
+    const width = preset.width * (0.22 + index * 0.015);
+    const depth = preset.depth * 0.46;
+    const height = preset.height + index * 12;
+    const x = (index - (towerCount - 1) * 0.5) * preset.width * 0.28;
+    const z = (index % 2) * preset.depth * 0.12;
+    addMapEditorPlaceBox(group, {
+      x,
+      y: height * 0.5,
+      z,
+      width,
+      height,
+      depth,
+      material,
+      preview,
+    });
+    if (!preview) {
+      const glass = new THREE.Mesh(
+        new THREE.BoxGeometry(width * 0.7, height * 0.74, 0.12),
+        materials[preset.glassMaterial] || materials.haeundaeExordiumGlass,
+      );
+      glass.position.set(x, height * 0.5 + 1.2, z - depth * 0.5 - 0.08);
+      group.add(glass);
+    }
+  }
+  return group;
+}
+
+function createMapEditorTreeClusterPlaceGroup(preset, { preview = false, valid = true } = {}) {
+  const group = new THREE.Group();
+  const leafMaterial = createMapEditorPlaceMaterial(preview, valid, preset.material);
+  const trunkMaterial = preview ? leafMaterial : materials.coastalRock;
+  const count = Math.max(3, preset.cluster ?? 5);
+  for (let index = 0; index < count; index += 1) {
+    const angle = index * Math.PI * 2 / count;
+    const radius = index === 0 ? 0 : 7 + (index % 2) * 3;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius * 0.78;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.62, 4.2, 7), trunkMaterial);
+    trunk.position.set(x, 2.1, z);
+    trunk.castShadow = !preview;
+    trunk.receiveShadow = true;
+    group.add(trunk);
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(3.8 + (index % 2) * 0.7, 9.2, 10), leafMaterial);
+    crown.position.set(x, 8.6, z);
+    crown.castShadow = !preview;
+    crown.receiveShadow = true;
+    group.add(crown);
+  }
+  return group;
+}
+
+function createMapEditorPlaceObjectGroup(preset, options = {}) {
+  const group = preset.kind === "visual-building-cluster"
+    ? createMapEditorApartmentClusterPlaceGroup(preset, options)
+    : preset.kind === "visual-nature"
+      ? createMapEditorTreeClusterPlaceGroup(preset, options)
+      : createMapEditorBuildingPlaceGroup(preset, options);
+
+  if (options.preview) {
+    const footprint = new THREE.Mesh(
+      new THREE.BoxGeometry(preset.width, 0.12, preset.depth),
+      new THREE.MeshBasicMaterial({
+        color: options.valid ? 0x52f7b1 : 0xff4c67,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+      }),
+    );
+    footprint.position.y = 0.06;
+    footprint.renderOrder = 520;
+    group.add(footprint);
+  }
+
+  return group;
+}
+
+function applyMapEditorPlaceTransform(group, localPosition, scale = 1, rotationDeg = 0) {
+  if (!group || !localPosition) return;
+  const rotationRad = THREE.MathUtils.degToRad(rotationDeg);
+  setStageSceneryTransform(
+    group,
+    new THREE.Vector3(localPosition.x, localPosition.y, localPosition.z),
+    rotationRad,
+    0,
+    true,
+  );
+  group.scale.setScalar(scale);
+  group.updateMatrixWorld(true);
+}
+
+function getMapEditorPlaceFootprint(preset, localPosition, scale = 1, clearance = 0) {
+  const halfWidth = preset.width * scale * 0.5 + clearance;
+  const halfDepth = preset.depth * scale * 0.5 + clearance;
+  return {
+    minX: localPosition.x - halfWidth,
+    maxX: localPosition.x + halfWidth,
+    minZ: localPosition.z - halfDepth,
+    maxZ: localPosition.z + halfDepth,
+  };
+}
+
+function doMapEditorFootprintsOverlap(a, b) {
+  return Boolean(a && b && a.minX <= b.maxX && a.maxX >= b.minX && a.minZ <= b.maxZ && a.maxZ >= b.minZ);
+}
+
+function getMapEditorRecordApproxFootprint(record) {
+  const local = getMapEditorCurrentLocalPosition(record);
+  if (!local || !record.group.visible) return null;
+  record.group.updateMatrixWorld(true);
+  mapEditorBox.setFromObject(record.group);
+  if (mapEditorBox.isEmpty()) return null;
+  mapEditorBox.getSize(mapEditorSize);
+  const halfWidth = Math.max(2, mapEditorSize.x * 0.5);
+  const halfDepth = Math.max(2, mapEditorSize.z * 0.5);
+  return {
+    minX: local.x - halfWidth,
+    maxX: local.x + halfWidth,
+    minZ: local.z - halfDepth,
+    maxZ: local.z + halfDepth,
+  };
+}
+
+function validateMapEditorPlacePosition(preset, localPosition, scale = 1) {
+  if (!preset || !localPosition) {
+    return { valid: false, reason: "No object preset" };
+  }
+  if (!Number.isFinite(localPosition.x)
+    || !Number.isFinite(localPosition.y)
+    || !Number.isFinite(localPosition.z)
+    || !Number.isFinite(scale)) {
+    return { valid: false, reason: "Invalid placement number" };
+  }
+  if (localPosition.z > stageStartZ + 24 || localPosition.z < stageEndZ - 24) {
+    return { valid: false, reason: "Z is outside current stage" };
+  }
+
+  const centerGround = getStageDefinitionGroundSample(0, localPosition.z);
+  if (!centerGround) {
+    return { valid: false, reason: "No nearby stage ground reference" };
+  }
+  const roadHalfWidth = centerGround.segment.width * 0.5;
+  if (Math.abs(localPosition.x) < roadHalfWidth + 7) {
+    return { valid: false, reason: "Too close to playable road" };
+  }
+
+  const candidate = getMapEditorPlaceFootprint(preset, localPosition, scale, 3.5);
+  const overlap = mapEditorObjects
+    .filter((record) => record.group.visible)
+    .some((record) => doMapEditorFootprintsOverlap(candidate, getMapEditorRecordApproxFootprint(record)));
+  if (overlap) {
+    return { valid: false, reason: "Footprint overlaps an existing map object" };
+  }
+
+  return { valid: true, reason: "Ready" };
+}
+
+function ensureMapEditorPlacementSurface() {
+  if (mapEditorState.placementSurface) return mapEditorState.placementSurface;
+  const surface = new THREE.Mesh(
+    new THREE.BoxGeometry(mapEditorPlacementPlaneSize.width, 0.12, mapEditorPlacementPlaneSize.depth),
+    new THREE.MeshBasicMaterial({
+      color: 0x5ad7ff,
+      transparent: true,
+      opacity: 0.055,
+      depthWrite: false,
+    }),
+  );
+  surface.name = "MapEditorPlacementSurface";
+  surface.renderOrder = 510;
+  surface.userData.ignoreMouseObject = true;
+  surface.visible = false;
+  mapEditorState.placementSurface = surface;
+  scene.add(surface);
+  return surface;
+}
+
+function updateMapEditorPlacementSurface() {
+  const surface = ensureMapEditorPlacementSurface();
+  const visible = mapEditorState.active && mapEditorState.mode === "place";
+  surface.visible = visible;
+  document.body.classList.toggle("map-editor-place-ready", visible && mapEditorState.placeValid);
+  if (!visible) return surface;
+
+  const focusZ = mapEditorState.focusProgress >= 1
+    ? goalZ + 4
+    : getStageZAtGoalProgress(THREE.MathUtils.clamp(mapEditorState.focusProgress, 0, 0.98));
+  const ground = getStageDefinitionGroundSample(0, focusZ);
+  const y = (ground?.y ?? 0) + 0.06;
+  surface.userData.focusZ = focusZ;
+  setStageSceneryTransform(surface, new THREE.Vector3(0, y, focusZ), 0, 0, true);
+  surface.updateMatrixWorld(true);
+  return surface;
+}
+
+function setMapEditorPlaceLocalPosition(localPosition, preserveFocus = false) {
+  mapEditorState.placeLocalPosition = {
+    x: localPosition.x,
+    y: localPosition.y,
+    z: localPosition.z,
+  };
+  syncMapEditorPlaceInputs(preserveFocus);
+  updateMapEditorPlacePreview(preserveFocus);
+}
+
+function updateMapEditorPlaceFromInputs(preserveFocus = true) {
+  const values = getMapEditorPlaceInputs();
+  mapEditorState.placeLocalPosition = {
+    x: values.x,
+    y: values.y,
+    z: values.z,
+  };
+  mapEditorState.placeScale = values.scale;
+  mapEditorState.placeRotation = values.rotation;
+  updateMapEditorPlacePreview(preserveFocus);
+}
+
+function updateMapEditorPlaceFromPointer(clientX, clientY, preserveFocus = false) {
+  if (!mapEditorState.active || mapEditorState.mode !== "place") return false;
+  const surface = updateMapEditorPlacementSurface();
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+
+  mapEditorPointer.set(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1,
+  );
+  mapEditorRaycaster.setFromCamera(mapEditorPointer, camera);
+  const hit = mapEditorRaycaster.intersectObject(surface, false)[0];
+  if (!hit) return false;
+
+  mapEditorPlacementLocalPoint.copy(hit.point);
+  surface.worldToLocal(mapEditorPlacementLocalPoint);
+  const focusZ = Number(surface.userData.focusZ);
+  const nextZ = Number.isFinite(focusZ) ? focusZ + mapEditorPlacementLocalPoint.z : mapEditorState.placeLocalPosition.z;
+  const preset = getMapEditorPlacePreset();
+  const ground = getStageDefinitionGroundSample(0, nextZ);
+  const nextLocal = {
+    x: mapEditorPlacementLocalPoint.x,
+    y: (ground?.y ?? 0) + (preset.yOffset ?? 0),
+    z: nextZ,
+  };
+  setMapEditorPlaceLocalPosition(nextLocal, preserveFocus);
+  return true;
+}
+
+function rebuildMapEditorPlacePreview(valid) {
+  if (mapEditorState.placePreview) {
+    scene.remove(mapEditorState.placePreview);
+  }
+  const preset = getMapEditorPlacePreset();
+  mapEditorState.placePreview = createMapEditorPlaceObjectGroup(preset, { preview: true, valid });
+  mapEditorState.placePreview.name = "MapEditorPlacePreview";
+  mapEditorState.placePreview.userData.ignoreMouseObject = true;
+  scene.add(mapEditorState.placePreview);
+}
+
+function updateMapEditorPlacePreview(preserveFocus = false) {
+  const preset = getMapEditorPlacePreset();
+  const values = getMapEditorPlaceInputs();
+  const localPosition = { x: values.x, y: values.y, z: values.z };
+  const validation = validateMapEditorPlacePosition(preset, localPosition, values.scale);
+  const needsRebuild = !mapEditorState.placePreview
+    || mapEditorState.placePreview.userData.presetKey !== mapEditorState.placePresetKey
+    || mapEditorState.placePreview.userData.valid !== validation.valid;
+  mapEditorState.placeValid = validation.valid;
+  if (needsRebuild) {
+    rebuildMapEditorPlacePreview(validation.valid);
+    mapEditorState.placePreview.userData.presetKey = mapEditorState.placePresetKey;
+    mapEditorState.placePreview.userData.valid = validation.valid;
+  }
+  mapEditorState.placePreview.visible = mapEditorState.active && mapEditorState.mode === "place";
+  applyMapEditorPlaceTransform(mapEditorState.placePreview, localPosition, values.scale, values.rotation);
+  if (mapEditorPlaceCommitButton) {
+    mapEditorPlaceCommitButton.disabled = !validation.valid;
+  }
+  if (mapEditorModeStatusEl && mapEditorState.mode === "place") {
+    mapEditorModeStatusEl.textContent = validation.valid ? "Place Object" : validation.reason;
+  }
+  if (!preserveFocus) {
+    syncMapEditorPlaceInputs(false);
+  }
+  document.body.classList.toggle("map-editor-place-ready", mapEditorState.active && mapEditorState.mode === "place" && validation.valid);
+  return validation;
+}
+
+function snapMapEditorPlaceToFocus() {
+  const focusZ = mapEditorState.focusProgress >= 1
+    ? goalZ + 4
+    : getStageZAtGoalProgress(THREE.MathUtils.clamp(mapEditorState.focusProgress, 0, 0.98));
+  const preset = getMapEditorPlacePreset();
+  const ground = getStageDefinitionGroundSample(0, focusZ);
+  const side = mapEditorState.placeLocalPosition.x >= 0 ? 1 : -1;
+  setMapEditorPlaceLocalPosition({
+    x: side * Math.max(150, Math.abs(mapEditorState.placeLocalPosition.x || 160)),
+    y: (ground?.y ?? 0) + (preset.yOffset ?? 0),
+    z: focusZ,
+  });
+  setMapEditorStatus("Placement moved to current focus");
+}
+
+function commitMapEditorPlacement() {
+  updateMapEditorPlaceFromInputs(true);
+  const values = getMapEditorPlaceInputs();
+  const before = captureMapEditorPlacedState();
+  const result = createMapEditorPlacedRecord({
+    presetKey: mapEditorState.placePresetKey,
+    localPosition: { x: values.x, y: values.y, z: values.z },
+    scale: values.scale,
+    rotation: values.rotation,
+  }, { select: true });
+  if (!result.record) {
+    setMapEditorStatus(`Cannot place: ${result.error}`);
+    updateMapEditorPlacePreview(true);
+    return null;
+  }
+  finalizeMapEditorPlacementMutation("placed", before);
+  updateMapEditorPlacePreview(true);
+  setMapEditorStatus(`${result.record.label} placed and saved`);
+  return result.record;
+}
+
+function getMapEditorPlacedRecordPayload(record) {
+  const localPosition = getMapEditorCurrentLocalPosition(record);
+  if (!record?.isMapEditorPlaced || !localPosition) return null;
+  return {
+    placementSerial: record.placementSerial,
+    presetKey: record.placePresetKey,
+    localPosition: {
+      x: roundMapEditorNumber(localPosition.x),
+      y: roundMapEditorNumber(localPosition.y),
+      z: roundMapEditorNumber(localPosition.z),
+    },
+    scale: roundMapEditorNumber(record.placeScale),
+    rotation: roundMapEditorNumber(record.placeRotation),
+  };
+}
+
+function captureMapEditorPlacedState() {
+  return mapEditorPlacedObjects
+    .map(getMapEditorPlacedRecordPayload)
+    .filter(Boolean);
+}
+
+function getMapEditorPlacementStorageKey() {
+  return `${mapEditorPlacementStoragePrefix}:${getStageRoute(currentStageIndex)}`;
+}
+
+function persistMapEditorPlacedObjects() {
+  try {
+    const placements = captureMapEditorPlacedState();
+    const key = getMapEditorPlacementStorageKey();
+    if (placements.length === 0) {
+      window.localStorage.removeItem(key);
+      return true;
+    }
+    window.localStorage.setItem(key, JSON.stringify({
+      version: 1,
+      source: "Map Editor Place Mode",
+      stageRoute: getStageRoute(currentStageIndex),
+      placements,
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createMapEditorPlacedRecord(placement, { select = false, skipValidation = false } = {}) {
+  const presetKey = String(placement?.presetKey || "");
+  if (!Object.hasOwn(mapEditorPlacePresets, presetKey)) {
+    return { record: null, error: "Unknown object preset" };
+  }
+  const localPosition = cloneMapEditorLocalPosition(placement?.localPosition);
+  const scale = THREE.MathUtils.clamp(Number(placement?.scale), 0.25, 4);
+  const rotation = Number(placement?.rotation);
+  if (!localPosition || !Number.isFinite(scale) || !Number.isFinite(rotation)) {
+    return { record: null, error: "Invalid placement data" };
+  }
+
+  const preset = getMapEditorPlacePreset(presetKey);
+  const validation = validateMapEditorPlacePosition(preset, localPosition, scale);
+  if (!skipValidation && !validation.valid) {
+    return { record: null, error: validation.reason };
+  }
+
+  const requestedSerial = Number(placement?.placementSerial);
+  const serial = Number.isInteger(requestedSerial) && requestedSerial > 0
+    ? requestedSerial
+    : mapEditorState.placedObjectSerial + 1;
+  mapEditorState.placedObjectSerial = Math.max(mapEditorState.placedObjectSerial, serial);
+
+  const group = createMapEditorPlaceObjectGroup(preset, { preview: false, valid: true });
+  applyMapEditorPlaceTransform(group, localPosition, scale, rotation);
+  scene.add(group);
+  const record = registerMapEditorObject(group, {
+    id: `map-editor-placed-${presetKey}-${serial}`,
+    label: `Placed ${preset.label} ${serial}`,
+    kind: preset.kind,
+    source: "mapEditorPlaceMode",
+    localPosition,
+    metadata: {
+      presetKey,
+      presetLabel: preset.label,
+      placementSession: true,
+      placementSerial: serial,
+      scale: roundMapEditorNumber(scale),
+      rotationDeg: roundMapEditorNumber(rotation),
+      footprint: {
+        width: roundMapEditorNumber(preset.width * scale),
+        depth: roundMapEditorNumber(preset.depth * scale),
+        height: roundMapEditorNumber(preset.height * scale),
+      },
+    },
+  });
+  record.isMapEditorPlaced = true;
+  record.placementSerial = serial;
+  record.placePresetKey = presetKey;
+  record.placeScale = scale;
+  record.placeRotation = rotation;
+  mapEditorPlacedObjects.push(record);
+  if (select) {
+    setMapEditorSelection(record);
+  }
+  return { record, error: null };
+}
+
+function removeMapEditorPlacedRecord(record, { sync = false } = {}) {
+  if (!record?.isMapEditorPlaced) return false;
+  unregisterMapEditorObject(record, { sync, disposePlacedGeometry: true });
+  return true;
+}
+
+function replaceMapEditorPlacedObjects(placements, {
+  skipValidation = false,
+  selectLast = false,
+  sync = true,
+  persist = false,
+} = {}) {
+  const nextPlacements = Array.isArray(placements) ? placements : [];
+  [...mapEditorPlacedObjects].forEach((record) => removeMapEditorPlacedRecord(record));
+  mapEditorState.placedObjectSerial = 0;
+
+  const created = [];
+  const skipped = [];
+  nextPlacements.forEach((placement) => {
+    const result = createMapEditorPlacedRecord(placement, { skipValidation });
+    if (result.record) {
+      created.push(result.record);
+    } else {
+      skipped.push(result.error);
+    }
+  });
+
+  if (selectLast && created.length > 0) {
+    setMapEditorSelection(created[created.length - 1]);
+  }
+  if (persist) {
+    persistMapEditorPlacedObjects();
+  }
+  if (sync) {
+    syncMapEditorPanel(true);
+  }
+  return { created, skipped };
+}
+
+function finalizeMapEditorPlacementMutation(label, before) {
+  const after = captureMapEditorPlacedState();
+  const changed = JSON.stringify(before) !== JSON.stringify(after);
+  if (changed) {
+    mapEditorPlaceHistory.push({ label, before, after });
+    if (mapEditorPlaceHistory.length > mapEditorPlacementHistoryLimit) {
+      mapEditorPlaceHistory.shift();
+    }
+    mapEditorPlaceRedoHistory.length = 0;
+  }
+  persistMapEditorPlacedObjects();
+  syncMapEditorPanel(true);
+  return changed;
+}
+
+function restoreMapEditorPlacedObjects() {
+  const stageRoute = getStageRoute(currentStageIndex);
+  if (mapEditorState.placedRestoredStage === stageRoute) return false;
+  mapEditorState.placedRestoredStage = stageRoute;
+
+  let payload;
+  try {
+    const raw = window.localStorage.getItem(getMapEditorPlacementStorageKey());
+    if (!raw) return false;
+    payload = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (!payload || payload.stageRoute !== stageRoute || !Array.isArray(payload.placements)) {
+    return false;
+  }
+
+  const normalized = normalizeMapEditorPlacementImport(payload);
+  if (!normalized.placements.length) return false;
+  replaceMapEditorPlacedObjects(normalized.placements, {
+    skipValidation: true,
+    selectLast: false,
+    sync: false,
+    persist: false,
+  });
+  mapEditorPlaceHistory.length = 0;
+  mapEditorPlaceRedoHistory.length = 0;
+  return true;
+}
+
+function normalizeMapEditorPlacementImport(payload) {
+  const source = Array.isArray(payload) ? { placements: payload } : payload;
+  if (!source || typeof source !== "object") {
+    return { placements: [], invalidCount: 1, stageRoute: null };
+  }
+  const rawPlacements = Array.isArray(source.placements) ? source.placements : [];
+  const placements = [];
+  let invalidCount = 0;
+  rawPlacements.forEach((entry) => {
+    const presetKey = String(entry?.presetKey || entry?.metadata?.presetKey || "");
+    const localPosition = cloneMapEditorLocalPosition(entry?.localPosition);
+    const scale = Number(entry?.scale ?? entry?.metadata?.scale);
+    const rotation = Number(entry?.rotation ?? entry?.metadata?.rotationDeg);
+    if (!Object.hasOwn(mapEditorPlacePresets, presetKey)
+      || !localPosition
+      || !Number.isFinite(scale)
+      || !Number.isFinite(rotation)) {
+      invalidCount += 1;
+      return;
+    }
+    placements.push({
+      placementSerial: Number(entry?.placementSerial ?? entry?.metadata?.placementSerial),
+      presetKey,
+      localPosition,
+      scale,
+      rotation,
+    });
+  });
+  return {
+    placements,
+    invalidCount,
+    stageRoute: source.stageRoute ?? null,
+  };
+}
+
+function importMapEditorPlacedObjects() {
+  const raw = mapEditorPlaceImportInput?.value?.trim();
+  if (!raw) {
+    setMapEditorStatus("Paste placement JSON first");
+    return;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    setMapEditorStatus("Import JSON is invalid");
+    return;
+  }
+  const normalized = normalizeMapEditorPlacementImport(payload);
+  const stageRoute = getStageRoute(currentStageIndex);
+  if (normalized.stageRoute && normalized.stageRoute !== stageRoute) {
+    setMapEditorStatus(`Import stage ${normalized.stageRoute} does not match stage ${stageRoute}`);
+    return;
+  }
+  if (normalized.placements.length === 0) {
+    setMapEditorStatus("Import has no valid placed objects");
+    return;
+  }
+
+  const before = captureMapEditorPlacedState();
+  const result = replaceMapEditorPlacedObjects(normalized.placements, {
+    skipValidation: false,
+    selectLast: true,
+    sync: false,
+    persist: false,
+  });
+  if (result.created.length === 0) {
+    replaceMapEditorPlacedObjects(before, {
+      skipValidation: true,
+      selectLast: true,
+      sync: false,
+      persist: false,
+    });
+    syncMapEditorPanel(true);
+    setMapEditorStatus("Import conflicts with current map");
+    return;
+  }
+  finalizeMapEditorPlacementMutation("imported", before);
+  const skippedSuffix = result.skipped.length + normalized.invalidCount > 0
+    ? `, ${result.skipped.length + normalized.invalidCount} skipped`
+    : "";
+  setMapEditorStatus(`${result.created.length} placed objects imported and saved${skippedSuffix}`);
+}
+
+function getMapEditorSelectedPlacedRecord() {
+  if (mapEditorState.selectedRecord?.isMapEditorPlaced) {
+    return mapEditorState.selectedRecord;
+  }
+  if (!mapEditorState.selectedRecord) {
+    return mapEditorPlacedObjects[mapEditorPlacedObjects.length - 1] || null;
+  }
+  return null;
+}
+
+function duplicateMapEditorPlacedObject() {
+  const source = getMapEditorSelectedPlacedRecord();
+  if (!source) {
+    setMapEditorStatus("Select a placed object to duplicate");
+    return;
+  }
+  const sourcePayload = getMapEditorPlacedRecordPayload(source);
+  const preset = getMapEditorPlacePreset(sourcePayload.presetKey);
+  const xStep = preset.width * sourcePayload.scale + 10;
+  const zStep = preset.depth * sourcePayload.scale + 10;
+  const offsets = [
+    [xStep, 0], [-xStep, 0], [0, zStep], [0, -zStep],
+    [xStep, zStep], [-xStep, zStep], [xStep, -zStep], [-xStep, -zStep],
+  ];
+  const candidate = offsets
+    .map(([x, z]) => ({
+      ...sourcePayload,
+      placementSerial: null,
+      localPosition: {
+        x: sourcePayload.localPosition.x + x,
+        y: sourcePayload.localPosition.y,
+        z: sourcePayload.localPosition.z + z,
+      },
+    }))
+    .find((placement) => validateMapEditorPlacePosition(
+      preset,
+      placement.localPosition,
+      placement.scale,
+    ).valid);
+  if (!candidate) {
+    setMapEditorStatus("No free footprint found for duplicate");
+    return;
+  }
+
+  const before = captureMapEditorPlacedState();
+  const result = createMapEditorPlacedRecord(candidate, { select: true });
+  if (!result.record) {
+    setMapEditorStatus(`Cannot duplicate: ${result.error}`);
+    return;
+  }
+  finalizeMapEditorPlacementMutation("duplicated", before);
+  setMapEditorStatus(`${result.record.label} duplicated and saved`);
+}
+
+function deleteSelectedMapEditorPlacedObject() {
+  const record = getMapEditorSelectedPlacedRecord();
+  if (!record) {
+    setMapEditorStatus("Select a placed object to delete");
+    return;
+  }
+  const before = captureMapEditorPlacedState();
+  const label = record.label;
+  removeMapEditorPlacedRecord(record);
+  finalizeMapEditorPlacementMutation("deleted", before);
+  setMapEditorStatus(`${label} deleted and saved`);
+}
+
+function clearMapEditorPlacedObjects() {
+  if (mapEditorPlacedObjects.length === 0) {
+    setMapEditorStatus("No placed objects to clear");
+    return;
+  }
+  const before = captureMapEditorPlacedState();
+  [...mapEditorPlacedObjects].forEach((record) => removeMapEditorPlacedRecord(record));
+  finalizeMapEditorPlacementMutation("cleared", before);
+  setMapEditorStatus("placed objects cleared and saved");
+}
+
+function undoMapEditorPlacedAction() {
+  const entry = mapEditorPlaceHistory.pop();
+  if (!entry) {
+    setMapEditorStatus("No placement action to undo");
+    return;
+  }
+  replaceMapEditorPlacedObjects(entry.before, {
+    skipValidation: true,
+    selectLast: true,
+    sync: false,
+    persist: true,
+  });
+  mapEditorPlaceRedoHistory.push(entry);
+  syncMapEditorPanel(true);
+  setMapEditorStatus(`${entry.label} undone`);
+}
+
+function redoMapEditorPlacedAction() {
+  const entry = mapEditorPlaceRedoHistory.pop();
+  if (!entry) {
+    setMapEditorStatus("No placement action to redo");
+    return;
+  }
+  replaceMapEditorPlacedObjects(entry.after, {
+    skipValidation: true,
+    selectLast: true,
+    sync: false,
+    persist: true,
+  });
+  mapEditorPlaceHistory.push(entry);
+  syncMapEditorPanel(true);
+  setMapEditorStatus(`${entry.label} redone`);
+}
+
+function renderMapEditorPlacedList() {
+  if (!mapEditorPlacedListEl) return;
+  mapEditorPlacedListEl.replaceChildren();
+  if (mapEditorPlacedObjects.length === 0) {
+    mapEditorPlacedListEl.textContent = "No placed objects";
+    return;
+  }
+  mapEditorPlacedObjects.forEach((record, index) => {
+    const local = getMapEditorCurrentLocalPosition(record);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.mapEditorPlacedId = record.id;
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(mapEditorState.selectedRecord === record));
+    button.textContent = `${index + 1}. ${record.label} | x ${roundMapEditorNumber(local.x)}, z ${roundMapEditorNumber(local.z)}`;
+    mapEditorPlacedListEl.append(button);
+  });
+}
+
+function createMapEditorPlacedExport() {
+  return {
+    experiment: "EXP-123Y",
+    source: "Map Editor Place Workflow",
+    stage: currentStage.label,
+    stageRoute: getStageRoute(currentStageIndex),
+    count: mapEditorPlacedObjects.length,
+    placements: captureMapEditorPlacedState(),
+    objects: mapEditorPlacedObjects.map((record) => createMapEditorSnapshot(record)),
+  };
+}
+
+async function copyMapEditorPlacedObjects() {
+  if (mapEditorPlacedObjects.length === 0) {
+    setMapEditorStatus("No placed objects to copy");
+    return;
+  }
+  const text = JSON.stringify(createMapEditorPlacedExport(), null, 2);
+  if (mapEditorOutputEl) {
+    mapEditorOutputEl.value = text;
+    mapEditorOutputEl.classList.remove("hidden");
+  }
+  const copied = await copyTunerTextToClipboard(text, mapEditorOutputEl);
+  setMapEditorStatus(copied ? "placed object JSON copied" : "placed JSON ready for manual copy");
+}
+
 function cloneMapEditorLocalPosition(value) {
   if (!value) return null;
   const x = Number(value.x);
@@ -18930,6 +19461,13 @@ function formatMapEditorInputNumber(value) {
   return Number(Number(value).toFixed(2)).toString();
 }
 
+function readInputNumber(input, fallback) {
+  const value = input?.value?.trim() ?? "";
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function formatMapEditorDeltaNumber(value) {
   const rounded = roundMapEditorNumber(value);
   return rounded > 0 ? `+${rounded}` : `${rounded}`;
@@ -18938,12 +19476,54 @@ function formatMapEditorDeltaNumber(value) {
 function setMapEditorSelection(record) {
   mapEditorState.selectedRecord = record || null;
   updateMapEditorSelectionHelper();
+  updateMapEditorPlacedFootprintHelper();
   syncMapEditorPanel();
   if (record) {
     setMapEditorStatus(`${record.label} selected`);
   } else {
     setMapEditorStatus("No registered map object selected");
   }
+}
+
+function ensureMapEditorPlacedFootprintHelper() {
+  if (mapEditorState.placedFootprintHelper) return mapEditorState.placedFootprintHelper;
+  const helper = new THREE.Group();
+  const footprint = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 0.14, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd344,
+      transparent: true,
+      opacity: 0.26,
+      depthWrite: false,
+    }),
+  );
+  footprint.position.y = 0.13;
+  helper.add(footprint);
+  helper.name = "MapEditorPlacedFootprint";
+  helper.userData.ignoreMouseObject = true;
+  helper.visible = false;
+  scene.add(helper);
+  mapEditorState.placedFootprintHelper = helper;
+  return helper;
+}
+
+function updateMapEditorPlacedFootprintHelper() {
+  const helper = ensureMapEditorPlacedFootprintHelper();
+  const record = mapEditorState.selectedRecord;
+  const localPosition = getMapEditorCurrentLocalPosition(record);
+  const visible = Boolean(mapEditorState.active && record?.isMapEditorPlaced && localPosition);
+  helper.visible = visible;
+  if (!visible) return helper;
+
+  const preset = getMapEditorPlacePreset(record.placePresetKey);
+  if (helper.userData.presetKey !== record.placePresetKey) {
+    const mesh = helper.children[0];
+    mesh.geometry.dispose();
+    mesh.geometry = new THREE.BoxGeometry(preset.width, 0.14, preset.depth);
+    helper.userData.presetKey = record.placePresetKey;
+  }
+  applyMapEditorPlaceTransform(helper, localPosition, record.placeScale, record.placeRotation);
+  return helper;
 }
 
 function updateMapEditorSelectionHelper() {
@@ -19051,6 +19631,7 @@ function formatMapEditorDetails(record = mapEditorState.selectedRecord) {
     return [
       `Registered objects: ${mapEditorObjects.length}`,
       `Hidden this session: ${mapEditorHiddenObjectIds.size}`,
+      `Placed this session: ${mapEditorPlacedObjects.length}`,
       "Click a highlighted map/building group in the scene.",
       "Left drag: orbit camera",
       "Mouse wheel: zoom",
@@ -19090,6 +19671,13 @@ function setMapEditorMode(mode) {
     return;
   }
   mapEditorState.mode = mode;
+  if (mode === "place") {
+    updateMapEditorPlacementSurface();
+    updateMapEditorPlacePreview(true);
+  } else if (mapEditorState.placePreview) {
+    mapEditorState.placePreview.visible = false;
+    updateMapEditorPlacementSurface();
+  }
   syncMapEditorPanel(true);
   setMapEditorStatus(`${mapEditorModeStatusText[mode]} mode`);
 }
@@ -19150,6 +19738,35 @@ function syncMapEditorEditControls(preserveFocus = false) {
   }
 }
 
+function syncMapEditorPlaceControls(preserveFocus = false) {
+  populateMapEditorPlacePresets();
+  syncMapEditorPlaceInputs(preserveFocus);
+  renderMapEditorPlacedList();
+  const selectedPlacedRecord = getMapEditorSelectedPlacedRecord();
+  if (mapEditorDuplicatePlacedButton) {
+    mapEditorDuplicatePlacedButton.disabled = !selectedPlacedRecord;
+  }
+  if (mapEditorDeleteSelectedPlacedButton) {
+    mapEditorDeleteSelectedPlacedButton.disabled = !selectedPlacedRecord;
+  }
+  if (mapEditorUndoPlacedButton) {
+    mapEditorUndoPlacedButton.disabled = mapEditorPlaceHistory.length === 0;
+  }
+  if (mapEditorRedoPlacedButton) {
+    mapEditorRedoPlacedButton.disabled = mapEditorPlaceRedoHistory.length === 0;
+  }
+  if (mapEditorCopyPlacedButton) {
+    mapEditorCopyPlacedButton.disabled = mapEditorPlacedObjects.length === 0;
+  }
+  if (mapEditorClearPlacedButton) {
+    mapEditorClearPlacedButton.disabled = mapEditorPlacedObjects.length === 0;
+  }
+  updateMapEditorPlacedFootprintHelper();
+  if (mapEditorState.active && mapEditorState.mode === "place") {
+    updateMapEditorPlacePreview(preserveFocus);
+  }
+}
+
 function applyMapEditorLocalPosition(record, nextLocalPosition) {
   if (!record?.originalLocalPosition || !nextLocalPosition) return false;
   const x = Number(nextLocalPosition.x);
@@ -19193,12 +19810,6 @@ function applyMapEditorPositionInputs() {
     return;
   }
 
-  const readInputNumber = (input, fallback) => {
-    const value = input?.value?.trim() ?? "";
-    if (!value) return fallback;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
   const nextLocal = {
     x: readInputNumber(mapEditorEditXInput, currentLocal.x),
     y: readInputNumber(mapEditorEditYInput, currentLocal.y),
@@ -19277,6 +19888,8 @@ function syncMapEditorPanel(preserveProgressFocus = false) {
     mapEditorResetHiddenButton.disabled = mapEditorHiddenObjectIds.size === 0;
   }
   syncMapEditorEditControls(preserveProgressFocus);
+  syncMapEditorPlaceControls(preserveProgressFocus);
+  updateMapEditorPlacementSurface();
 }
 
 function applyMapEditorViewPreset(view) {
@@ -19297,11 +19910,20 @@ function setDebugMapEditorPanelOpen(open) {
 
   if (!nextOpen) {
     setMapEditorOrbitActive(false);
+    if (mapEditorState.placePreview) {
+      mapEditorState.placePreview.visible = false;
+    }
+    if (mapEditorState.placedFootprintHelper) {
+      mapEditorState.placedFootprintHelper.visible = false;
+    }
+    updateMapEditorPlacementSurface();
     updateMapEditorSelectionHelper();
     return;
   }
 
   mapEditorState.focusProgress = getGoalProgressForZ(player.position.z);
+  const restoredPlacedObjects = restoreMapEditorPlacedObjects();
+  snapMapEditorPlaceToFocus();
   player.velocity.set(0, 0, 0);
   keys.clear();
   quickStepQueued = 0;
@@ -19321,8 +19943,11 @@ function setDebugMapEditorPanelOpen(open) {
   setDebugTuningPanelOpen(false);
   setHelpPanelOpen(false);
   updateMapEditorCamera(0);
+  updateMapEditorPlacementSurface();
   syncMapEditorPanel();
-  setMapEditorStatus(`Map editor ready: ${mapEditorObjects.length} registered objects`);
+  setMapEditorStatus(restoredPlacedObjects
+    ? `Map editor ready: ${mapEditorObjects.length} registered objects, ${mapEditorPlacedObjects.length} saved placements restored`
+    : `Map editor ready: ${mapEditorObjects.length} registered objects`);
 }
 
 function isMapEditorPointerEvent(event) {
@@ -19349,7 +19974,14 @@ function handleMapEditorPointerDown(event) {
 }
 
 function handleMapEditorPointerMove(event) {
-  if (!mapEditorPointerState.active || event.pointerId !== mapEditorPointerState.pointerId) return;
+  if (!mapEditorPointerState.active || event.pointerId !== mapEditorPointerState.pointerId) {
+    if (mapEditorState.active && mapEditorState.mode === "place") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      updateMapEditorPlaceFromPointer(event.clientX, event.clientY, true);
+    }
+    return;
+  }
 
   event.preventDefault();
   event.stopImmediatePropagation();
@@ -19386,7 +20018,12 @@ function handleMapEditorPointerEnd(event) {
   }
   setMapEditorOrbitActive(false);
   if (shouldSelect) {
-    selectMapEditorObjectAt(event.clientX, event.clientY);
+    if (mapEditorState.mode === "place") {
+      updateMapEditorPlaceFromPointer(event.clientX, event.clientY, true);
+      commitMapEditorPlacement();
+    } else {
+      selectMapEditorObjectAt(event.clientX, event.clientY);
+    }
   }
 }
 
@@ -19445,6 +20082,10 @@ function handleMapEditorProgressInput() {
   warpToGoalProgress(progress);
   player.velocity.set(0, 0, 0);
   updateMapEditorCamera(0);
+  updateMapEditorPlacementSurface();
+  if (mapEditorState.mode === "place") {
+    updateMapEditorPlacePreview(true);
+  }
   syncMapEditorPanel(true);
 }
 
@@ -19457,7 +20098,7 @@ function handleMapEditorStageChange() {
   nextUrl.searchParams.set("stage", stageRoute);
   nextUrl.searchParams.set("skipIntro", "1");
   nextUrl.searchParams.delete("debugStartZ");
-  nextUrl.searchParams.set("v", "exp123s-gap-background-density");
+  nextUrl.searchParams.set("v", "exp123y-map-editor-place-workflow");
   window.location.href = nextUrl.toString();
 }
 
@@ -19542,6 +20183,10 @@ function updateMapEditorCamera(dt) {
   camera.lookAt(mapEditorCameraTarget);
   camera.fov = THREE.MathUtils.lerp(camera.fov, 48, lerpAmount);
   camera.updateProjectionMatrix();
+  updateMapEditorPlacementSurface();
+  if (mapEditorState.mode === "place") {
+    updateMapEditorPlacePreview(true);
+  }
   updateMapEditorSelectionHelper();
   return true;
 }
@@ -19550,6 +20195,7 @@ function bindDebugMapEditorPanel() {
   debugMapEditorOpenButton?.addEventListener("click", () => setDebugMapEditorPanelOpen(true));
   document.querySelector("[data-close-panel='debug-map-editor']")
     ?.addEventListener("click", () => setDebugMapEditorPanelOpen(false));
+  populateMapEditorPlacePresets();
   mapEditorStageSelect?.addEventListener("change", handleMapEditorStageChange);
   mapEditorProgressInput?.addEventListener("input", handleMapEditorProgressInput);
   mapEditorViewSelect?.addEventListener("change", () => applyMapEditorViewPreset(mapEditorViewSelect.value));
@@ -19563,6 +20209,41 @@ function bindDebugMapEditorPanel() {
     button.addEventListener("click", () => {
       nudgeMapEditorSelection(button.dataset.mapEditorNudgeAxis, Number(button.dataset.mapEditorNudge));
     });
+  });
+  mapEditorPlaceObjectSelect?.addEventListener("change", () => {
+    mapEditorState.placePresetKey = mapEditorPlaceObjectSelect.value;
+    const preset = getMapEditorPlacePreset();
+    const ground = getStageDefinitionGroundSample(0, mapEditorState.placeLocalPosition.z);
+    mapEditorState.placeLocalPosition.y = (ground?.y ?? 0) + (preset.yOffset ?? 0);
+    syncMapEditorPlaceInputs(false);
+    updateMapEditorPlacePreview(false);
+    setMapEditorStatus(`${preset.label} selected for placement`);
+  });
+  [
+    mapEditorPlaceXInput,
+    mapEditorPlaceYInput,
+    mapEditorPlaceZInput,
+    mapEditorPlaceScaleInput,
+    mapEditorPlaceRotationInput,
+  ].forEach((input) => {
+    input?.addEventListener("input", () => updateMapEditorPlaceFromInputs(true));
+    input?.addEventListener("change", () => updateMapEditorPlaceFromInputs(false));
+  });
+  mapEditorPlaceAtFocusButton?.addEventListener("click", snapMapEditorPlaceToFocus);
+  mapEditorPlaceCommitButton?.addEventListener("click", commitMapEditorPlacement);
+  mapEditorDuplicatePlacedButton?.addEventListener("click", duplicateMapEditorPlacedObject);
+  mapEditorDeleteSelectedPlacedButton?.addEventListener("click", deleteSelectedMapEditorPlacedObject);
+  mapEditorUndoPlacedButton?.addEventListener("click", undoMapEditorPlacedAction);
+  mapEditorRedoPlacedButton?.addEventListener("click", redoMapEditorPlacedAction);
+  mapEditorCopyPlacedButton?.addEventListener("click", copyMapEditorPlacedObjects);
+  mapEditorImportPlacedButton?.addEventListener("click", importMapEditorPlacedObjects);
+  mapEditorClearPlacedButton?.addEventListener("click", clearMapEditorPlacedObjects);
+  mapEditorPlacedListEl?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-map-editor-placed-id]");
+    const record = button ? mapEditorObjectById.get(button.dataset.mapEditorPlacedId) : null;
+    if (record?.isMapEditorPlaced) {
+      setMapEditorSelection(record);
+    }
   });
   mapEditorResetPositionButton?.addEventListener("click", resetMapEditorSelectionPosition);
   mapEditorCopyButton?.addEventListener("click", copyMapEditorSelection);
